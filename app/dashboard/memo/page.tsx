@@ -1,12 +1,7 @@
 "use client"
 import { useState } from "react"
 import {
-  BarChart3,
-  Calendar,
   FileText,
-  Home,
-  Settings,
-  TrendingUp,
   Plus,
   Search,
   Tag,
@@ -51,16 +46,8 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  AppSidebar,
 } from "@/components/ui/sidebar"
-
-// Menu items
-const menuItems = [
-  { title: "ダッシュボード", icon: Home, url: "/", isActive: false },
-  { title: "カレンダー", icon: Calendar, url: "/calendar", isActive: false },
-  { title: "メモ", icon: FileText, url: "/memo", isActive: true },
-  { title: "分析", icon: BarChart3, url: "/analysis", isActive: false },
-  { title: "設定", icon: Settings, url: "#", isActive: false },
-]
 
 // Sample memo data
 const sampleMemos = [
@@ -140,38 +127,6 @@ const availableTags = [
   "フィボナッチ",
   "学習",
 ]
-
-function AppSidebar() {
-  return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <TrendingUp className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Trade Tracker</span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>メニュー</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={item.isActive} tooltip={item.title}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
-}
 
 function MemoCard({
   memo,

@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
+import { Calendar, FileText, BarChart3, PanelLeft, Settings, TrendingUp, Home } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
 import { cn } from "@/lib/utils"
@@ -25,6 +25,15 @@ const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
 const SIDEBAR_WIDTH_ICON = "3rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+
+// Menu items
+const menuItems = [
+  { title: "ダッシュボード", icon: Home, url: "/dashboard", isActive: false },
+  { title: "カレンダー", icon: Calendar, url: "/dashboard/calendar", isActive: false },
+  { title: "メモ", icon: FileText, url: "/dashboard/memo", isActive: false },
+  { title: "分析", icon: BarChart3, url: "/dashboard/analysis", isActive: true },
+  { title: "設定", icon: Settings, url: "/dashboard/settings", isActive: false },
+]
 
 type SidebarContext = {
   state: "expanded" | "collapsed"
@@ -735,6 +744,38 @@ const SidebarMenuSubButton = React.forwardRef<
 })
 SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
 
+function AppSidebar() {
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader>
+        <div className="flex items-center gap-2 px-4 py-2">
+          <TrendingUp className="h-6 w-6 text-blue-600" />
+          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Trade Tracker</span>
+        </div>
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>メニュー</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton asChild isActive={item.isActive} tooltip={item.title}>
+                    <a href={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    </Sidebar>
+  )
+}
+
 export {
   Sidebar,
   SidebarContent,
@@ -760,4 +801,5 @@ export {
   SidebarSeparator,
   SidebarTrigger,
   useSidebar,
+  AppSidebar,
 }

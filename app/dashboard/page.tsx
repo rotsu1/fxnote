@@ -1,10 +1,6 @@
 "use client"
 import {
-  BarChart3,
-  Calendar,
   FileText,
-  Home,
-  Settings,
   TrendingUp,
   TrendingDown,
   Plus,
@@ -19,49 +15,12 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  AppSidebar,
 } from "@/components/ui/sidebar"
 
-// Menu items with Japanese labels
-const menuItems = [
-  {
-    title: "ダッシュボード",
-    icon: Home,
-    url: "#",
-    isActive: true,
-  },
-  {
-    title: "カレンダー",
-    icon: Calendar,
-    url: "#",
-  },
-  {
-    title: "メモ",
-    icon: FileText,
-    url: "#",
-  },
-  {
-    title: "分析",
-    icon: BarChart3,
-    url: "#",
-  },
-  {
-    title: "設定",
-    icon: Settings,
-    url: "#",
-  },
-]
 
 // Sample data
 const plSummary = [
@@ -92,37 +51,7 @@ const recentNotes = [
   { date: "2024-01-13", title: "週間振り返り", preview: "今週の取引結果と反省点..." },
 ]
 
-function AppSidebar() {
-  return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <TrendingUp className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Trade Tracker</span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>メニュー</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={item.isActive} tooltip={item.title}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
-}
+
 
 function PLSummaryCards() {
   return (

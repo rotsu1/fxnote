@@ -1,11 +1,7 @@
 "use client"
 import { useState } from "react"
 import {
-  BarChart3,
   Calendar,
-  FileText,
-  Home,
-  Settings,
   TrendingUp,
   TrendingDown,
   Clock,
@@ -20,28 +16,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
+  AppSidebar,
 } from "@/components/ui/sidebar"
-
-// Menu items
-const menuItems = [
-  { title: "ダッシュボード", icon: Home, url: "/", isActive: false },
-  { title: "カレンダー", icon: Calendar, url: "/calendar", isActive: false },
-  { title: "メモ", icon: FileText, url: "#", isActive: false },
-  { title: "分析", icon: BarChart3, url: "/analysis", isActive: true },
-  { title: "設定", icon: Settings, url: "#", isActive: false },
-]
 
 // Sample analytics data
 const keyStats = [
@@ -86,38 +65,6 @@ const marketConditions = [
   { condition: "ボラティリティ高", trades: 67, winRate: 45, avgProfit: 1890, performance: "poor" },
   { condition: "ボラティリティ低", trades: 43, winRate: 69, avgProfit: 3210, performance: "good" },
 ]
-
-function AppSidebar() {
-  return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <TrendingUp className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Trade Tracker</span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>メニュー</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={item.isActive} tooltip={item.title}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
-}
 
 function KeyStatsGrid() {
   return (
