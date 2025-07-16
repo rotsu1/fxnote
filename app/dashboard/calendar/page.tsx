@@ -32,16 +32,7 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
   AppSidebar,
@@ -161,6 +152,18 @@ function MonthlyNavigation({ currentDate, onDateChange }: { currentDate: Date; o
         </Button>
       </div>
       <div className="text-lg font-semibold text-green-600">月間損益: +¥128,750</div>
+      {/* use this later */}
+      {/* <div
+          className={`text-lg font-semibold ${
+            monthlyPL > 0
+              ? "text-green-600"
+              : monthlyPL < 0
+              ? "text-red-600"
+              : "text-gray-500"
+          }`}
+        >
+          月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
+      </div> */}
     </div>
   )
 }
@@ -212,7 +215,7 @@ function CalendarGrid({ currentDate, onDateClick }: { currentDate: Date; onDateC
               className={`min-h-[80px] p-2 border-r border-b cursor-pointer hover:bg-gray-50 transition-colors ${
                 !isCurrentMonth ? "text-gray-400 bg-gray-50" : ""
               } ${colorClass}`}
-              onClick={() => isCurrentMonth && tradeCount > 0 && onDateClick(dateStr)}
+              onClick={() => isCurrentMonth && onDateClick(dateStr)}
             >
               <div className="text-sm font-medium mb-1">{day.getDate()}</div>
               {isCurrentMonth && tradeCount > 0 && (
@@ -316,9 +319,18 @@ function RightSidebar({
             </Button>
           </div>
 
-          <div className={`text-xl font-bold ${dailyPL > 0 ? "text-green-600" : "text-red-600"}`}>
+          <div
+            className={`text-xl font-bold ${
+              dailyPL > 0
+                ? "text-green-600"
+                : dailyPL < 0
+                ? "text-red-600"
+                : "text-gray-500"
+            }`}
+          >
             日次損益: {dailyPL > 0 ? "+" : ""}¥{dailyPL.toLocaleString()}
           </div>
+
 
           <div className="text-sm text-gray-500">{trades.length}件の取引</div>
         </div>
