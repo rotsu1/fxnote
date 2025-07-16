@@ -1,5 +1,10 @@
+"use client";
+
 import Image from "next/image"
 import Link from "next/link"
+
+import { useState } from "react"
+import { Eye, EyeOff } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,6 +12,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 
 export default function Component() {
+  const [showPassword, setShowPassword] = useState(false)
+  const [password, setPassword] = useState("")
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-100 dark:bg-gray-900">
       {/* Left Background Image - visible on large screens and up */}
@@ -50,7 +57,25 @@ export default function Component() {
                   パスワードを忘れた場合
                 </Link>
               </div>
-              <Input id="password" type="password" required />
+              <div className="relative group">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button type="button" className="w-1/2 flex items-center justify-center gap-2" variant="outline">

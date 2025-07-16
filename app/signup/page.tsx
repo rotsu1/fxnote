@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useState } from "react"
+import { Eye, EyeOff } from "lucide-react"
 
 export default function Component() {
   const [firstName, setFirstName] = useState("");
@@ -16,6 +17,8 @@ export default function Component() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
@@ -84,15 +87,48 @@ export default function Component() {
             <div className="grid gap-2">
               <div className="flex items-center">
                 <Label htmlFor="password">パスワード</Label>
-                <Link href="#" className="ml-auto inline-block text-sm underline">
-                  パスワードを忘れた場合
-                </Link>
               </div>
-              <Input id="password" type="password" value={password} onChange={handlePasswordChange} required />
+              <div className="relative group">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={handlePasswordChange}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                  onClick={() => setShowPassword(v => !v)}
+                  aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="confirmPassword">パスワード（確認）</Label>
-              <Input id="confirmPassword" type="password" value={confirmPassword} onChange={handleConfirmPasswordChange} required />
+              <div className="relative group">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={handleConfirmPasswordChange}
+                  required
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                  onClick={() => setShowConfirmPassword(v => !v)}
+                  aria-label={showConfirmPassword ? "パスワードを隠す" : "パスワードを表示"}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
               {passwordError && (
                 <span className="text-sm text-red-600">{passwordError}</span>
               )}
@@ -109,7 +145,7 @@ export default function Component() {
             </div>
           </CardContent>
           <CardFooter className="text-center text-sm">
-            <Link href="/signup" className="underline">
+            <Link href="/login" className="underline">
               サインイン
             </Link>
           </CardFooter>
