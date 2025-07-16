@@ -15,11 +15,11 @@ export default function Component() {
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState("")
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-gray-100 dark:bg-gray-900">
+    <main className="relative flex flex-col min-h-screen items-center justify-center overflow-hidden bg-white dark:bg-gray-900">
       {/* Left Background Image - visible on large screens and up */}
       <div className="absolute left-0 top-0 hidden h-full w-1/2 lg:block">
         <Image
-          src="/placeholder.svg?height=1080&width=960"
+          src="/login-left.webp"
           alt="Abstract background image for the left side of the login page"
           width={960}
           height={1080}
@@ -30,7 +30,7 @@ export default function Component() {
       {/* Right Background Image - visible on large screens and up */}
       <div className="absolute right-0 top-0 hidden h-full w-1/2 lg:block">
         <Image
-          src="/placeholder.svg?height=1080&width=960"
+          src="/login-right.webp"
           alt="Abstract background image for the right side of the login page"
           width={960}
           height={1080}
@@ -39,6 +39,13 @@ export default function Component() {
         />
       </div>
 
+      {/* FXNote Logo and Title - horizontally aligned above the card */}
+      <Link href={"/"}>
+        <div className="relative z-10 flex items-center justify-center w-full mb-2">
+            <Image src="/logo.svg" alt="FXNote Logo" width={40} height={40} />
+            <span className="ml-3 text-4xl font-bold tracking-tight text-gray-900 dark:text-white">FXNote</span>
+        </div>
+      </Link>
       {/* Login Form Container - positioned above background images */}
       <div className="relative z-10 flex w-full items-center justify-center p-4 sm:p-6 md:p-8 lg:p-10">
         <Card className="w-full max-w-md bg-white/90 backdrop-blur-sm shadow-lg dark:bg-gray-800/90">
