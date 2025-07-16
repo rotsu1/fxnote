@@ -1,385 +1,210 @@
-"use client"
-import {
-  BarChart3,
-  Calendar,
-  FileText,
-  Home,
-  Settings,
-  TrendingUp,
-  TrendingDown,
-  Plus,
-  AlertTriangle,
-} from "lucide-react"
-
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Separator } from "@/components/ui/separator"
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
+import { Input } from "@/components/ui/input"
+import { Mountain } from "lucide-react"
+import Image from "next/image"
+import Link from "next/link"
 
-// Menu items with Japanese labels
-const menuItems = [
-  {
-    title: "ダッシュボード",
-    icon: Home,
-    url: "#",
-    isActive: true,
-  },
-  {
-    title: "カレンダー",
-    icon: Calendar,
-    url: "#",
-  },
-  {
-    title: "メモ",
-    icon: FileText,
-    url: "#",
-  },
-  {
-    title: "分析",
-    icon: BarChart3,
-    url: "#",
-  },
-  {
-    title: "設定",
-    icon: Settings,
-    url: "#",
-  },
-]
-
-// Sample data
-const plSummary = [
-  { title: "今日の損益", value: "+¥12,500", trend: "up", color: "text-green-600" },
-  { title: "今週の損益", value: "+¥45,200", trend: "up", color: "text-green-600" },
-  { title: "今月の損益", value: "+¥128,750", trend: "up", color: "text-green-600" },
-  { title: "総損益", value: "+¥892,340", trend: "up", color: "text-green-600" },
-]
-
-const performanceMetrics = [
-  { title: "今月の勝率", value: "68%", description: "32勝 / 47取引" },
-  { title: "平均利益/損失", value: "¥2,740", description: "利益時平均" },
-  { title: "最大連勝・連敗", value: "7勝 / 3敗", description: "現在の記録" },
-  { title: "今月の取引回数", value: "47回", description: "前月比 +12%" },
-]
-
-const recentTrades = [
-  { date: "2024-01-15", pair: "USD/JPY", type: "買い", pnl: "+¥3,200", status: "利確" },
-  { date: "2024-01-15", pair: "EUR/USD", type: "売り", pnl: "-¥1,800", status: "損切" },
-  { date: "2024-01-14", pair: "GBP/JPY", type: "買い", pnl: "+¥5,400", status: "利確" },
-  { date: "2024-01-14", pair: "USD/JPY", type: "売り", pnl: "+¥2,100", status: "利確" },
-  { date: "2024-01-13", pair: "AUD/USD", type: "買い", pnl: "-¥2,900", status: "損切" },
-]
-
-const recentNotes = [
-  { date: "2024-01-15", title: "市場分析：USD/JPY上昇トレンド", preview: "米国経済指標の好調により..." },
-  { date: "2024-01-14", title: "取引戦略の見直し", preview: "リスク管理の改善点について..." },
-  { date: "2024-01-13", title: "週間振り返り", preview: "今週の取引結果と反省点..." },
-]
-
-function AppSidebar() {
+export default function Component() {
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex items-center gap-2 px-4 py-2">
-          <TrendingUp className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Trade Tracker</span>
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>メニュー</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild isActive={item.isActive} tooltip={item.title}>
-                    <a href={item.url}>
-                      <item.icon className="h-4 w-4" />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    </Sidebar>
-  )
-}
-
-function PLSummaryCards() {
-  return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-      {plSummary.map((item, index) => (
-        <Card key={index}>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
-            {item.trend === "up" ? (
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            )}
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${item.color}`}>{item.value}</div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  )
-}
-
-function PerformanceMetrics() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>パフォーマンス指標</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {performanceMetrics.map((metric, index) => (
-            <div key={index} className="space-y-2">
-              <div className="text-sm font-medium text-muted-foreground">{metric.title}</div>
-              <div className="text-2xl font-bold">{metric.value}</div>
-              <div className="text-xs text-muted-foreground">{metric.description}</div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function QuickActions() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>クイックアクション</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button className="flex-1">
-            <Plus className="mr-2 h-4 w-4" />
-            新規取引登録
-          </Button>
-          <Button variant="outline" className="flex-1 bg-transparent">
-            <FileText className="mr-2 h-4 w-4" />
-            新規メモ作成
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function RecentActivity() {
-  return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>最近の取引履歴</CardTitle>
-          <CardDescription>最新5件の取引</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="min-w-[80px]">日付</TableHead>
-                  <TableHead className="min-w-[80px]">通貨ペア</TableHead>
-                  <TableHead className="min-w-[80px]">損益</TableHead>
-                  <TableHead className="min-w-[60px]">状態</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {recentTrades.map((trade, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="text-sm">{trade.date}</TableCell>
-                    <TableCell className="font-medium">{trade.pair}</TableCell>
-                    <TableCell className={trade.pnl.startsWith("+") ? "text-green-600" : "text-red-600"}>
-                      {trade.pnl}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>最近のメモ</CardTitle>
-          <CardDescription>最新3件のメモ</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentNotes.map((note, index) => (
-              <div key={index} className="border-b pb-3 last:border-b-0">
-                <div className="font-medium text-sm">{note.title}</div>
-                <div className="text-xs text-muted-foreground mt-1">{note.date}</div>
-                <div className="text-sm text-muted-foreground mt-1">{note.preview}</div>
+    <div className="flex flex-col min-h-dvh">
+      <header className="px-4 lg:px-6 h-14 flex items-center">
+        <Link href="/" className="flex items-center justify-center">
+          <Mountain className="size-6" />
+          <span className="sr-only">Acme株式会社</span>
+        </Link>
+        <nav className="ml-auto flex gap-4 sm:gap-6">
+          <Link href="#" className="text-sm font-medium hover:underline underline-offset-4">
+            機能
+          </Link>
+          <Link href="#" className="text-sm font-medium hover:underline underline-offset-4">
+            料金
+          </Link>
+          <Link href="#" className="text-sm font-medium hover:underline underline-offset-4">
+            会社概要
+          </Link>
+          <Link href="#" className="text-sm font-medium hover:underline underline-offset-4">
+            お問い合わせ
+          </Link>
+        </nav>
+      </header>
+      <main className="flex-1">
+        <section className="w-full py-6 sm:py-12 md:py-24 lg:py-32 xl:py-48">
+          <div className="container px-4 md:px-6">
+            <div className="grid gap-6 lg:grid-cols-[1fr_400px] lg:gap-12 xl:grid-cols-[1fr_600px]">
+              <Image
+                src="/placeholder.svg?height=550&width=550"
+                width="550"
+                height="550"
+                alt="Hero"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square"
+              />
+              <div className="flex flex-col justify-center space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-3xl font-bold tracking-tighter sm:text-5xl xl:text-6xl/none">
+                    トレード記録を効率化する究極のプラットフォーム
+                  </h1>
+                  <p className="max-w-[600px] text-muted-foreground md:text-xl">
+                    トレードの記録、分析、管理をこれ一つで。あなたのトレードを次のレベルへ引き上げます。
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 min-[400px]:flex-row">
+                  <Link
+                    href="/"
+                    className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    今すぐ始める
+                  </Link>
+                  <Link
+                    href="/"
+                    className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                  >
+                    詳細を見る
+                  </Link>
+                </div>
               </div>
-            ))}
+            </div>
           </div>
-        </CardContent>
-      </Card>
+        </section>
+        <section className="w-full py-12 md:py-24 lg:py-32 bg-muted">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center">
+              <div className="space-y-2">
+                <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">新機能</div>
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">より速い分析。より多くの洞察。</h2>
+                <p className="max-w-[900px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  迅速な進歩のためのプラットフォーム。自動化された記録、組み込みの分析、統合された管理により、インフラ管理ではなく機能の提供に集中できます。
+                </p>
+              </div>
+            </div>
+            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-2 lg:gap-12">
+              <Image
+                src="/placeholder.svg?height=310&width=550"
+                width="550"
+                height="310"
+                alt="Image"
+                className="mx-auto aspect-video overflow-hidden rounded-xl object-cover object-center sm:w-full lg:order-last"
+              />
+              <div className="flex flex-col justify-center space-y-4">
+                <ul className="grid gap-6">
+                  <li>
+                    <div className="grid gap-1">
+                      <h3 className="text-xl font-bold">共同作業</h3>
+                      <p className="text-muted-foreground">
+                        組み込みの共有機能で、トレード仲間との共同作業をスムーズに。
+                      </p>
+                    </div>
+                  </li>
+                  <li>
+                    <div className="grid gap-1">
+                      <h3 className="text-xl font-bold">自動化</h3>
+                      <p className="text-muted-foreground">記録ワークフローを自動化し、時間を節約。</p>
+                    </div>
+                  </li>
+                  <li>
+                    <div className="grid gap-1">
+                      <h3 className="text-xl font-bold">拡張性</h3>
+                      <p className="text-muted-foreground">クラウドにデプロイし、簡単に拡張できます。</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+        <section className="w-full py-12 md:py-24 lg:py-32">
+          <div className="container grid items-center gap-6 px-4 md:px-6 lg:grid-cols-2 lg:gap-10">
+            <div className="space-y-2">
+              <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">
+                最高のトレーダーが愛するワークフローを体験してください。
+              </h2>
+              <p className="max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                自動化された記録と分析により、トレードの改善に集中できます。
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 min-[400px]:flex-row lg:justify-end">
+              <Link
+                href="#"
+                className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+              >
+                お問い合わせ
+              </Link>
+              <Link
+                href="#"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+              >
+                詳細を見る
+              </Link>
+            </div>
+          </div>
+        </section>
+        <section className="w-full py-12 md:py-24 lg:py-32 border-t">
+          <div className="container grid items-center justify-center gap-4 px-4 text-center md:px-6">
+            <div className="space-y-3">
+              <h2 className="text-3xl font-bold tracking-tighter md:text-4xl/tight">
+                最高のトレーダーが愛するワークフローを体験してください。
+              </h2>
+              <p className="mx-auto max-w-[600px] text-muted-foreground md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                自動化された記録と分析により、トレードの改善に集中できます。
+              </p>
+            </div>
+            <div className="mx-auto w-full max-w-sm space-y-2">
+              <form className="flex gap-2">
+                <Input type="email" placeholder="メールアドレスを入力" className="max-w-lg flex-1" />
+                <Button type="submit">登録</Button>
+              </form>
+              <p className="text-xs text-muted-foreground">
+                ローンチ時に通知を受け取るために登録してください。{" "}
+                <Link href="/terms" className="underline underline-offset-2">
+                  利用規約
+                </Link>
+              </p>
+            </div>
+          </div>
+        </section>
+        <section className="w-full py-12 md:py-24 lg:py-32 border-t">
+          <div className="container px-4 md:px-6">
+            <div className="grid gap-10 sm:px-10 md:gap-16 md:grid-cols-2">
+              <div className="space-y-4">
+                <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">パフォーマンス</div>
+                <h2 className="lg:leading-tighter text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl xl:text-[3.4rem] 2xl:text-[3.75rem]">
+                  トレードの成長はエキサイティングであるべきで、恐ろしいものではありません。
+                </h2>
+                <Link
+                  href="#"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  今すぐ始める
+                </Link>
+              </div>
+              <div className="flex flex-col items-start space-y-4">
+                <div className="inline-block rounded-lg bg-muted px-3 py-1 text-sm">セキュリティ</div>
+                <p className="mx-auto max-w-[700px] text-muted-foreground md:text-xl/relaxed">
+                  トレード量に合わせて動的に拡張できるように設計された完全に管理されたインフラストラクチャ、すべての顧客に対してサイトが高速であることを保証するグローバルエッジ、およびアプリのあらゆる側面を監視するためのツール。
+                </p>
+                <Link
+                  href="#"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
+                >
+                  お問い合わせ
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
+        <p className="text-xs text-muted-foreground">
+          &copy; {new Date().getFullYear()} Acme株式会社. 全ての権利を保有します。
+        </p>
+        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
+          <Link href="#" className="text-xs hover:underline underline-offset-4">
+            利用規約
+          </Link>
+          <Link href="#" className="text-xs hover:underline underline-offset-4">
+            プライバシーポリシー
+          </Link>
+        </nav>
+      </footer>
     </div>
-  )
-}
-
-function MiniCalendar() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>ミニカレンダー</CardTitle>
-        <CardDescription>今月の損益カレンダー</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-7 gap-1 text-center text-sm">
-          {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
-            <div key={day} className="p-2 font-medium text-muted-foreground">
-              {day}
-            </div>
-          ))}
-          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-            <div
-              key={day}
-              className={`p-2 rounded cursor-pointer hover:bg-muted transition-colors ${
-                day === 15 ? "bg-green-100 text-green-800" : day === 12 ? "bg-red-100 text-red-800" : ""
-              }`}
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function PLTrendChart() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>損益トレンドチャート</CardTitle>
-        <CardDescription>過去30日間の累積損益</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[200px] flex items-end justify-between gap-1">
-          {Array.from({ length: 30 }, (_, i) => (
-            <div
-              key={i}
-              className="bg-blue-500 rounded-t transition-all hover:bg-blue-600"
-              style={{
-                height: `${Math.random() * 100 + 20}px`,
-                width: "100%",
-              }}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function AlertsNotifications() {
-  return (
-    <div className="space-y-4">
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>注意:</strong> 今日の損失が¥5,000を超えました。リスク管理を確認してください。
-        </AlertDescription>
-      </Alert>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>月間目標の進捗</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>目標: ¥200,000</span>
-              <span>現在: ¥128,750 (64%)</span>
-            </div>
-            <Progress value={64} className="w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
-export default function TradingDashboard() {
-  return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
-          <SidebarTrigger className="-ml-1" />
-          <Separator orientation="vertical" className="mr-2 h-4" />
-          <div className="flex items-center gap-2">
-            <h1 className="text-lg font-semibold">ダッシュボード</h1>
-          </div>
-        </header>
-
-        <main className="flex-1 space-y-6 p-4 md:p-6">
-          {/* P/L Summary Cards */}
-          <section>
-            <h2 className="text-xl font-semibold mb-4">損益サマリーカード</h2>
-            <PLSummaryCards />
-          </section>
-
-          {/* Performance Metrics */}
-          <section>
-            <PerformanceMetrics />
-          </section>
-
-          {/* Quick Actions */}
-          <section>
-            <QuickActions />
-          </section>
-
-          {/* Recent Activity */}
-          <section>
-            <h2 className="text-xl font-semibold mb-4">最近の活動</h2>
-            <RecentActivity />
-          </section>
-
-          {/* Mini Calendar and P/L Trend Chart */}
-          <section className="grid gap-4 lg:grid-cols-2">
-            <MiniCalendar />
-            <PLTrendChart />
-          </section>
-
-          {/* Alerts & Notifications */}
-          <section>
-            <h2 className="text-xl font-semibold mb-4">アラート・通知</h2>
-            <AlertsNotifications />
-          </section>
-        </main>
-      </SidebarInset>
-    </SidebarProvider>
   )
 }
