@@ -125,29 +125,51 @@ const getPLColor = (pnl: number) => {
 
 function MonthlyNavigation({ currentDate, onDateChange }: { currentDate: Date; onDateChange: (date: Date) => void }) {
   const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
+  const currentYear = currentDate.getFullYear()
+  const currentMonth = currentDate.getMonth()
+  const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i) // 10 years before and after
 
-  const goToPreviousMonth = () => {
+  const handleYearChange = (year: number) => {
     const newDate = new Date(currentDate)
-    newDate.setMonth(newDate.getMonth() - 1)
+    newDate.setFullYear(year)
     onDateChange(newDate)
   }
 
-  const goToNextMonth = () => {
+  const handleMonthChange = (month: number) => {
     const newDate = new Date(currentDate)
-    newDate.setMonth(newDate.getMonth() + 1)
+    newDate.setMonth(month)
     onDateChange(newDate)
   }
 
   return (
     <div className="flex items-center justify-between mb-6">
       <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" onClick={goToPreviousMonth}>
+        <Button variant="outline" size="sm" onClick={() => handleMonthChange(currentMonth - 1)}>
           <ChevronLeft className="h-4 w-4" />
         </Button>
-        <h2 className="text-2xl font-bold">
-          {currentDate.getFullYear()}年 {monthNames[currentDate.getMonth()]}
-        </h2>
-        <Button variant="outline" size="sm" onClick={goToNextMonth}>
+        <div className="flex items-center gap-2">
+          <Select value={String(currentYear)} onValueChange={(val) => handleYearChange(Number(val))}>
+            <SelectTrigger className="w-24">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={String(year)}>{year}年</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={String(currentMonth)} onValueChange={(val) => handleMonthChange(Number(val))}>
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {monthNames.map((name, idx) => (
+                <SelectItem key={idx} value={String(idx)}>{name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => handleMonthChange(currentMonth + 1)}>
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
