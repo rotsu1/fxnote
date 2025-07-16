@@ -13,7 +13,7 @@ export default function Component() {
           <span className="sr-only">Acme株式会社</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/login" className="text-sm font-medium hover:underline underline-offset-4">
             ログイン / 新規登録
           </Link>
           <Link href="#" className="text-sm font-medium hover:underline underline-offset-4">
