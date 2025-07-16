@@ -147,7 +147,7 @@ function AppSidebar() {
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2">
           <TrendingUp className="h-6 w-6 text-blue-600" />
-          <span className="font-bold text-lg">Trade Tracker</span>
+          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Trade Tracker</span>
         </div>
       </SidebarHeader>
       <SidebarContent>
