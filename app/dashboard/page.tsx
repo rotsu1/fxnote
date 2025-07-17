@@ -21,7 +21,6 @@ import {
   SidebarTrigger,
   AppSidebar,
 } from "@/components/ui/sidebar"
-import AuthGuard from "@/components/AuthGuard";
 
 
 // Sample data
@@ -57,7 +56,6 @@ const recentNotes = [
 
 function PLSummaryCards() {
   return (
-    <AuthGuard>
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {plSummary.map((item, index) => (
           <Card key={index}>
@@ -75,7 +73,6 @@ function PLSummaryCards() {
           </Card>
         ))}
       </div>
-    </AuthGuard>
   )
 }
 
