@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   ChevronLeft,
   ChevronRight,
@@ -38,76 +38,18 @@ import {
   SidebarTrigger,
   AppSidebar,
 } from "@/components/ui/sidebar"
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 
-// Sample trade data
-const sampleTrades = {
-  "2024-01-15": [
-    {
-      id: 1,
-      pair: "USD/JPY",
-      type: "買い",
-      entry: 148.5,
-      exit: 149.2,
-      pnl: 3200,
-      status: "利確",
-      time: "09:30",
-      tags: ["スキャルピング", "朝"],
-    },
-    {
-      id: 2,
-      pair: "EUR/USD",
-      type: "売り",
-      entry: 1.095,
-      exit: 1.092,
-      pnl: -1800,
-      status: "損切",
-      time: "14:15",
-      tags: ["デイトレード"],
-    },
-  ],
-  "2024-01-14": [
-    {
-      id: 3,
-      pair: "GBP/JPY",
-      type: "買い",
-      entry: 185.2,
-      exit: 186.8,
-      pnl: 5400,
-      status: "利確",
-      time: "11:00",
-      tags: ["スイング"],
-    },
-    {
-      id: 4,
-      pair: "USD/JPY",
-      type: "売り",
-      entry: 148.8,
-      exit: 148.5,
-      pnl: 2100,
-      status: "利確",
-      time: "16:30",
-      tags: ["スキャルピング"],
-    },
-  ],
-  "2024-01-12": [
-    {
-      id: 5,
-      pair: "AUD/USD",
-      type: "買い",
-      entry: 0.675,
-      exit: 0.672,
-      pnl: -2900,
-      status: "損切",
-      time: "13:45",
-      tags: ["デイトレード", "失敗"],
-    },
-  ],
-}
-
-// Calculate daily P/L
-const getDailyPL = (date: string) => {
-  const trades = sampleTrades[date] || []
-  return trades.reduce((sum, trade) => sum + trade.pnl, 0)
+// Helper to group trades by date (entry_time)
+function groupTradesByDate(trades: any[]): Record<string, any[]> {
+  return trades.reduce((acc: Record<string, any[]>, trade: any) => {
+    const date = trade.entry_time?.split("T")[0];
+    if (!date) return acc;
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(trade);
+    return acc;
+  }, {});
 }
 
 // Get color based on P/L
@@ -191,23 +133,29 @@ function MonthlyNavigation({ currentDate, onDateChange }: { currentDate: Date; o
   )
 }
 
-function CalendarGrid({ currentDate, onDateClick }: { currentDate: Date; onDateClick: (date: string) => void }) {
-  const year = currentDate.getFullYear()
-  const month = currentDate.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const lastDay = new Date(year, month + 1, 0)
-  const startDate = new Date(firstDay)
-  startDate.setDate(startDate.getDate() - firstDay.getDay())
+function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate: Date; onDateClick: (date: string) => void; groupedTrades: Record<string, any[]> }) {
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const lastDay = new Date(year, month + 1, 0);
+  const startDate = new Date(firstDay);
+  startDate.setDate(startDate.getDate() - firstDay.getDay());
 
-  const days = []
-  const current = new Date(startDate)
+  const days = [];
+  const current = new Date(startDate);
 
   for (let i = 0; i < 42; i++) {
-    days.push(new Date(current))
-    current.setDate(current.getDate() + 1)
+    days.push(new Date(current));
+    current.setDate(current.getDate() + 1);
   }
 
-  const dayNames = ["日", "月", "火", "水", "木", "金", "土"]
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+
+  // Calculate daily P/L
+  const getDailyPL = (date: string, groupedTrades: Record<string, any[]>): number => {
+    const trades = groupedTrades[date] || [];
+    return trades.reduce((sum: number, trade: any) => sum + (trade.profit_loss || 0), 0);
+  };
 
   return (
     <div className="bg-white rounded-lg border">
@@ -222,22 +170,19 @@ function CalendarGrid({ currentDate, onDateClick }: { currentDate: Date; onDateC
           </div>
         ))}
       </div>
-
       {/* Calendar Days */}
       <div className="grid grid-cols-7">
         {days.map((day, index) => {
-          const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`
-          const isCurrentMonth = day.getMonth() === month
-          const dailyPL = getDailyPL(dateStr)
-          const tradeCount = (sampleTrades[dateStr] || []).length
-          const colorClass = isCurrentMonth && tradeCount > 0 ? getPLColor(dailyPL) : ""
+          const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+          const isCurrentMonth = day.getMonth() === month;
+          const dailyPL = getDailyPL(dateStr, groupedTrades);
+          const tradeCount = (groupedTrades[dateStr] || []).length;
+          const colorClass = isCurrentMonth && tradeCount > 0 ? getPLColor(dailyPL) : "";
 
           return (
             <div
               key={index}
-              className={`min-h-[80px] p-2 border-r border-b cursor-pointer hover:bg-gray-50 transition-colors ${
-                !isCurrentMonth ? "text-gray-400 bg-gray-50" : ""
-              } ${colorClass}`}
+              className={`min-h-[80px] p-2 border-r border-b cursor-pointer hover:bg-gray-50 transition-colors ${!isCurrentMonth ? "text-gray-400 bg-gray-50" : ""} ${colorClass}`}
               onClick={() => isCurrentMonth && onDateClick(dateStr)}
             >
               <div className="text-sm font-medium mb-1">{day.getDate()}</div>
@@ -250,11 +195,11 @@ function CalendarGrid({ currentDate, onDateClick }: { currentDate: Date; onDateC
                 </div>
               )}
             </div>
-          )
+          );
         })}
       </div>
     </div>
-  )
+  );
 }
 
 function TradeCard({
@@ -325,7 +270,7 @@ function RightSidebar({
 }) {
   if (!isOpen) return null
 
-  const dailyPL = trades.reduce((sum, trade) => sum + trade.pnl, 0)
+  const dailyPL = trades.reduce((sum, trade) => sum + (trade.profit_loss || 0), 0)
 
   return (
     <>
@@ -626,46 +571,71 @@ function DisplaySettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
 }
 
 export default function CalendarPage() {
-  const [currentDate, setCurrentDate] = useState(new Date(2024, 0, 1)) // January 2024
-  const [selectedDate, setSelectedDate] = useState<string>("")
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState(false)
-  const [editingTrade, setEditingTrade] = useState<any>(null)
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false)
-  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState(false)
-  const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState(false)
-  const [deleteTradeId, setDeleteTradeId] = useState<number | null>(null)
+  const user = useAuth();
+  const [currentDate, setCurrentDate] = useState<Date>(new Date(2024, 0, 1));
+  const [selectedDate, setSelectedDate] = useState<string>("");
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
+  const [editingTrade, setEditingTrade] = useState<any>(null);
+  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState<boolean>(false);
+  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState<boolean>(false);
+  const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState<boolean>(false);
+  const [deleteTradeId, setDeleteTradeId] = useState<number | null>(null);
+  const [trades, setTrades] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    supabase
+      .from("trades")
+      .select("*")
+      .eq("user_id", user.id)
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setTrades([]);
+        } else {
+          setTrades(data || []);
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  const groupedTrades = groupTradesByDate(trades);
 
   const handleDateClick = (date: string) => {
-    setSelectedDate(date)
-    setIsRightSidebarOpen(true)
-  }
+    setSelectedDate(date);
+    setIsRightSidebarOpen(true);
+  };
 
   const handleEditTrade = (trade: any) => {
-    setEditingTrade(trade)
-    setIsTradeDialogOpen(true)
-  }
+    setEditingTrade(trade);
+    setIsTradeDialogOpen(true);
+  };
 
   const handleAddTrade = () => {
-    setEditingTrade(null)
-    setIsTradeDialogOpen(true)
-  }
+    setEditingTrade(null);
+    setIsTradeDialogOpen(true);
+  };
 
   const handleSaveTrade = (trade: any) => {
     // Save trade logic here
-    setIsTradeDialogOpen(false)
-    setEditingTrade(null)
-  }
+    setIsTradeDialogOpen(false);
+    setEditingTrade(null);
+  };
 
   const handleDeleteTrade = (id: number) => {
-    setDeleteTradeId(id)
-  }
+    setDeleteTradeId(id);
+  };
 
   const confirmDelete = () => {
     // Delete trade logic here
-    setDeleteTradeId(null)
-  }
+    setDeleteTradeId(null);
+  };
 
-  const selectedTrades = sampleTrades[selectedDate] || []
+  const selectedTrades = groupedTrades[selectedDate] || [];
 
   return (
     <SidebarProvider>
@@ -678,12 +648,18 @@ export default function CalendarPage() {
             <h1 className="text-lg font-semibold">カレンダー</h1>
           </div>
         </header>
-
         <main className="flex-1 p-4 md:p-6">
-          <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} />
-          <CalendarGrid currentDate={currentDate} onDateClick={handleDateClick} />
+          {loading ? (
+            <div className="text-center py-10">読み込み中...</div>
+          ) : error ? (
+            <div className="text-center text-red-600 py-10">{error}</div>
+          ) : (
+            <>
+              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} />
+              <CalendarGrid currentDate={currentDate} onDateClick={handleDateClick} groupedTrades={groupedTrades} />
+            </>
+          )}
         </main>
-
         <RightSidebar
           isOpen={isRightSidebarOpen}
           onClose={() => setIsRightSidebarOpen(false)}
@@ -695,18 +671,14 @@ export default function CalendarPage() {
           onImportCSV={() => setIsCSVDialogOpen(true)}
           onDisplaySettings={() => setIsDisplaySettingsOpen(true)}
         />
-
         <TradeEditDialog
           trade={editingTrade}
           isOpen={isTradeDialogOpen}
           onClose={() => setIsTradeDialogOpen(false)}
           onSave={handleSaveTrade}
         />
-
         <CSVImportDialog isOpen={isCSVDialogOpen} onClose={() => setIsCSVDialogOpen(false)} />
-
         <DisplaySettingsDialog isOpen={isDisplaySettingsOpen} onClose={() => setIsDisplaySettingsOpen(false)} />
-
         <AlertDialog open={deleteTradeId !== null} onOpenChange={() => setDeleteTradeId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
@@ -723,5 +695,5 @@ export default function CalendarPage() {
         </AlertDialog>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
