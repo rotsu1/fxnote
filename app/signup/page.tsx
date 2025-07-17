@@ -111,81 +111,81 @@ export default function Component() {
             <CardTitle className="text-3xl font-bold">新規登録</CardTitle>
           </CardHeader>
           <form onSubmit={handleSignUp}>
-          <CardContent className="grid gap-4">
-            <div className="flex gap-2">
-              <div className="flex-1 grid gap-2">
-                <Label htmlFor="firstName">名</Label>
-                <Input id="firstName" type="text" placeholder="名" value={firstName} onChange={e => setFirstName(e.target.value)} required />
+            <CardContent className="grid gap-4">
+              <div className="flex gap-2">
+                <div className="flex-1 grid gap-2">
+                  <Label htmlFor="firstName">名</Label>
+                  <Input id="firstName" type="text" placeholder="名" value={firstName} onChange={e => setFirstName(e.target.value)} required />
+                </div>
+                <div className="flex-1 grid gap-2">
+                  <Label htmlFor="lastName">姓</Label>
+                  <Input id="lastName" type="text" placeholder="姓" value={lastName} onChange={e => setLastName(e.target.value)} required />
+                </div>
               </div>
-              <div className="flex-1 grid gap-2">
-                <Label htmlFor="lastName">姓</Label>
-                <Input id="lastName" type="text" placeholder="姓" value={lastName} onChange={e => setLastName(e.target.value)} required />
+              <div className="grid gap-2">
+                <Label htmlFor="email">メールアドレス</Label>
+                <Input id="email" type="email" placeholder="m@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="email">メールアドレス</Label>
-              <Input id="email" type="email" placeholder="m@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
-            </div>
-            <div className="grid gap-2">
-              <div className="flex items-center">
-                <Label htmlFor="password">パスワード</Label>
+              <div className="grid gap-2">
+                <div className="flex items-center">
+                  <Label htmlFor="password">パスワード</Label>
+                </div>
+                <div className="relative group">
+                  <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={handlePasswordChange}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                    onClick={() => setShowPassword(v => !v)}
+                    aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
+                  >
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
               </div>
-              <div className="relative group">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={handlePasswordChange}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
-                  onClick={() => setShowPassword(v => !v)}
-                  aria-label={showPassword ? "パスワードを隠す" : "パスワードを表示"}
-                >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+              <div className="grid gap-2">
+                <Label htmlFor="confirmPassword">パスワード（確認）</Label>
+                <div className="relative group">
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={handleConfirmPasswordChange}
+                    required
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                    onClick={() => setShowConfirmPassword(v => !v)}
+                    aria-label={showConfirmPassword ? "パスワードを隠す" : "パスワードを表示"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {passwordError && (
+                  <span className="text-sm text-red-600">{passwordError}</span>
+                )}
               </div>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="confirmPassword">パスワード（確認）</Label>
-              <div className="relative group">
-                <Input
-                  id="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
-                  value={confirmPassword}
-                  onChange={handleConfirmPasswordChange}
-                  required
-                  className="pr-10"
-                />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
-                  onClick={() => setShowConfirmPassword(v => !v)}
-                  aria-label={showConfirmPassword ? "パスワードを隠す" : "パスワードを表示"}
-                >
-                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                </button>
+              <div className="flex gap-2">
+                <Button type="button" className="w-1/2 flex items-center justify-center gap-2" variant="outline">
+                  {/* Google Icon (optional) */}
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5" fill="none"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.97 32.833 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.045 0 19.824-8.955 19.824-20 0-1.341-.138-2.651-.213-3.917z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.084 19.002 13 24 13c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4c-7.732 0-14.41 4.41-17.694 10.691z"/><path fill="#FBBC05" d="M24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C34.418 32.833 29.418 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/></g></svg>
+                  Googleでサインイン
+                </Button>
+                <Button type="submit" className="w-1/2">
+                  Login
+                </Button>
               </div>
-              {passwordError && (
-                <span className="text-sm text-red-600">{passwordError}</span>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <Button type="button" className="w-1/2 flex items-center justify-center gap-2" variant="outline">
-                {/* Google Icon (optional) */}
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5" fill="none"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.97 32.833 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.045 0 19.824-8.955 19.824-20 0-1.341-.138-2.651-.213-3.917z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.084 19.002 13 24 13c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4c-7.732 0-14.41 4.41-17.694 10.691z"/><path fill="#FBBC05" d="M24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C34.418 32.833 29.418 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/></g></svg>
-                Googleでサインイン
-              </Button>
-              <Button type="submit" className="w-1/2">
-                Login
-              </Button>
-            </div>
-          </CardContent>
+            </CardContent>
           </form>
           <CardFooter className="text-center text-sm">
             <Link href="/login" className="underline">
