@@ -1,5 +1,6 @@
 "use client"
-import { useState } from "react"
+
+import { useState, useEffect } from "react"
 import {
   FileText,
   Plus,
@@ -34,78 +35,15 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
   SidebarInset,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
   SidebarProvider,
   SidebarTrigger,
   AppSidebar,
 } from "@/components/ui/sidebar"
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 
-// Sample memo data
-const sampleMemos = [
-  {
-    id: 1,
-    title: "USD/JPY 上昇トレンド分析",
-    content:
-      "今日のUSD/JPYは強い上昇トレンドを見せている。米国の経済指標が好調で、FRBの利上げ期待が高まっている。148.50レベルでのサポートが確認され、次のターゲットは150.00となりそう。リスク管理を徹底し、利確ポイントを明確にしておく必要がある。",
-    date: "2024-01-15",
-    tags: ["USD/JPY", "トレンド分析", "市場観察"],
-    type: "market-analysis",
-  },
-  {
-    id: 2,
-    title: "今日の取引振り返り",
-    content:
-      "今日は3回の取引を実行。EUR/USDで損切りになったが、GBP/JPYとUSD/JPYで利確できた。損切りの判断が早すぎた可能性があり、もう少し様子を見るべきだった。次回は15分足でのサポート・レジスタンスをより慎重に確認する。",
-    date: "2024-01-15",
-    tags: ["取引日記", "振り返り", "EUR/USD", "GBP/JPY"],
-    type: "trade-journal",
-  },
-  {
-    id: 3,
-    title: "週間市場展望",
-    content:
-      "来週は重要な経済指標が多数発表される。特に米国のCPI、雇用統計に注目。日銀の政策決定会合も控えており、円相場への影響が予想される。ボラティリティが高くなる可能性があるため、ポジションサイズを調整する必要がある。",
-    date: "2024-01-14",
-    tags: ["週間展望", "経済指標", "リスク管理"],
-    type: "market-outlook",
-  },
-  {
-    id: 4,
-    title: "新戦略のバックテスト結果",
-    content:
-      "移動平均線クロス戦略のバックテストを実施。過去6ヶ月のデータで勝率65%、プロフィットファクター1.8という結果。特に東京時間での成績が良好。実際の取引で試してみる価値がありそう。",
-    date: "2024-01-13",
-    tags: ["戦略", "バックテスト", "移動平均線"],
-    type: "strategy",
-  },
-  {
-    id: 5,
-    title: "心理的な課題と対策",
-    content:
-      "最近、連敗後に大きなポジションを取ってしまう傾向がある。感情的な取引を避けるため、取引前にチェックリストを確認し、冷静な判断を心がける。また、1日の最大損失額を事前に決めておく。",
-    date: "2024-01-12",
-    tags: ["心理", "リスク管理", "取引ルール"],
-    type: "psychology",
-  },
-  {
-    id: 6,
-    title: "テクニカル分析の学習メモ",
-    content:
-      "フィボナッチリトレースメントの使い方を復習。特に61.8%レベルでの反発を狙った取引が有効。過去のチャートを見返すと、このレベルでの反発率が高いことを確認。今後の取引で積極的に活用していく。",
-    date: "2024-01-11",
-    tags: ["テクニカル分析", "フィボナッチ", "学習"],
-    type: "learning",
-  },
-]
+// Remove sampleMemos
 
 const availableTags = [
   "USD/JPY",
@@ -441,84 +379,151 @@ function ExportDialog({
 }
 
 export default function MemoPage() {
-  const [memos, setMemos] = useState(sampleMemos)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const [selectedMemos, setSelectedMemos] = useState<number[]>([])
-  const [columns, setColumns] = useState(3)
-  const [editingMemo, setEditingMemo] = useState<any>(null)
-  const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false)
-  const [isLayoutSettingsOpen, setIsLayoutSettingsOpen] = useState(false)
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false)
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+  const user = useAuth();
+  const [memos, setMemos] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [selectedMemos, setSelectedMemos] = useState<number[]>([]);
+  const [columns, setColumns] = useState(3);
+  const [editingMemo, setEditingMemo] = useState<any>(null);
+  const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false);
+  const [isLayoutSettingsOpen, setIsLayoutSettingsOpen] = useState(false);
+  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    supabase
+      .from("memos")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setMemos([]);
+        } else {
+          setMemos(data || []);
+        }
+        setLoading(false);
+      });
+  }, [user]);
 
   // Filter memos based on search and tags
   const filteredMemos = memos.filter((memo) => {
     const matchesSearch =
       memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      memo.content.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => memo.tags.includes(tag))
-    return matchesSearch && matchesTags
-  })
+      memo.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => memo.tags.includes(tag));
+    return matchesSearch && matchesTags;
+  });
 
   const handleEditMemo = (memo: any) => {
-    setEditingMemo(memo)
-    setIsMemoDialogOpen(true)
-  }
+    setEditingMemo(memo);
+    setIsMemoDialogOpen(true);
+  };
 
   const handleAddMemo = () => {
-    setEditingMemo(null)
-    setIsMemoDialogOpen(true)
-  }
+    setEditingMemo(null);
+    setIsMemoDialogOpen(true);
+  };
 
-  const handleSaveMemo = (memoData: any) => {
-    if (editingMemo) {
-      // Update existing memo
-      setMemos(
-        memos.map((m) => (m.id === editingMemo.id ? { ...memoData, id: editingMemo.id, date: editingMemo.date } : m)),
-      )
-    } else {
-      // Add new memo
-      const newMemo = {
-        ...memoData,
-        id: Math.max(...memos.map((m) => m.id)) + 1,
-        date: new Date().toISOString().split("T")[0],
+  const handleSaveMemo = async (memoData: any) => {
+    if (!user) return;
+    
+    try {
+      if (editingMemo) {
+        // Update existing memo
+        const { error } = await supabase
+          .from("memos")
+          .update({
+            title: memoData.title,
+            content: memoData.content,
+            tags: memoData.tags,
+            type: memoData.type,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingMemo.id)
+          .eq("user_id", user.id);
+        
+        if (error) throw error;
+        
+        setMemos(memos.map((m) => (m.id === editingMemo.id ? { ...m, ...memoData } : m)));
+      } else {
+        // Add new memo
+        const { data, error } = await supabase
+          .from("memos")
+          .insert([{
+            user_id: user.id,
+            title: memoData.title,
+            content: memoData.content,
+            tags: memoData.tags,
+            type: memoData.type,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }])
+          .select();
+        
+        if (error) throw error;
+        
+        if (data && data[0]) {
+          setMemos([data[0], ...memos]);
+        }
       }
-      setMemos([newMemo, ...memos])
+      setIsMemoDialogOpen(false);
+      setEditingMemo(null);
+    } catch (error: any) {
+      console.error("Error saving memo:", error);
+      setError(error.message);
     }
-    setIsMemoDialogOpen(false)
-    setEditingMemo(null)
-  }
+  };
 
   const handleDeleteMemo = (id: number) => {
-    setDeleteConfirmId(id)
-  }
+    setDeleteConfirmId(id);
+  };
 
-  const confirmDelete = () => {
-    if (deleteConfirmId) {
-      setMemos(memos.filter((m) => m.id !== deleteConfirmId))
-      setDeleteConfirmId(null)
+  const confirmDelete = async () => {
+    if (!deleteConfirmId || !user) return;
+    
+    try {
+      const { error } = await supabase
+        .from("memos")
+        .delete()
+        .eq("id", deleteConfirmId)
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      
+      setMemos(memos.filter((m) => m.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    } catch (error: any) {
+      console.error("Error deleting memo:", error);
+      setError(error.message);
     }
-  }
+  };
 
   const toggleTagFilter = (tag: string) => {
-    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
-  }
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  };
 
   const getGridColumns = () => {
     switch (columns) {
       case 1:
-        return "grid-cols-1"
+        return "grid-cols-1";
       case 2:
-        return "grid-cols-1 md:grid-cols-2"
+        return "grid-cols-1 md:grid-cols-2";
       case 3:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
       case 4:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
       default:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"
+        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
     }
-  }
+  };
 
   return (
     <SidebarProvider>
@@ -533,77 +538,85 @@ export default function MemoPage() {
         </header>
 
         <main className="flex-1 p-4 md:p-6">
-          {/* Search and Filter Bar */}
-          <div className="mb-6 space-y-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-                <Input
-                  placeholder="メモを検索..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={handleAddMemo}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  新規メモ
-                </Button>
-                <Button variant="outline" onClick={() => setIsLayoutSettingsOpen(true)}>
-                  <Grid3X3 className="mr-2 h-4 w-4" />
-                  設定
-                </Button>
-                <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
-                  <Download className="mr-2 h-4 w-4" />
-                  エクスポート
-                </Button>
-              </div>
-            </div>
+          {loading ? (
+            <div className="text-center py-10">読み込み中...</div>
+          ) : error ? (
+            <div className="text-center text-red-600 py-10">{error}</div>
+          ) : (
+            <>
+              {/* Search and Filter Bar */}
+              <div className="mb-6 space-y-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1 relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+                    <Input
+                      placeholder="メモを検索..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={handleAddMemo}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      新規メモ
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsLayoutSettingsOpen(true)}>
+                      <Grid3X3 className="mr-2 h-4 w-4" />
+                      設定
+                    </Button>
+                    <Button variant="outline" onClick={() => setIsExportDialogOpen(true)}>
+                      <Download className="mr-2 h-4 w-4" />
+                      エクスポート
+                    </Button>
+                  </div>
+                </div>
 
-            {/* Tag Filter */}
-            <div>
-              <div className="text-sm font-medium mb-2">タグでフィルター:</div>
-              <div className="flex flex-wrap gap-1">
-                {availableTags.map((tag, index) => (
-                  <Badge
-                    key={index}
-                    variant={selectedTags.includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleTagFilter(tag)}
-                  >
-                    {tag}
-                  </Badge>
+                {/* Tag Filter */}
+                <div>
+                  <div className="text-sm font-medium mb-2">タグでフィルター:</div>
+                  <div className="flex flex-wrap gap-1">
+                    {availableTags.map((tag, index) => (
+                      <Badge
+                        key={index}
+                        variant={selectedTags.includes(tag) ? "default" : "outline"}
+                        className="cursor-pointer"
+                        onClick={() => toggleTagFilter(tag)}
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                    {selectedTags.length > 0 && (
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedTags([])} className="h-6 px-2 text-xs">
+                        クリア
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Results Info */}
+              <div className="mb-4 text-sm text-muted-foreground">{filteredMemos.length}件のメモが見つかりました</div>
+
+              {/* Memo Grid */}
+              <div className={`grid gap-4 ${getGridColumns()}`}>
+                {filteredMemos.map((memo) => (
+                  <MemoCard key={memo.id} memo={memo} onEdit={handleEditMemo} onDelete={handleDeleteMemo} />
                 ))}
-                {selectedTags.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedTags([])} className="h-6 px-2 text-xs">
-                    クリア
-                  </Button>
-                )}
               </div>
-            </div>
-          </div>
 
-          {/* Results Info */}
-          <div className="mb-4 text-sm text-muted-foreground">{filteredMemos.length}件のメモが見つかりました</div>
-
-          {/* Memo Grid */}
-          <div className={`grid gap-4 ${getGridColumns()}`}>
-            {filteredMemos.map((memo) => (
-              <MemoCard key={memo.id} memo={memo} onEdit={handleEditMemo} onDelete={handleDeleteMemo} />
-            ))}
-          </div>
-
-          {filteredMemos.length === 0 && (
-            <div className="text-center py-12">
-              <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-medium mb-2">メモが見つかりません</h3>
-              <p className="text-muted-foreground mb-4">検索条件を変更するか、新しいメモを作成してください。</p>
-              <Button onClick={handleAddMemo}>
-                <Plus className="mr-2 h-4 w-4" />
-                新規メモを作成
-              </Button>
-            </div>
+              {filteredMemos.length === 0 && (
+                <div className="text-center py-12">
+                  <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium mb-2">メモが見つかりません</h3>
+                  <p className="text-muted-foreground mb-4">検索条件を変更するか、新しいメモを作成してください。</p>
+                  <Button onClick={handleAddMemo}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    新規メモを作成
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </main>
 
@@ -644,5 +657,5 @@ export default function MemoPage() {
         </AlertDialog>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }

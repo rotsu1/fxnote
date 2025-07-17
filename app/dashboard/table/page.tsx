@@ -56,8 +56,6 @@ interface Trade {
   pips: number
   profit: number
   emotion: string
-  strategy: string
-  marketCondition: string
   holdingTime: string
   notes?: string
   tags: string[]
@@ -75,8 +73,6 @@ const initialTrades: Trade[] = [
     pips: 70,
     profit: 3200,
     emotion: "興奮",
-    strategy: "ブレイクアウト",
-    marketCondition: "トレンド",
     holdingTime: "1h 15m",
     notes: "米国経済指標の好調により上昇。利確ポイントで決済。",
     tags: ["スキャルピング", "朝"],
@@ -92,8 +88,6 @@ const initialTrades: Trade[] = [
     pips: 30,
     profit: -1800,
     emotion: "焦り",
-    strategy: "レンジブレイク",
-    marketCondition: "レンジ",
     holdingTime: "0h 45m",
     notes: "サポートラインを割ったが、すぐに反発。損切りが遅れた。",
     tags: ["デイトレード"],
@@ -109,8 +103,6 @@ const initialTrades: Trade[] = [
     pips: 160,
     profit: 5400,
     emotion: "冷静",
-    strategy: "押し目買い",
-    marketCondition: "トレンド",
     holdingTime: "2h 30m",
     notes: "日足のトレンドに沿ってエントリー。順調に伸びた。",
     tags: ["スイング"],
@@ -126,8 +118,6 @@ const initialTrades: Trade[] = [
     pips: 30,
     profit: 2100,
     emotion: "満足",
-    strategy: "逆張り",
-    marketCondition: "レンジ",
     holdingTime: "0h 20m",
     notes: "短期的な反発を狙った。素早い利確。",
     tags: ["スキャルピング"],
@@ -143,8 +133,6 @@ const initialTrades: Trade[] = [
     pips: 30,
     profit: -2900,
     emotion: "後悔",
-    strategy: "サポート反発",
-    marketCondition: "レンジ",
     holdingTime: "1h 00m",
     notes: "サポートラインが機能せず、損切り。分析不足。",
     tags: ["デイトレード", "失敗"],
@@ -186,7 +174,6 @@ const strategies = [
   "トレンドフォロー",
   "カウンタートレード",
 ]
-const marketConditions = ["トレンド", "レンジ", "高ボラティリティ", "低ボラティリティ"]
 
 // Column definitions for settings and table rendering
 const allColumns = [
@@ -206,22 +193,6 @@ const allColumns = [
   { id: "pips", label: "pips", type: "number", defaultVisible: true, minWidth: "min-w-[70px]" },
   { id: "profit", label: "損益 (¥)", type: "number", defaultVisible: true, minWidth: "min-w-[90px]" },
   { id: "emotion", label: "感情", type: "select", options: emotions, defaultVisible: true, minWidth: "min-w-[90px]" },
-  {
-    id: "strategy",
-    label: "戦略",
-    type: "select",
-    options: strategies,
-    defaultVisible: true,
-    minWidth: "min-w-[120px]",
-  },
-  {
-    id: "marketCondition",
-    label: "市場状況",
-    type: "select",
-    options: marketConditions,
-    defaultVisible: true,
-    minWidth: "min-w-[120px]",
-  },
   { id: "holdingTime", label: "保有時間", type: "text", defaultVisible: true, minWidth: "min-w-[100px]" },
   { id: "notes", label: "メモ", type: "textarea", defaultVisible: false, minWidth: "min-w-[200px]" },
   { id: "tags", label: "タグ", type: "tags", defaultVisible: false, minWidth: "min-w-[150px]" },
@@ -251,8 +222,6 @@ function TradeEditDialog({
       pips: undefined,
       profit: undefined,
       emotion: "",
-      strategy: "",
-      marketCondition: "",
       holdingTime: "",
       notes: "",
       tags: [],
@@ -271,8 +240,6 @@ function TradeEditDialog({
         pips: undefined,
         profit: undefined,
         emotion: "",
-        strategy: "",
-        marketCondition: "",
         holdingTime: "",
         notes: "",
         tags: [],
@@ -424,41 +391,6 @@ function TradeEditDialog({
                 {emotions.map((e) => (
                   <SelectItem key={e} value={e}>
                     {e}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="strategy">戦略</Label>
-            <Select value={formData.strategy} onValueChange={(value) => setFormData({ ...formData, strategy: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {strategies.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="marketCondition">市場状況</Label>
-            <Select
-              value={formData.marketCondition}
-              onValueChange={(value) => setFormData({ ...formData, marketCondition: value })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {marketConditions.map((mc) => (
-                  <SelectItem key={mc} value={mc}>
-                    {mc}
                   </SelectItem>
                 ))}
               </SelectContent>
