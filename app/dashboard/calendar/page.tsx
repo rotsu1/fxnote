@@ -207,14 +207,16 @@ function TradeCard({
   onEdit,
   onDelete,
 }: { trade: any; onEdit: (trade: any) => void; onDelete: (id: number) => void }) {
+  // Ensure pnl is a number
+  const pnl = typeof trade.pnl === "number" ? trade.pnl : (typeof trade.profit_loss === "number" ? trade.profit_loss : 0);
   return (
     <Card className="mb-3">
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
             <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
-            <span className="font-medium">{trade.pair}</span>
-            <span className="text-sm text-gray-500">{trade.time}</span>
+            <span className="font-medium">{trade.pair || trade.currency_pair}</span>
+            <span className="text-sm text-gray-500">{trade.time || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.exit_time?.split("T")[1]?.slice(0,5)}</span>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => onEdit(trade)}>
@@ -227,16 +229,16 @@ function TradeCard({
         </div>
 
         <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-          <div>エントリー: {trade.entry}</div>
-          <div>エグジット: {trade.exit}</div>
+          <div>エントリー: {trade.entry || trade.entry_price}</div>
+          <div>エグジット: {trade.exit || trade.exit_price}</div>
         </div>
 
-        <div className={`text-lg font-bold mb-2 ${trade.pnl > 0 ? "text-green-600" : "text-red-600"}`}>
-          {trade.pnl > 0 ? "+" : ""}¥{trade.pnl.toLocaleString()}
+        <div className={`text-lg font-bold mb-2 ${pnl > 0 ? "text-green-600" : "text-red-600"}`}>
+          {pnl > 0 ? "+" : ""}¥{Number(pnl).toLocaleString()}
         </div>
 
         <div className="flex flex-wrap gap-1">
-          {trade.tags.map((tag: string, index: number) => (
+          {(trade.tags || (trade.trade_memo ? [trade.trade_memo] : [])).map((tag: string, index: number) => (
             <Badge key={index} variant="outline" className="text-xs">
               {tag}
             </Badge>
@@ -244,7 +246,7 @@ function TradeCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function RightSidebar({
