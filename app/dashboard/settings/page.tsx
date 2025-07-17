@@ -46,6 +46,10 @@ import {
   AppSidebar,
 } from "@/components/ui/sidebar"
 
+import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/hooks/use-toast";
+import { useRouter } from "next/navigation";
+
 // Sample user data
 const initialUserData = {
   email: "trader@example.com",
@@ -532,6 +536,19 @@ function AuthenticationManagement() {
 }
 
 export default function SettingsPage() {
+  const { toast } = useToast();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({ title: "ログアウト失敗", description: error.message });
+    } else {
+      toast({ title: "ログアウトしました" });
+      router.push("/login");
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -551,8 +568,13 @@ export default function SettingsPage() {
             <ProfileSettings />
             <AuthenticationManagement />
           </div>
+          <div className="max-w-2xl mx-auto pt-8">
+            <Button onClick={handleLogout} className="w-full" variant="destructive">
+              ログアウト
+            </Button>
+          </div>
         </main>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
