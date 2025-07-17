@@ -1,26 +1,34 @@
-// components/AuthGuard.tsx
 "use client";
 
+import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/useAuth"; // update path as needed
-import { useEffect } from "react";
+import { ReactNode, useEffect, useState } from "react";
 
-type Props = {
-  children: React.ReactNode;
-};
-
-export default function AuthGuard({ children }: Props) {
+export default function AuthGuard({ children }: { children: ReactNode }) {
   const user = useAuth();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (user === null) {
-      router.replace("/login"); // redirect to login if not authenticated
+    // Once we know user is null or defined, loading is done
+    if (user !== undefined) {
+      setIsLoading(false);
+      if (user === null) {
+        router.push("/login");
+      }
     }
   }, [user, router]);
 
-  // Avoid flicker: render nothing until auth is confirmed
-  if (user === null) return null;
+  if (isLoading) {
+    // Show loading indicator or blank while checking auth
+    return <div>Loading...</div>;
+  }
 
-  return <>{children}</>;
+  // If user is logged in, render children
+  if (user) {
+    return <>{children}</>;
+  }
+
+  // If user is null, user will be redirected, so don't render anything
+  return null;
 }
