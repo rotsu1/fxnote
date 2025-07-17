@@ -202,6 +202,12 @@ function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate
   );
 }
 
+function getJapaneseTradeType(type: string) {
+  if (type === "buy") return "買い";
+  if (type === "sell") return "売り";
+  return type;
+}
+
 function TradeCard({
   trade,
   onEdit,
@@ -216,6 +222,7 @@ function TradeCard({
           <div className="flex items-center gap-2">
             <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
             <span className="font-medium">{trade.pair || trade.currency_pair}</span>
+            <span className="text-sm text-gray-500">{getJapaneseTradeType(trade.type || trade.trade_type)}</span>
             <span className="text-sm text-gray-500">{trade.time || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.exit_time?.split("T")[1]?.slice(0,5)}</span>
           </div>
           <div className="flex gap-1">
@@ -346,30 +353,50 @@ function TradeEditDialog({
   onClose: () => void
   onSave: (trade: any) => void
 }) {
-  const [formData, setFormData] = useState(
-    trade || {
-      pair: "",
-      type: "買い",
-      entry: "",
-      exit: "",
-      pnl: "",
-      status: "利確",
-      time: "",
-      tags: [],
-    },
-  )
-  const [newTag, setNewTag] = useState("")
+  const defaultForm = {
+    pair: "",
+    type: "buy",
+    entry: "",
+    exit: "",
+    pnl: "",
+    status: "利確",
+    time: "",
+    tags: [] as string[],
+  };
+  const [formData, setFormData] = useState<typeof defaultForm>(defaultForm);
+  const [newTag, setNewTag] = useState("");
+
+  // Sync formData with trade prop when dialog opens or trade changes
+  useEffect(() => {
+    if (isOpen) {
+      if (trade) {
+        setFormData({
+          pair: trade.pair || trade.currency_pair || "",
+          type: trade.type || trade.trade_type || "buy",
+          entry: trade.entry || trade.entry_price || "",
+          exit: trade.exit || trade.exit_price || "",
+          pnl: trade.pnl || trade.profit_loss || "",
+          status: trade.status || "利確",
+          time: trade.time || trade.entry_time?.split("T")[1]?.slice(0,5) || "",
+          tags: trade.tags || (trade.trade_memo ? [trade.trade_memo] : []),
+        });
+      } else {
+        setFormData(defaultForm);
+      }
+      setNewTag("");
+    }
+  }, [isOpen, trade]);
 
   const addTag = () => {
     if (newTag && !formData.tags.includes(newTag)) {
-      setFormData({ ...formData, tags: [...formData.tags, newTag] })
-      setNewTag("")
+      setFormData({ ...formData, tags: [...formData.tags, newTag] });
+      setNewTag("");
     }
-  }
+  };
 
   const removeTag = (tagToRemove: string) => {
-    setFormData({ ...formData, tags: formData.tags.filter((tag: string) => tag !== tagToRemove) })
-  }
+    setFormData({ ...formData, tags: formData.tags.filter((tag: string) => tag !== tagToRemove) });
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -392,11 +419,11 @@ function TradeEditDialog({
               <Label htmlFor="type">取引種別</Label>
               <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue>{getJapaneseTradeType(formData.type)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="買い">買い</SelectItem>
-                  <SelectItem value="売り">売り</SelectItem>
+                  <SelectItem value="buy">買い</SelectItem>
+                  <SelectItem value="sell">売り</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -475,7 +502,7 @@ function TradeEditDialog({
             <div className="flex flex-wrap gap-1">
               {formData.tags.map((tag: string, index: number) => (
                 <Badge key={index} variant="outline" className="cursor-pointer" onClick={() => removeTag(tag)}>
-                  {tag} ×
+                  {tag}
                 </Badge>
               ))}
             </div>
@@ -490,7 +517,7 @@ function TradeEditDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }
 
 function CSVImportDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
