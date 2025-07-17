@@ -43,28 +43,7 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
-// Remove sampleMemos
-
-const availableTags = [
-  "USD/JPY",
-  "EUR/USD",
-  "GBP/JPY",
-  "トレンド分析",
-  "市場観察",
-  "取引日記",
-  "振り返り",
-  "週間展望",
-  "経済指標",
-  "リスク管理",
-  "戦略",
-  "バックテスト",
-  "移動平均線",
-  "心理",
-  "取引ルール",
-  "テクニカル分析",
-  "フィボナッチ",
-  "学習",
-]
+// Remove hardcoded availableTags
 
 function MemoCard({
   memo,
@@ -140,11 +119,13 @@ function MemoEditDialog({
   isOpen,
   onClose,
   onSave,
+  availableTags,
 }: {
   memo: any
   isOpen: boolean
   onClose: () => void
   onSave: (memo: any) => void
+  availableTags: string[]
 }) {
   const [formData, setFormData] = useState(
     memo || {
@@ -236,7 +217,7 @@ function MemoEditDialog({
             <div className="mb-3">
               <div className="text-sm text-muted-foreground mb-2">既存のタグから選択:</div>
               <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                {availableTags.map((tag, index) => (
+                {availableTags.map((tag: string, index: number) => (
                   <Badge
                     key={index}
                     variant={formData.tags.includes(tag) ? "default" : "outline"}
@@ -381,6 +362,7 @@ function ExportDialog({
 export default function MemoPage() {
   const user = useAuth();
   const [memos, setMemos] = useState<any[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -397,8 +379,30 @@ export default function MemoPage() {
     if (!user) return;
     setLoading(true);
     setError("");
+    
+    // Fetch tags from note_tags table
     supabase
-      .from("memos")
+      .from("note_tags")
+      .select("tag_name")
+      .eq("user_id", user.id)
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setAvailableTags([]);
+        } else {
+          const tags = (data || []).map((item: any) => item.tag_name).sort();
+          setAvailableTags(tags);
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    // Fetch notes for display
+    supabase
+      .from("notes")
       .select("*")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
@@ -409,7 +413,6 @@ export default function MemoPage() {
         } else {
           setMemos(data || []);
         }
-        setLoading(false);
       });
   }, [user]);
 
@@ -439,7 +442,7 @@ export default function MemoPage() {
       if (editingMemo) {
         // Update existing memo
         const { error } = await supabase
-          .from("memos")
+          .from("notes")
           .update({
             title: memoData.title,
             content: memoData.content,
@@ -456,7 +459,7 @@ export default function MemoPage() {
       } else {
         // Add new memo
         const { data, error } = await supabase
-          .from("memos")
+          .from("notes")
           .insert([{
             user_id: user.id,
             title: memoData.title,
@@ -491,7 +494,7 @@ export default function MemoPage() {
     
     try {
       const { error } = await supabase
-        .from("memos")
+        .from("notes")
         .delete()
         .eq("id", deleteConfirmId)
         .eq("user_id", user.id);
@@ -576,7 +579,7 @@ export default function MemoPage() {
                 <div>
                   <div className="text-sm font-medium mb-2">タグでフィルター:</div>
                   <div className="flex flex-wrap gap-1">
-                    {availableTags.map((tag, index) => (
+                    {availableTags.map((tag: string, index: number) => (
                       <Badge
                         key={index}
                         variant={selectedTags.includes(tag) ? "default" : "outline"}
@@ -626,6 +629,7 @@ export default function MemoPage() {
           isOpen={isMemoDialogOpen}
           onClose={() => setIsMemoDialogOpen(false)}
           onSave={handleSaveMemo}
+          availableTags={availableTags}
         />
 
         <LayoutSettingsDialog
