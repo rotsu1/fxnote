@@ -50,8 +50,8 @@ export default function Component() {
       setPasswordError("パスワードが一致しません");
       return;
     }
-
-    // 1. Sign up user
+  
+    // 1. Sign up user in Supabase Auth
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -67,10 +67,33 @@ export default function Component() {
       setMessage(error.message);
       return;
     }
-    
-    setMessage("Signup successful! Please check your email to confirm.");
+  
+    const user = data.user;
+  
+    if (!user) {
+      setMessage("サインアップは成功しましたが、ユーザー情報が取得できませんでした。");
+      return;
+    }
+  
+    // 2. Insert into 'profiles' table using the user.id
+    const { error: profileError } = await supabase.from("profiles").insert([
+      {
+        id: user.id, // must match auth.users.id
+        timezone: "Asia/Tokyo", // optional - customize as needed
+        preferred_currency: "JPY", // optional
+      },
+    ]);
+  
+    if (profileError) {
+      setMessage("アカウントは作成されましたが、プロフィールの保存に失敗しました。");
+      console.error("Profile insert error:", profileError);
+      return;
+    }
+  
+    setMessage("サインアップに成功しました。確認メールをご確認ください。");
     router.push("/dashboard");
   };
+  
 
   return (
     <main className="relative flex flex-col min-h-screen items-center justify-center overflow-hidden bg-white dark:bg-gray-900">
