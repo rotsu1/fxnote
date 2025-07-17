@@ -43,6 +43,8 @@ import {
   AppSidebar,
 } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 
 // Sample trade data (expanded for table view)
 interface Trade {
@@ -60,84 +62,6 @@ interface Trade {
   notes?: string
   tags: string[]
 }
-
-const initialTrades: Trade[] = [
-  {
-    id: 1,
-    date: "2024-01-15",
-    time: "09:30",
-    pair: "USD/JPY",
-    type: "買い",
-    entry: 148.5,
-    exit: 149.2,
-    pips: 70,
-    profit: 3200,
-    emotion: "興奮",
-    holdingTime: "1h 15m",
-    notes: "米国経済指標の好調により上昇。利確ポイントで決済。",
-    tags: ["スキャルピング", "朝"],
-  },
-  {
-    id: 2,
-    date: "2024-01-15",
-    time: "14:15",
-    pair: "EUR/USD",
-    type: "売り",
-    entry: 1.095,
-    exit: 1.092,
-    pips: 30,
-    profit: -1800,
-    emotion: "焦り",
-    holdingTime: "0h 45m",
-    notes: "サポートラインを割ったが、すぐに反発。損切りが遅れた。",
-    tags: ["デイトレード"],
-  },
-  {
-    id: 3,
-    date: "2024-01-14",
-    time: "11:00",
-    pair: "GBP/JPY",
-    type: "買い",
-    entry: 185.2,
-    exit: 186.8,
-    pips: 160,
-    profit: 5400,
-    emotion: "冷静",
-    holdingTime: "2h 30m",
-    notes: "日足のトレンドに沿ってエントリー。順調に伸びた。",
-    tags: ["スイング"],
-  },
-  {
-    id: 4,
-    date: "2024-01-14",
-    time: "16:30",
-    pair: "USD/JPY",
-    type: "売り",
-    entry: 148.8,
-    exit: 148.5,
-    pips: 30,
-    profit: 2100,
-    emotion: "満足",
-    holdingTime: "0h 20m",
-    notes: "短期的な反発を狙った。素早い利確。",
-    tags: ["スキャルピング"],
-  },
-  {
-    id: 5,
-    date: "2024-01-13",
-    time: "13:45",
-    pair: "AUD/USD",
-    type: "買い",
-    entry: 0.675,
-    exit: 0.672,
-    pips: 30,
-    profit: -2900,
-    emotion: "後悔",
-    holdingTime: "1h 00m",
-    notes: "サポートラインが機能せず、損切り。分析不足。",
-    tags: ["デイトレード", "失敗"],
-  },
-]
 
 const availableTags = [
   "USD/JPY",
@@ -512,86 +436,221 @@ function TableSettingsDialog({
 }
 
 export default function TablePage() {
-  const [trades, setTrades] = useState<Trade[]>(initialTrades)
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date(2024, 0, 15)) // Default to a date with data
-  const [editingCell, setEditingCell] = useState<{ id: number; field: keyof Trade } | null>(null)
-  const [editingTrade, setEditingTrade] = useState<Partial<Trade> | null>(null)
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false)
-  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false)
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+  const user = useAuth();
+  const [trades, setTrades] = useState<Trade[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
+  const [editingCell, setEditingCell] = useState<{ id: number; field: keyof Trade } | null>(null);
+  const [editingTrade, setEditingTrade] = useState<Partial<Trade> | null>(null);
+  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
+  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     allColumns.filter((col) => col.defaultVisible).map((col) => col.id),
-  )
+  );
+
+  useEffect(() => {
+    if (!user) return;
+    setLoading(true);
+    setError("");
+    supabase
+      .from("trades")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("entry_time", { ascending: false })
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setTrades([]);
+        } else {
+          // Transform DB data to match Trade interface
+          const transformedTrades = (data || []).map((trade: any) => ({
+            id: trade.id,
+            date: trade.entry_time?.split("T")[0] || "",
+            time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
+            pair: trade.currency_pair || "",
+            type: (trade.trade_type === "buy" ? "買い" : trade.trade_type === "sell" ? "売り" : "買い") as "買い" | "売り",
+            entry: trade.entry_price,
+            exit: trade.exit_price,
+            pips: trade.pips || 0,
+            profit: trade.profit_loss,
+            emotion: trade.emotion || "",
+            holdingTime: trade.holding_time || "",
+            notes: trade.trade_memo || "",
+            tags: trade.tags || [],
+          })) as Trade[];
+          setTrades(transformedTrades);
+        }
+        setLoading(false);
+      });
+  }, [user]);
 
   const filteredTrades = useMemo(() => {
-    if (!selectedDate) return []
-    const dateString = format(selectedDate, "yyyy-MM-dd")
-    return trades.filter((trade) => trade.date === dateString)
-  }, [trades, selectedDate])
+    if (!selectedDate) return [];
+    const dateString = format(selectedDate, "yyyy-MM-dd");
+    return trades.filter((trade) => trade.date === dateString);
+  }, [trades, selectedDate]);
 
   const handleCellClick = (id: number, field: keyof Trade) => {
-    setEditingCell({ id, field })
-  }
+    setEditingCell({ id, field });
+  };
 
-  const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
-    setTrades((prevTrades) => prevTrades.map((trade) => (trade.id === id ? { ...trade, [field]: value } : trade)))
-  }, [])
+  const handleCellChange = useCallback(async (id: number, field: keyof Trade, value: any) => {
+    if (!user) return;
+    
+    try {
+      // Update in database
+      const { error } = await supabase
+        .from("trades")
+        .update({ [field]: value })
+        .eq("id", id)
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setTrades((prevTrades) => prevTrades.map((trade) => (trade.id === id ? { ...trade, [field]: value } : trade)));
+    } catch (error: any) {
+      console.error("Error updating trade:", error);
+      setError(error.message);
+    }
+  }, [user]);
 
   const handleCellBlur = () => {
-    setEditingCell(null)
-  }
+    setEditingCell(null);
+  };
 
   const handleAddTrade = () => {
-    setEditingTrade(null) // Clear any previous editing state
-    setIsTradeDialogOpen(true)
-  }
+    setEditingTrade(null);
+    setIsTradeDialogOpen(true);
+  };
 
   const handleEditTrade = (trade: Trade) => {
-    setEditingTrade(trade)
-    setIsTradeDialogOpen(true)
-  }
+    setEditingTrade(trade);
+    setIsTradeDialogOpen(true);
+  };
 
-  const handleSaveTrade = (tradeData: Partial<Trade>) => {
-    if (editingTrade?.id) {
-      // Update existing trade
-      setTrades((prevTrades) =>
-        prevTrades.map((t) => (t.id === editingTrade.id ? ({ ...t, ...tradeData } as Trade) : t)),
-      )
-    } else {
-      // Add new trade
-      const newId = trades.length > 0 ? Math.max(...trades.map((t) => t.id)) + 1 : 1
-      setTrades((prevTrades) => [{ ...tradeData, id: newId } as Trade, ...prevTrades])
+  const handleSaveTrade = async (tradeData: Partial<Trade>) => {
+    if (!user) return;
+    
+    try {
+      if (editingTrade?.id) {
+        // Update existing trade
+        const { error } = await supabase
+          .from("trades")
+          .update({
+            currency_pair: tradeData.pair,
+            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            entry_price: tradeData.entry,
+            exit_price: tradeData.exit,
+            pips: tradeData.pips,
+            profit_loss: tradeData.profit,
+            emotion: tradeData.emotion,
+            holding_time: tradeData.holdingTime,
+            trade_memo: tradeData.notes,
+            tags: tradeData.tags,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingTrade.id)
+          .eq("user_id", user.id);
+        
+        if (error) throw error;
+        
+        setTrades((prevTrades) =>
+          prevTrades.map((t) => (t.id === editingTrade.id ? ({ ...t, ...tradeData } as Trade) : t)),
+        );
+      } else {
+        // Add new trade
+        const { data, error } = await supabase
+          .from("trades")
+          .insert([{
+            user_id: user.id,
+            currency_pair: tradeData.pair,
+            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            entry_price: tradeData.entry,
+            exit_price: tradeData.exit,
+            pips: tradeData.pips,
+            profit_loss: tradeData.profit,
+            emotion: tradeData.emotion,
+            holding_time: tradeData.holdingTime,
+            trade_memo: tradeData.notes,
+            tags: tradeData.tags,
+            entry_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
+            exit_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }])
+          .select();
+        
+        if (error) throw error;
+        
+        if (data && data[0]) {
+          const newTrade: Trade = {
+            id: data[0].id,
+            date: data[0].entry_time?.split("T")[0] || "",
+            time: data[0].entry_time?.split("T")[1]?.slice(0, 5) || "",
+            pair: data[0].currency_pair || "",
+            type: (data[0].trade_type === "buy" ? "買い" : "売り") as "買い" | "売り",
+            entry: data[0].entry_price,
+            exit: data[0].exit_price,
+            pips: data[0].pips || 0,
+            profit: data[0].profit_loss,
+            emotion: data[0].emotion || "",
+            holdingTime: data[0].holding_time || "",
+            notes: data[0].trade_memo || "",
+            tags: data[0].tags || [],
+          };
+          setTrades((prevTrades) => [newTrade, ...prevTrades]);
+        }
+      }
+      setIsTradeDialogOpen(false);
+      setEditingTrade(null);
+    } catch (error: any) {
+      console.error("Error saving trade:", error);
+      setError(error.message);
     }
-    setIsTradeDialogOpen(false)
-    setEditingTrade(null)
-  }
+  };
 
   const handleDeleteTrade = (id: number) => {
-    setDeleteConfirmId(id)
-  }
+    setDeleteConfirmId(id);
+  };
 
-  const confirmDelete = () => {
-    if (deleteConfirmId) {
-      setTrades((prevTrades) => prevTrades.filter((t) => t.id !== deleteConfirmId))
-      setDeleteConfirmId(null)
+  const confirmDelete = async () => {
+    if (!deleteConfirmId || !user) return;
+    
+    try {
+      const { error } = await supabase
+        .from("trades")
+        .delete()
+        .eq("id", deleteConfirmId)
+        .eq("user_id", user.id);
+      
+      if (error) throw error;
+      
+      setTrades((prevTrades) => prevTrades.filter((t) => t.id !== deleteConfirmId));
+      setDeleteConfirmId(null);
+    } catch (error: any) {
+      console.error("Error deleting trade:", error);
+      setError(error.message);
     }
-  }
+  };
 
   const handleToggleColumn = (columnId: string, isVisible: boolean) => {
-    setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)))
-  }
+    setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)));
+  };
 
   const getColumnValue = (trade: Trade, columnId: string) => {
-    const column = allColumns.find((c) => c.id === columnId)
-    if (!column) return ""
+    const column = allColumns.find((c) => c.id === columnId);
+    if (!column) return "";
 
-    const value = trade[column.id as keyof Trade]
+    const value = trade[column.id as keyof Trade];
 
     if (column.id === "profit" && typeof value === "number") {
-      return `¥${value.toLocaleString()}`
+      return `¥${value.toLocaleString()}`;
     }
     if (column.id === "pips" && typeof value === "number") {
-      return `${value} pips`
+      return `${value} pips`;
     }
     if (column.id === "tags" && Array.isArray(value)) {
       return (
@@ -602,10 +661,10 @@ export default function TablePage() {
             </Badge>
           ))}
         </div>
-      )
+      );
     }
-    return String(value)
-  }
+    return String(value);
+  };
 
   return (
     <SidebarProvider>
@@ -620,192 +679,197 @@ export default function TablePage() {
         </header>
 
         <main className="flex-1 p-4 md:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            {/* Date Picker */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-[280px] justify-start text-left font-normal",
-                    !selectedDate && "text-muted-foreground",
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : <span>日付を選択</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ja} />
-              </PopoverContent>
-            </Popover>
+          {loading ? (
+            <div className="text-center py-10">読み込み中...</div>
+          ) : error ? (
+            <div className="text-center text-red-600 py-10">{error}</div>
+          ) : (
+            <>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                {/* Date Picker */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant={"outline"}
+                      className={cn(
+                        "w-[280px] justify-start text-left font-normal",
+                        !selectedDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : <span>日付を選択</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ja} />
+                  </PopoverContent>
+                </Popover>
 
-            {/* Action Buttons */}
-            <div className="flex gap-2">
-              <Button onClick={handleAddTrade}>
-                <Plus className="mr-2 h-4 w-4" />
-                取引を追加
-              </Button>
-              <Button variant="outline" onClick={() => setIsTableSettingsOpen(true)}>
-                <Settings className="h-4 w-4" />
-                <span className="sr-only">設定</span>
-              </Button>
-            </div>
-          </div>
-
-          {/* Trade History Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : "日付を選択"} の取引
-              </CardTitle>
-              <CardDescription>{filteredTrades.length}件の取引が見つかりました</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto max-h-[calc(100vh-250px)]">
-                {" "}
-                {/* Max height for scroll */}
-                <Table className="min-w-full">
-                  <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
-                    <TableRow>
-                      {visibleColumns.map((colId) => {
-                        const column = allColumns.find((c) => c.id === colId)
-                        return column ? (
-                          <TableHead key={column.id} className={column.minWidth}>
-                            {column.label}
-                          </TableHead>
-                        ) : null
-                      })}
-                      <TableHead className="min-w-[80px] text-right">アクション</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTrades.length > 0 ? (
-                      filteredTrades.map((trade) => (
-                        <TableRow key={trade.id}>
-                          {visibleColumns.map((colId) => {
-                            const column = allColumns.find((c) => c.id === colId)
-                            if (!column) return null
-
-                            const isEditing = editingCell?.id === trade.id && editingCell.field === column.id
-                            const value = trade[column.id as keyof Trade]
-
-                            return (
-                              <TableCell
-                                key={column.id}
-                                onClick={() => handleCellClick(trade.id, column.id as keyof Trade)}
-                                className="py-2 px-4 border-b border-r last:border-r-0"
-                              >
-                                {isEditing ? (
-                                  column.type === "select" ? (
-                                    <Select
-                                      value={String(value)}
-                                      onValueChange={(val) => handleCellChange(trade.id, column.id as keyof Trade, val)}
-                                      onOpenChange={(open) => !open && handleCellBlur()}
-                                      autoFocus
-                                    >
-                                      <SelectTrigger className="h-8">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {(column.options || []).map((option) => (
-                                          <SelectItem key={option} value={option}>
-                                            {option}
-                                          </SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
-                                  ) : column.type === "textarea" ? (
-                                    <Textarea
-                                      value={String(value)}
-                                      onChange={(e) =>
-                                        handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                                      }
-                                      onBlur={handleCellBlur}
-                                      autoFocus
-                                      rows={2}
-                                      className="min-w-[150px]"
-                                    />
-                                  ) : (
-                                    <Input
-                                      type={
-                                        column.type === "number"
-                                          ? "number"
-                                          : column.type === "date"
-                                            ? "date"
-                                            : column.type === "time"
-                                              ? "time"
-                                              : "text"
-                                      }
-                                      step={
-                                        column.type === "number"
-                                          ? column.id === "entry" || column.id === "exit"
-                                            ? "0.0001"
-                                            : "0.1"
-                                          : undefined
-                                      }
-                                      value={String(value)}
-                                      onChange={(e) =>
-                                        handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                                      }
-                                      onBlur={handleCellBlur}
-                                      autoFocus
-                                      className="h-8"
-                                    />
-                                  )
-                                ) : (
-                                  <span
-                                    className={cn(
-                                      column.id === "profit" &&
-                                        (trade.profit && trade.profit > 0
-                                          ? "text-green-600"
-                                          : trade.profit && trade.profit < 0
-                                            ? "text-red-600"
-                                            : ""),
-                                      column.id === "pips" &&
-                                        (trade.pips && trade.pips > 0
-                                          ? "text-green-600"
-                                          : trade.pips && trade.pips < 0
-                                            ? "text-red-600"
-                                            : ""),
-                                      "block min-h-[24px] py-1", // Ensure consistent height
-                                    )}
-                                  >
-                                    {getColumnValue(trade, column.id)}
-                                  </span>
-                                )}
-                              </TableCell>
-                            )
-                          })}
-                          <TableCell className="py-2 px-4 border-b text-right">
-                            <div className="flex justify-end gap-1">
-                              <Button variant="ghost" size="sm" onClick={() => handleEditTrade(trade)}>
-                                <Edit className="h-4 w-4" />
-                                <span className="sr-only">編集</span>
-                              </Button>
-                              <Button variant="ghost" size="sm" onClick={() => handleDeleteTrade(trade.id)}>
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                                <span className="sr-only">削除</span>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell
-                          colSpan={visibleColumns.length + 1}
-                          className="h-24 text-center text-muted-foreground"
-                        >
-                          選択された日付の取引はありません。
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
+                {/* Action Buttons */}
+                <div className="flex gap-2">
+                  <Button onClick={handleAddTrade}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    取引を追加
+                  </Button>
+                  <Button variant="outline" onClick={() => setIsTableSettingsOpen(true)}>
+                    <Settings className="h-4 w-4" />
+                    <span className="sr-only">設定</span>
+                  </Button>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+
+              {/* Trade History Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>
+                    {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : "日付を選択"} の取引
+                  </CardTitle>
+                  <CardDescription>{filteredTrades.length}件の取引が見つかりました</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto max-h-[calc(100vh-250px)]">
+                    <Table className="min-w-full">
+                      <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
+                        <TableRow>
+                          {visibleColumns.map((colId) => {
+                            const column = allColumns.find((c) => c.id === colId);
+                            return column ? (
+                              <TableHead key={column.id} className={column.minWidth}>
+                                {column.label}
+                              </TableHead>
+                            ) : null;
+                          })}
+                          <TableHead className="min-w-[80px] text-right">アクション</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredTrades.length > 0 ? (
+                          filteredTrades.map((trade) => (
+                            <TableRow key={trade.id}>
+                              {visibleColumns.map((colId) => {
+                                const column = allColumns.find((c) => c.id === colId);
+                                if (!column) return null;
+
+                                const isEditing = editingCell?.id === trade.id && editingCell.field === column.id;
+                                const value = trade[column.id as keyof Trade];
+
+                                return (
+                                  <TableCell
+                                    key={column.id}
+                                    onClick={() => handleCellClick(trade.id, column.id as keyof Trade)}
+                                    className="py-2 px-4 border-b border-r last:border-r-0"
+                                  >
+                                    {isEditing ? (
+                                      column.type === "select" ? (
+                                        <Select
+                                          value={String(value)}
+                                          onValueChange={(val) => handleCellChange(trade.id, column.id as keyof Trade, val)}
+                                          onOpenChange={(open) => !open && handleCellBlur()}
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            {(column.options || []).map((option) => (
+                                              <SelectItem key={option} value={option}>
+                                                {option}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      ) : column.type === "textarea" ? (
+                                        <Textarea
+                                          value={String(value)}
+                                          onChange={(e) =>
+                                            handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
+                                          }
+                                          onBlur={handleCellBlur}
+                                          autoFocus
+                                          rows={2}
+                                          className="min-w-[150px]"
+                                        />
+                                      ) : (
+                                        <Input
+                                          type={
+                                            column.type === "number"
+                                              ? "number"
+                                              : column.type === "date"
+                                                ? "date"
+                                                : column.type === "time"
+                                                  ? "time"
+                                                  : "text"
+                                          }
+                                          step={
+                                            column.type === "number"
+                                              ? column.id === "entry" || column.id === "exit"
+                                                ? "0.0001"
+                                                : "0.1"
+                                              : undefined
+                                          }
+                                          value={String(value)}
+                                          onChange={(e) =>
+                                            handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
+                                          }
+                                          onBlur={handleCellBlur}
+                                          autoFocus
+                                          className="h-8"
+                                        />
+                                      )
+                                    ) : (
+                                      <span
+                                        className={cn(
+                                          column.id === "profit" &&
+                                            (trade.profit && trade.profit > 0
+                                              ? "text-green-600"
+                                              : trade.profit && trade.profit < 0
+                                                ? "text-red-600"
+                                                : ""),
+                                          column.id === "pips" &&
+                                            (trade.pips && trade.pips > 0
+                                              ? "text-green-600"
+                                              : trade.pips && trade.pips < 0
+                                                ? "text-red-600"
+                                                : ""),
+                                          "block min-h-[24px] py-1",
+                                        )}
+                                      >
+                                        {getColumnValue(trade, column.id)}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                );
+                              })}
+                              <TableCell className="py-2 px-4 border-b text-right">
+                                <div className="flex justify-end gap-1">
+                                  <Button variant="ghost" size="sm" onClick={() => handleEditTrade(trade)}>
+                                    <Edit className="h-4 w-4" />
+                                    <span className="sr-only">編集</span>
+                                  </Button>
+                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteTrade(trade.id)}>
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                    <span className="sr-only">削除</span>
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        ) : (
+                          <TableRow>
+                            <TableCell
+                              colSpan={visibleColumns.length + 1}
+                              className="h-24 text-center text-muted-foreground"
+                            >
+                              選択された日付の取引はありません。
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </main>
 
         {/* Modals */}
@@ -840,5 +904,5 @@ export default function TablePage() {
         </AlertDialog>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }
