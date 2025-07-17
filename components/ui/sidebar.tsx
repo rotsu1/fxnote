@@ -3,7 +3,7 @@
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
-import { Calendar, FileText, BarChart3, PanelLeft, Settings, TrendingUp, Home } from "lucide-react"
+import { Calendar, FileText, BarChart3, PanelLeft, Settings, TrendingUp, Home, Table } from "lucide-react"
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -32,6 +32,7 @@ const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 const menuItems = [
   { title: "ダッシュボード", icon: Home, url: "/dashboard", isActive: false },
   { title: "カレンダー", icon: Calendar, url: "/dashboard/calendar", isActive: false },
+  { title: "テーブル", icon: Table, url: "/dashboard/table", isActive: false },
   { title: "メモ", icon: FileText, url: "/dashboard/memo", isActive: false },
   { title: "分析", icon: BarChart3, url: "/dashboard/analysis", isActive: true },
   { title: "設定", icon: Settings, url: "/dashboard/settings", isActive: false },
