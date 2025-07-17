@@ -7,10 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useState } from "react"
+import { useState, FormEvent } from "react"
 import { Eye, EyeOff } from "lucide-react"
+import { supabase } from "@/lib/supabaseClient"
+import { useRouter } from "next/navigation";
 
 export default function Component() {
+  const router = useRouter();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -19,6 +23,7 @@ export default function Component() {
   const [passwordError, setPasswordError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [message, setMessage] = useState("");
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
@@ -36,6 +41,35 @@ export default function Component() {
     } else {
       setPasswordError("");
     }
+  };
+
+  const handleSignUp = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+  
+    if (password !== confirmPassword) {
+      setPasswordError("パスワードが一致しません");
+      return;
+    }
+
+    // 1. Sign up user
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName,
+        },
+      },
+    });
+  
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+    
+    setMessage("Signup successful! Please check your email to confirm.");
+    router.push("/dashboard");
   };
 
   return (
@@ -76,6 +110,7 @@ export default function Component() {
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-3xl font-bold">新規登録</CardTitle>
           </CardHeader>
+          <form onSubmit={handleSignUp}>
           <CardContent className="grid gap-4">
             <div className="flex gap-2">
               <div className="flex-1 grid gap-2">
@@ -151,6 +186,7 @@ export default function Component() {
               </Button>
             </div>
           </CardContent>
+          </form>
           <CardFooter className="text-center text-sm">
             <Link href="/login" className="underline">
               サインイン
