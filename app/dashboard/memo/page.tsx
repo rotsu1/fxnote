@@ -70,6 +70,9 @@ function MemoCard({
     return colors[type as keyof typeof colors] || "bg-gray-100 text-gray-800"
   }
 
+  // Ensure tags is always an array
+  const memoTags = Array.isArray(memo.tags) ? memo.tags : [];
+
   return (
     <Card className="h-full hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
@@ -98,14 +101,14 @@ function MemoCard({
       <CardContent className="pt-0">
         <p className="text-sm text-muted-foreground mb-3 line-clamp-4">{truncateContent(memo.content)}</p>
         <div className="flex flex-wrap gap-1">
-          {memo.tags.slice(0, 3).map((tag: string, index: number) => (
+          {memoTags.slice(0, 3).map((tag: string, index: number) => (
             <Badge key={index} variant="outline" className="text-xs">
               {tag}
             </Badge>
           ))}
-          {memo.tags.length > 3 && (
+          {memoTags.length > 3 && (
             <Badge variant="outline" className="text-xs">
-              +{memo.tags.length - 3}
+              +{memoTags.length - 3}
             </Badge>
           )}
         </div>
@@ -136,6 +139,18 @@ function MemoEditDialog({
     },
   )
   const [newTag, setNewTag] = useState("")
+
+  // Sync formData when memo prop changes
+  useEffect(() => {
+    setFormData(
+      memo || {
+        title: "",
+        content: "",
+        tags: [],
+        type: "trade-journal",
+      },
+    )
+  }, [memo])
 
   const addTag = () => {
     if (newTag && !formData.tags.includes(newTag)) {
@@ -220,7 +235,7 @@ function MemoEditDialog({
                 {availableTags.map((tag: string, index: number) => (
                   <Badge
                     key={index}
-                    variant={formData.tags.includes(tag) ? "default" : "outline"}
+                    variant={(formData.tags || []).includes(tag) ? "default" : "outline"}
                     className="cursor-pointer text-xs"
                     onClick={() => addExistingTag(tag)}
                   >
@@ -231,7 +246,7 @@ function MemoEditDialog({
             </div>
 
             <div className="flex flex-wrap gap-1">
-              {formData.tags.map((tag: string, index: number) => (
+              {(formData.tags || []).map((tag: string, index: number) => (
                 <Badge key={index} variant="default" className="cursor-pointer" onClick={() => removeTag(tag)}>
                   {tag} ×
                 </Badge>
@@ -400,20 +415,59 @@ export default function MemoPage() {
   useEffect(() => {
     if (!user) return;
     
-    // Fetch notes for display
-    supabase
-      .from("notes")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-          setMemos([]);
-        } else {
-          setMemos(data || []);
-        }
-      });
+    // Fetch notes with their tags from note_tag_links
+    const fetchNotesWithTags = async () => {
+      try {
+        // First fetch all notes
+        const { data: notesData, error: notesError } = await supabase
+          .from("notes")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (notesError) throw notesError;
+
+        // Then fetch all tag links for these notes
+        const noteIds = notesData?.map(note => note.id) || [];
+        const { data: tagLinksData, error: tagLinksError } = await supabase
+          .from("note_tag_links")
+          .select(`
+            note_id,
+            note_tags!inner(tag_name)
+          `)
+          .in("note_id", noteIds);
+
+        if (tagLinksError) throw tagLinksError;
+
+        // Group tags by note_id
+        const tagsByNoteId: Record<number, string[]> = {};
+        tagLinksData?.forEach(link => {
+          const noteId = link.note_id;
+          const tagName = (link.note_tags as any)?.tag_name;
+          if (noteId && tagName) {
+            if (!tagsByNoteId[noteId]) {
+              tagsByNoteId[noteId] = [];
+            }
+            tagsByNoteId[noteId].push(tagName);
+          }
+        });
+
+        // Combine notes with their tags
+        const notesWithTags = notesData?.map(note => ({
+          ...note,
+          tags: tagsByNoteId[note.id] || []
+        })) || [];
+
+        console.log("Notes with tags:", notesWithTags);
+        setMemos(notesWithTags);
+      } catch (error: any) {
+        console.error("Error fetching notes with tags:", error);
+        setError(error.message);
+        setMemos([]);
+      }
+    };
+
+    fetchNotesWithTags();
   }, [user]);
 
   // Filter memos based on search and tags
@@ -421,7 +475,11 @@ export default function MemoPage() {
     const matchesSearch =
       memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       memo.content.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => memo.tags.includes(tag));
+    
+    // Ensure tags is always an array
+    const memoTags = Array.isArray(memo.tags) ? memo.tags : (memo.tags ? JSON.parse(memo.tags) : []);
+    const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => memoTags.includes(tag));
+    
     return matchesSearch && matchesTags;
   });
 
@@ -441,40 +499,83 @@ export default function MemoPage() {
     try {
       if (editingMemo) {
         // Update existing memo
-        const { error } = await supabase
+        const { error: updateError } = await supabase
           .from("notes")
           .update({
             title: memoData.title,
             content: memoData.content,
-            tags: memoData.tags,
             type: memoData.type,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingMemo.id)
           .eq("user_id", user.id);
         
-        if (error) throw error;
+        if (updateError) throw updateError;
+
+        // Delete existing tag links
+        const { error: deleteError } = await supabase
+          .from("note_tag_links")
+          .delete()
+          .eq("note_id", editingMemo.id);
+
+        if (deleteError) throw deleteError;
+
+        // Insert new tag links
+        if (memoData.tags && memoData.tags.length > 0) {
+          const tagLinks = memoData.tags.map((tagName: string) => ({
+            note_id: editingMemo.id,
+            tag_name: tagName
+          }));
+
+          const { error: insertError } = await supabase
+            .from("note_tag_links")
+            .insert(tagLinks);
+
+          if (insertError) throw insertError;
+        }
         
+        // Update local state
         setMemos(memos.map((m) => (m.id === editingMemo.id ? { ...m, ...memoData } : m)));
       } else {
         // Add new memo
-        const { data, error } = await supabase
+        const { data: newNote, error: insertError } = await supabase
           .from("notes")
           .insert([{
             user_id: user.id,
             title: memoData.title,
             content: memoData.content,
-            tags: memoData.tags,
             type: memoData.type,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
           .select();
         
-        if (error) throw error;
+        if (insertError) throw insertError;
         
-        if (data && data[0]) {
-          setMemos([data[0], ...memos]);
+        if (newNote && newNote[0]) {
+          const noteId = newNote[0].id;
+          
+          // Insert tag links
+          if (memoData.tags && memoData.tags.length > 0) {
+            const tagLinks = memoData.tags.map((tagName: string) => ({
+              note_id: noteId,
+              tag_name: tagName
+            }));
+
+            const { error: tagError } = await supabase
+              .from("note_tag_links")
+              .insert(tagLinks);
+
+            if (tagError) throw tagError;
+          }
+
+          // Add tags to the note object for local state
+          const noteWithTags = {
+            ...newNote[0],
+            tags: memoData.tags || []
+          };
+          
+          setMemos([noteWithTags, ...memos]);
         }
       }
       setIsMemoDialogOpen(false);
@@ -493,6 +594,15 @@ export default function MemoPage() {
     if (!deleteConfirmId || !user) return;
     
     try {
+      // Delete tag links first
+      const { error: tagError } = await supabase
+        .from("note_tag_links")
+        .delete()
+        .eq("note_id", deleteConfirmId);
+      
+      if (tagError) throw tagError;
+
+      // Then delete the note
       const { error } = await supabase
         .from("notes")
         .delete()
