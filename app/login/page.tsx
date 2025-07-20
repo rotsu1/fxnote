@@ -3,7 +3,7 @@
 import Image from "next/image"
 import Link from "next/link"
 
-import { FormEvent, useState } from "react"
+import { FormEvent, useState, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -12,10 +12,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabaseClient"
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export default function Component() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -26,6 +27,15 @@ export default function Component() {
   const [emailError, setEmailError] = useState("")
   const [passwordError, setPasswordError] = useState("")
   const [authError, setAuthError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+
+  // Check for success message from URL parameters
+  useEffect(() => {
+    const message = searchParams.get('message');
+    if (message) {
+      setSuccessMessage(message);
+    }
+  }, [searchParams]);
 
   const validateForm = () => {
     let isValid = true;
@@ -134,6 +144,11 @@ export default function Component() {
                   <AlertDescription>{authError}</AlertDescription>
                 </Alert>
               )}
+              {successMessage && (
+                <Alert>
+                  <AlertDescription>{successMessage}</AlertDescription>
+                </Alert>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="email">メールアドレス</Label>
                 <Input 
@@ -155,7 +170,7 @@ export default function Component() {
               <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">パスワード</Label>
-                  <Link href="#" className="ml-auto inline-block text-sm underline">
+                  <Link href="/reset-password" className="ml-auto inline-block text-sm underline">
                     パスワードを忘れた場合
                   </Link>
                 </div>
