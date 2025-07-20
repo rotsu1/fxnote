@@ -24,9 +24,16 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
+interface Metric {
+  key: string;
+  title: string;
+  format: (value: any) => string;
+  color: (value: any) => string;
+}
+
 function KeyStatsGrid() {
   const user = useAuth();
-  const [keyStats, setKeyStats] = useState<any[]>([]);
+  const [keyStats, setKeyStats] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
@@ -40,12 +47,13 @@ function KeyStatsGrid() {
       .from("user_key_status")
       .select("*")
       .eq("user_id", user.id)
+      .single()
       .then(({ data, error }) => {
         if (error) {
           setError(error.message);
-          setKeyStats([]);
+          setKeyStats(null);
         } else {
-          setKeyStats(data || []);
+          setKeyStats(data);
         }
         setLoading(false);
       });
@@ -76,7 +84,7 @@ function KeyStatsGrid() {
     );
   }
 
-  if (keyStats.length === 0) {
+  if (!keyStats) {
     return (
       <div className="text-center text-muted-foreground py-10">
         統計データがありません
@@ -84,21 +92,96 @@ function KeyStatsGrid() {
     );
   }
 
+  // Define the metrics with their Japanese titles and formatting
+  const metrics: Metric[] = [
+    { 
+      key: 'win_rate', 
+      title: '勝率', 
+      format: (value: number) => `${value}%`,
+      color: (value: number) => value >= 60 ? "text-green-600" : value >= 40 ? "text-yellow-600" : "text-red-600"
+    },
+    { 
+      key: 'avg_win_trade_profit', 
+      title: '平均利益', 
+      format: (value: number) => `¥${value.toLocaleString()}`,
+      color: (_value: number) => "text-green-600"
+    },
+    { 
+      key: 'avg_loss_trade_pips', 
+      title: '平均損失pips', 
+      format: (value: number) => `${value.toFixed(1)} pips`,
+      color: (_value: number) => "text-red-600"
+    },
+    { 
+      key: 'avg_win_trade_pips', 
+      title: '平均利益pips', 
+      format: (value: number) => `${value.toFixed(1)} pips`,
+      color: (_value: number) => "text-green-600"
+    },
+    { 
+      key: 'avg_daily_win_trades', 
+      title: '日平均利益取引', 
+      format: (value: number) => `${value.toFixed(1)}回`,
+      color: (_value: number) => "text-blue-600"
+    },
+    { 
+      key: 'avg_holding_time', 
+      title: '平均保有時間', 
+      format: (value: string) => {
+        // Convert "02:30:00" format to "2h 30m"
+        const parts = value.split(':');
+        const hours = parseInt(parts[0]);
+        const minutes = parseInt(parts[1]);
+        return `${hours}h ${minutes}m`;
+      },
+      color: (_value: string) => "text-blue-600"
+    },
+    { 
+      key: 'avg_daily_loss_trades', 
+      title: '日平均損失取引', 
+      format: (value: number) => `${value.toFixed(1)}回`,
+      color: (_value: number) => "text-blue-600"
+    },
+    { 
+      key: 'payoff_ratio', 
+      title: 'ペイオフ比率', 
+      format: (value: number) => value.toFixed(2),
+      color: (value: number) => value >= 1.5 ? "text-green-600" : value >= 1.0 ? "text-yellow-600" : "text-red-600"
+    },
+  ];
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {keyStats.map((stat, index) => (
-        <Card key={index}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${stat.color || "text-gray-900 dark:text-gray-100"}`}>
-              {stat.value}
-              {stat.unit && <span className="text-sm font-normal ml-1">{stat.unit}</span>}
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+      {metrics.map((metric, index) => {
+        const value = keyStats[metric.key];
+        if (value === null || value === undefined) return null;
+        
+        // Handle different value types for color function
+        let colorClass = "text-gray-900 dark:text-gray-100";
+        if (metric.key === 'avg_holding_time') {
+          colorClass = metric.color(value as string);
+        } else {
+          colorClass = metric.color(value as number);
+        }
+        
+        return (
+          <Card key={index}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {metric.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${colorClass}`}>
+                {metric.key === 'avg_holding_time' 
+                  ? metric.format(value as string)
+                  : metric.format(value as number)
+                }
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   )
 }
