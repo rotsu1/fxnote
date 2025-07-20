@@ -15,9 +15,12 @@ import { useRouter } from "next/navigation"
 export default function UpdatePasswordPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [passwordError, setPasswordError] = useState("");
+  const [confirmPasswordError, setConfirmPasswordError] = useState("");
   const [authError, setAuthError] = useState("");
   const [isSessionValid, setIsSessionValid] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
@@ -49,6 +52,7 @@ export default function UpdatePasswordPage() {
 
   const validateForm = () => {
     setPasswordError("");
+    setConfirmPasswordError("");
     setAuthError("");
 
     if (!password.trim()) {
@@ -58,6 +62,11 @@ export default function UpdatePasswordPage() {
 
     if (password.length < 6) {
       setPasswordError("パスワードは6文字以上で入力してください");
+      return false;
+    }
+
+    if (password !== confirmPassword) {
+      setConfirmPasswordError("パスワードが一致しません");
       return false;
     }
 
@@ -212,6 +221,36 @@ export default function UpdatePasswordPage() {
                 </div>
                 {passwordError && (
                   <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
+                )}
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="confirm-password">パスワードの確認</Label>
+                <div className="relative group">
+                  <Input
+                    id="confirm-password"
+                    type={showConfirmPassword ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={e => {
+                      setConfirmPassword(e.target.value);
+                      if (confirmPasswordError) setConfirmPasswordError("");
+                      if (authError) setAuthError("");
+                    }}
+                    className={`pr-10 ${confirmPasswordError ? "border-red-500 focus:border-red-500" : ""}`}
+                    placeholder="パスワードを再入力"
+                  />
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 focus:outline-none opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity"
+                    onClick={() => setShowConfirmPassword(v => !v)}
+                    aria-label={showConfirmPassword ? "パスワードを隠す" : "パスワードを表示"}
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+                {confirmPasswordError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{confirmPasswordError}</p>
                 )}
               </div>
 
