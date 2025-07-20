@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import {
   FileText,
   TrendingUp,
@@ -21,43 +22,102 @@ import {
   SidebarTrigger,
   AppSidebar,
 } from "@/components/ui/sidebar"
-
-
-// Sample data
-const plSummary = [
-  { title: "今日の損益", value: "+¥12,500", trend: "up", color: "text-green-600" },
-  { title: "今週の損益", value: "+¥45,200", trend: "up", color: "text-green-600" },
-  { title: "今月の損益", value: "+¥128,750", trend: "up", color: "text-green-600" },
-  { title: "総損益", value: "+¥892,340", trend: "up", color: "text-green-600" },
-]
-
-const performanceMetrics = [
-  { title: "今月の勝率", value: "68%", description: "32勝 / 47取引" },
-  { title: "平均利益/損失", value: "¥2,740", description: "利益時平均" },
-  { title: "最大連勝・連敗", value: "7勝 / 3敗", description: "現在の記録" },
-  { title: "今月の取引回数", value: "47回", description: "前月比 +12%" },
-]
-
-const recentTrades = [
-  { date: "2024-01-15", pair: "USD/JPY", type: "買い", pnl: "+¥3,200", status: "利確" },
-  { date: "2024-01-15", pair: "EUR/USD", type: "売り", pnl: "-¥1,800", status: "損切" },
-  { date: "2024-01-14", pair: "GBP/JPY", type: "買い", pnl: "+¥5,400", status: "利確" },
-  { date: "2024-01-14", pair: "USD/JPY", type: "売り", pnl: "+¥2,100", status: "利確" },
-  { date: "2024-01-13", pair: "AUD/USD", type: "買い", pnl: "-¥2,900", status: "損切" },
-]
-
-const recentNotes = [
-  { date: "2024-01-15", title: "市場分析：USD/JPY上昇トレンド", preview: "米国経済指標の好調により..." },
-  { date: "2024-01-14", title: "取引戦略の見直し", preview: "リスク管理の改善点について..." },
-  { date: "2024-01-13", title: "週間振り返り", preview: "今週の取引結果と反省点..." },
-]
-
+import { supabase } from "@/lib/supabaseClient"
+import { useAuth } from "@/hooks/useAuth"
 
 
 function PLSummaryCards() {
+  const [plSummary, setPlSummary] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const user = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    supabase
+      .from("user_pl_summary")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setPlSummary(null);
+        } else {
+          setPlSummary(data);
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {[...Array(4)].map((_, index) => (
+          <Card key={index}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+              <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-red-600 py-10">
+        エラーが発生しました: {error}
+      </div>
+    );
+  }
+
+  if (!plSummary) {
+    return (
+      <div className="text-center text-muted-foreground py-10">
+        損益データがありません
+      </div>
+    );
+  }
+
+  const summaryData = [
+    { 
+      title: "今日の損益", 
+      value: `¥${plSummary.daily_profit.toLocaleString()}`, 
+      trend: plSummary.daily_profit >= 0 ? "up" : "down", 
+      color: plSummary.daily_profit >= 0 ? "text-green-600" : "text-red-600" 
+    },
+    { 
+      title: "今週の損益", 
+      value: `¥${plSummary.weekly_profit.toLocaleString()}`, 
+      trend: plSummary.weekly_profit >= 0 ? "up" : "down", 
+      color: plSummary.weekly_profit >= 0 ? "text-green-600" : "text-red-600" 
+    },
+    { 
+      title: "今月の損益", 
+      value: `¥${plSummary.monthly_profit.toLocaleString()}`, 
+      trend: plSummary.monthly_profit >= 0 ? "up" : "down", 
+      color: plSummary.monthly_profit >= 0 ? "text-green-600" : "text-red-600" 
+    },
+    { 
+      title: "総損益", 
+      value: `¥${plSummary.total_profit.toLocaleString()}`, 
+      trend: plSummary.total_profit >= 0 ? "up" : "down", 
+      color: plSummary.total_profit >= 0 ? "text-green-600" : "text-red-600" 
+    },
+  ];
+
   return (
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {plSummary.map((item, index) => (
+        {summaryData.map((item, index) => (
           <Card key={index}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
@@ -77,6 +137,112 @@ function PLSummaryCards() {
 }
 
 function PerformanceMetrics() {
+  const [performanceData, setPerformanceData] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const user = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    supabase
+      .from("user_performance_metrics")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setPerformanceData(null);
+        } else {
+          setPerformanceData(data);
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>パフォーマンス指標</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {[...Array(4)].map((_, index) => (
+              <div key={index} className="space-y-2">
+                <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+                <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>パフォーマンス指標</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-red-600 py-10">
+            エラーが発生しました: {error}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!performanceData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>パフォーマンス指標</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-muted-foreground py-10">
+            パフォーマンスデータがありません
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Calculate month-over-month change
+  const tradeCountChange = performanceData.previous_month_trade_count > 0 
+    ? ((performanceData.monthly_trade_count - performanceData.previous_month_trade_count) / performanceData.previous_month_trade_count * 100)
+    : 0;
+
+  const performanceMetrics = [
+    { 
+      title: "今月の勝率", 
+      value: `${performanceData.monthly_win_rate}%`, 
+      description: `${performanceData.monthly_win_count}勝 / ${performanceData.monthly_trade_count}取引` 
+    },
+    { 
+      title: "平均利益/損失", 
+      value: `¥${performanceData.average_profit_loss.toLocaleString()}`, 
+      description: "利益時平均" 
+    },
+    { 
+      title: "最大連勝・連敗", 
+      value: `${performanceData.max_win_streak}勝 / ${performanceData.max_loss_streak}敗`, 
+      description: "現在の記録" 
+    },
+    { 
+      title: "今月の取引回数", 
+      value: `${performanceData.monthly_trade_count}回`, 
+      description: `前月比 ${tradeCountChange >= 0 ? '+' : ''}${tradeCountChange.toFixed(0)}%` 
+    },
+  ];
+
   return (
     <Card>
       <CardHeader>
@@ -97,29 +263,141 @@ function PerformanceMetrics() {
   )
 }
 
-function QuickActions() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>クイックアクション</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="flex flex-col sm:flex-row gap-4">
-          <Button className="flex-1">
-            <Plus className="mr-2 h-4 w-4" />
-            新規取引登録
-          </Button>
-          <Button variant="outline" className="flex-1 bg-transparent">
-            <FileText className="mr-2 h-4 w-4" />
-            新規メモ作成
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function RecentActivity() {
+  const [recentTrades, setRecentTrades] = useState<any[]>([]);
+  const [recentNotes, setRecentNotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const user = useAuth();
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    // Fetch recent trades
+    supabase
+      .from("trades")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("entry_time", { ascending: false })
+      .limit(5)
+      .then(({ data: tradesData, error: tradesError }) => {
+        if (tradesError) {
+          setError(tradesError.message);
+          setRecentTrades([]);
+        } else {
+          setRecentTrades(tradesData || []);
+        }
+      });
+
+    // Fetch recent notes
+    supabase
+      .from("notes")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("note_date", { ascending: false })
+      .limit(3)
+      .then(({ data: notesData, error: notesError }) => {
+        if (notesError) {
+          setError(notesError.message);
+          setRecentNotes([]);
+        } else {
+          setRecentNotes(notesData || []);
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  };
+
+  const formatProfitLoss = (profitLoss: number) => {
+    const formatted = profitLoss.toLocaleString();
+    return profitLoss >= 0 ? `+¥${formatted}` : `-¥${Math.abs(profitLoss).toLocaleString()}`;
+  };
+
+  const truncateContent = (content: string, maxLength: number = 50) => {
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + "...";
+  };
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>最近の取引履歴</CardTitle>
+            <CardDescription>最新5件の取引</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {[...Array(5)].map((_, index) => (
+                <div key={index} className="flex items-center gap-4 p-3 rounded-lg border">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+                  <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>最近のメモ</CardTitle>
+            <CardDescription>最新3件のメモ</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[...Array(3)].map((_, index) => (
+                <div key={index} className="border-b pb-3 last:border-b-0">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                  <div className="h-3 bg-gray-200 rounded animate-pulse w-20 mb-1"></div>
+                  <div className="h-3 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>最近の取引履歴</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-red-600 py-10">
+              エラーが発生しました: {error}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>最近のメモ</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-red-600 py-10">
+              エラーが発生しました: {error}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <Card>
@@ -135,22 +413,26 @@ function RecentActivity() {
                   <TableHead className="min-w-[80px]">日付</TableHead>
                   <TableHead className="min-w-[80px]">通貨ペア</TableHead>
                   <TableHead className="min-w-[80px]">損益</TableHead>
-                  <TableHead className="min-w-[60px]">状態</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {recentTrades.map((trade, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="text-sm">{trade.date}</TableCell>
-                    <TableCell className="font-medium">{trade.pair}</TableCell>
-                    <TableCell className={trade.pnl.startsWith("+") ? "text-green-600" : "text-red-600"}>
-                      {trade.pnl}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
+                {recentTrades.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      取引データがありません
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : (
+                  recentTrades.map((trade, index) => (
+                    <TableRow key={trade.id || index}>
+                      <TableCell className="text-sm">{formatDate(trade.entry_time)}</TableCell>
+                      <TableCell className="font-medium">{trade.currency_pair}</TableCell>
+                      <TableCell className={trade.profit_loss >= 0 ? "text-green-600" : "text-red-600"}>
+                        {formatProfitLoss(trade.profit_loss)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>
@@ -164,13 +446,19 @@ function RecentActivity() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentNotes.map((note, index) => (
-              <div key={index} className="border-b pb-3 last:border-b-0">
-                <div className="font-medium text-sm">{note.title}</div>
-                <div className="text-xs text-muted-foreground mt-1">{note.date}</div>
-                <div className="text-sm text-muted-foreground mt-1">{note.preview}</div>
+            {recentNotes.length === 0 ? (
+              <div className="text-center text-muted-foreground py-8">
+                メモデータがありません
               </div>
-            ))}
+            ) : (
+              recentNotes.map((note, index) => (
+                <div key={note.id || index} className="border-b pb-3 last:border-b-0">
+                  <div className="font-medium text-sm">{note.title}</div>
+                  <div className="text-xs text-muted-foreground mt-1">{formatDate(note.note_date)}</div>
+                  <div className="text-sm text-muted-foreground mt-1">{truncateContent(note.content)}</div>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -284,11 +572,6 @@ export default function TradingDashboard() {
           {/* Performance Metrics */}
           <section>
             <PerformanceMetrics />
-          </section>
-
-          {/* Quick Actions */}
-          <section>
-            <QuickActions />
           </section>
 
           {/* Recent Activity */}
