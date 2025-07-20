@@ -1,10 +1,50 @@
+"use client"
+
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Mountain } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { supabase } from "@/lib/supabaseClient"
 
 export default function Component() {
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (error) {
+          console.error("Session check error:", error)
+        } else if (session) {
+          // User is authenticated, redirect to dashboard
+          router.push("/dashboard")
+          return
+        }
+      } catch (error) {
+        console.error("Unexpected error during session check:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    checkSession()
+  }, [router])
+
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="flex flex-col min-h-dvh items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        <p className="mt-4 text-muted-foreground">読み込み中...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-dvh">
       <header className="px-4 lg:px-6 h-14 flex items-center">
@@ -52,13 +92,13 @@ export default function Component() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Link
-                    href="/"
+                    href="/login"
                     className="inline-flex h-10 items-center justify-center rounded-md bg-primary px-8 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                   >
                     今すぐ始める
                   </Link>
                   <Link
-                    href="/"
+                    href="#"
                     className="inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                   >
                     詳細を見る
@@ -173,7 +213,7 @@ export default function Component() {
                   トレードの成長はエキサイティングであるべきで、恐ろしいものではありません。
                 </h2>
                 <Link
-                  href="#"
+                  href="/login"
                   className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
                 >
                   今すぐ始める
