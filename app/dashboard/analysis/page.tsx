@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import {
   Calendar,
   TrendingUp,
@@ -21,20 +21,10 @@ import {
   SidebarTrigger,
   AppSidebar,
 } from "@/components/ui/sidebar"
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 
 // Sample analytics data
-const keyStats = [
-  { title: "勝ちトレード平均pips", value: "24.5", unit: "pips", color: "text-green-600" },
-  { title: "負けトレード平均pips", value: "-18.2", unit: "pips", color: "text-red-600" },
-  { title: "勝ちトレード平均収益", value: "¥4,250", unit: "", color: "text-green-600" },
-  { title: "負けトレード平均損失", value: "¥2,890", unit: "", color: "text-red-600" },
-  { title: "1日の平均勝ちトレード回数", value: "3.2", unit: "回", color: "text-blue-600" },
-  { title: "1日の平均負けトレード回数", value: "1.8", unit: "回", color: "text-orange-600" },
-  { title: "ペイオフレシオ", value: "1.47", unit: "", color: "text-purple-600" },
-  { title: "勝率", value: "64%", unit: "", color: "text-green-600" },
-  { title: "平均保有時間", value: "2h 15m", unit: "", color: "text-blue-600" },
-]
-
 const timeAnalysisData = [
   { time: "00:00-02:00", wins: 2, losses: 3, avgPips: -5.2, performance: "weak" },
   { time: "02:00-04:00", wins: 1, losses: 1, avgPips: 2.1, performance: "neutral" },
@@ -59,14 +49,66 @@ const monthlyData = [
   { month: "6月", trades: 41, winRate: 73, profit: 189230, avgPips: 21.3 },
 ]
 
-const marketConditions = [
-  { condition: "トレンド相場", trades: 89, winRate: 72, avgProfit: 4850, performance: "excellent" },
-  { condition: "レンジ相場", trades: 156, winRate: 58, avgProfit: 2340, performance: "good" },
-  { condition: "ボラティリティ高", trades: 67, winRate: 45, avgProfit: 1890, performance: "poor" },
-  { condition: "ボラティリティ低", trades: 43, winRate: 69, avgProfit: 3210, performance: "good" },
-]
-
 function KeyStatsGrid() {
+  const user = useAuth();
+  const [keyStats, setKeyStats] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    supabase
+      .from("user_key_stats")
+      .select("*")
+      .eq("user_id", user.id)
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setKeyStats([]);
+        } else {
+          setKeyStats(data || []);
+        }
+        setLoading(false);
+      });
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {[...Array(9)].map((_, index) => (
+          <Card key={index}>
+            <CardHeader className="pb-2">
+              <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+            </CardHeader>
+            <CardContent>
+              <div className="h-8 bg-gray-200 rounded animate-pulse"></div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center text-red-600 py-10">
+        エラーが発生しました: {error}
+      </div>
+    );
+  }
+
+  if (keyStats.length === 0) {
+    return (
+      <div className="text-center text-muted-foreground py-10">
+        統計データがありません
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {keyStats.map((stat, index) => (
@@ -113,64 +155,6 @@ function MaxDrawdownCard() {
         <div className="mt-4">
           <div className="text-sm text-muted-foreground mb-2">期間: 2024年4月15日 - 2024年4月22日</div>
           <Progress value={12.4} className="w-full" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function RiskRewardAnalysis() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Target className="h-5 w-5 text-blue-600" />
-          リスクリワード比分析
-        </CardTitle>
-        <CardDescription>リスクとリワードの関係性を分析</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">平均リスク</div>
-              <div className="text-xl font-bold text-red-600">18.2 pips</div>
-            </div>
-            <div className="text-center">
-              <div className="text-sm text-muted-foreground">平均リワード</div>
-              <div className="text-xl font-bold text-green-600">24.5 pips</div>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <div className="text-sm text-muted-foreground">リスクリワード比</div>
-            <div className="text-2xl font-bold text-blue-600">1:1.35</div>
-          </div>
-
-          {/* Simple Risk-Reward Chart */}
-          <div className="mt-6">
-            <div className="text-sm font-medium mb-2">リスクリワード分布</div>
-            <div className="space-y-2">
-              {[
-                { ratio: "1:3以上", count: 12, percentage: 15 },
-                { ratio: "1:2-3", count: 28, percentage: 35 },
-                { ratio: "1:1-2", count: 32, percentage: 40 },
-                { ratio: "1:1未満", count: 8, percentage: 10 },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center gap-3">
-                  <div className="w-16 text-sm">{item.ratio}</div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <div className="flex-1 bg-gray-200 rounded-full h-2">
-                        <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${item.percentage}%` }} />
-                      </div>
-                      <div className="text-sm text-muted-foreground w-12">{item.count}件</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>
@@ -254,50 +238,6 @@ function TimeAnalysis() {
   )
 }
 
-function MarketConditionAnalysis() {
-  const getPerformanceColor = (performance: string) => {
-    switch (performance) {
-      case "excellent":
-        return "text-green-600 bg-green-50"
-      case "good":
-        return "text-blue-600 bg-blue-50"
-      case "poor":
-        return "text-red-600 bg-red-50"
-      default:
-        return "text-gray-600 bg-gray-50"
-    }
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Activity className="h-5 w-5 text-orange-600" />
-          市場状況別分析
-        </CardTitle>
-        <CardDescription>市場状況ごとのパフォーマンス</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-2">
-          {marketConditions.map((condition, index) => (
-            <div key={index} className={`p-4 rounded-lg border ${getPerformanceColor(condition.performance)}`}>
-              <div className="font-medium mb-2">{condition.condition}</div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>取引数: {condition.trades}件</div>
-                <div>勝率: {condition.winRate}%</div>
-                <div className="col-span-2">平均利益: ¥{condition.avgProfit.toLocaleString()}</div>
-              </div>
-              <div className="mt-2">
-                <Progress value={condition.winRate} className="h-2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function MonthlyBreakdown() {
   return (
     <Card>
@@ -346,124 +286,6 @@ function MonthlyBreakdown() {
   )
 }
 
-function TrendAnalysis() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-blue-600" />
-          トレンド分析
-        </CardTitle>
-        <CardDescription>トレンドフォロー戦略の成績</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-sm text-muted-foreground">上昇トレンド</div>
-              <div className="text-xl font-bold text-green-600">72%</div>
-              <div className="text-sm">勝率</div>
-            </div>
-            <div className="text-center p-4 bg-red-50 rounded-lg">
-              <div className="text-sm text-muted-foreground">下降トレンド</div>
-              <div className="text-xl font-bold text-red-600">68%</div>
-              <div className="text-sm">勝率</div>
-            </div>
-          </div>
-
-          {/* Simple trend chart visualization */}
-          <div className="mt-6">
-            <div className="text-sm font-medium mb-2">月間トレンド成績</div>
-            <div className="h-32 flex items-end justify-between gap-1">
-              {[65, 72, 68, 71, 69, 74].map((value, index) => (
-                <div key={index} className="flex-1 flex flex-col items-center">
-                  <div className="w-full bg-blue-500 rounded-t" style={{ height: `${value}%` }} />
-                  <div className="text-xs mt-1">{index + 1}月</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function ChartsDisplay() {
-  const [chartType, setChartType] = useState("bar")
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <PieChart className="h-5 w-5 text-purple-600" />
-          いろんなチャート表示
-        </CardTitle>
-        <CardDescription>
-          <div className="flex items-center gap-2">
-            <span>データの可視化</span>
-            <Select value={chartType} onValueChange={setChartType}>
-              <SelectTrigger className="w-32">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="bar">棒グラフ</SelectItem>
-                <SelectItem value="line">線グラフ</SelectItem>
-                <SelectItem value="pie">円グラフ</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        {chartType === "bar" && (
-          <div className="h-48 flex items-end justify-between gap-2">
-            {[45, 72, 38, 65, 89, 56, 73].map((value, index) => (
-              <div key={index} className="flex-1 flex flex-col items-center">
-                <div
-                  className="w-full bg-gradient-to-t from-blue-600 to-blue-400 rounded-t"
-                  style={{ height: `${value}%` }}
-                />
-                <div className="text-xs mt-1">Week {index + 1}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {chartType === "line" && (
-          <div className="h-48 relative">
-            <svg className="w-full h-full" viewBox="0 0 400 200">
-              <polyline
-                fill="none"
-                stroke="#3b82f6"
-                strokeWidth="2"
-                points="0,150 50,120 100,80 150,100 200,60 250,90 300,40 350,70 400,50"
-              />
-              {[150, 120, 80, 100, 60, 90, 40, 70, 50].map((y, index) => (
-                <circle key={index} cx={index * 50} cy={y} r="3" fill="#3b82f6" />
-              ))}
-            </svg>
-          </div>
-        )}
-
-        {chartType === "pie" && (
-          <div className="h-48 flex items-center justify-center">
-            <div className="relative w-32 h-32">
-              <div className="absolute inset-0 rounded-full bg-gradient-conic from-green-500 via-blue-500 to-red-500"></div>
-              <div className="absolute inset-4 rounded-full bg-white flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-sm font-medium">勝率</div>
-                  <div className="text-lg font-bold">64%</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
 export default function AnalysisPage() {
   return (
     <SidebarProvider>
@@ -490,38 +312,21 @@ export default function AnalysisPage() {
           {/* Analysis Tabs */}
           <section>
             <Tabs defaultValue="risk-reward" className="w-full">
-              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
-                <TabsTrigger value="risk-reward">リスク分析</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 lg:grid-cols-2">
                 <TabsTrigger value="time">時間帯分析</TabsTrigger>
-                <TabsTrigger value="market">市場状況</TabsTrigger>
-                <TabsTrigger value="trend">トレンド</TabsTrigger>
+                <TabsTrigger value="trend">月別分析</TabsTrigger>
               </TabsList>
-
-              <TabsContent value="risk-reward" className="mt-6">
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <RiskRewardAnalysis />
-                  <ChartsDisplay />
-                </div>
-              </TabsContent>
 
               <TabsContent value="time" className="mt-6">
                 <TimeAnalysis />
               </TabsContent>
 
-              <TabsContent value="market" className="mt-6">
-                <MarketConditionAnalysis />
-              </TabsContent>
-
               <TabsContent value="trend" className="mt-6">
-                <TrendAnalysis />
+              <MonthlyBreakdown />
               </TabsContent>
             </Tabs>
           </section>
 
-          {/* Monthly Breakdown */}
-          <section>
-            <MonthlyBreakdown />
-          </section>
         </main>
       </SidebarInset>
     </SidebarProvider>
