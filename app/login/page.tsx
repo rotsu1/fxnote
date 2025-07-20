@@ -126,7 +126,7 @@ export default function Component() {
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-3xl font-bold">サインイン</CardTitle>
           </CardHeader>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleLogin} noValidate>
             <CardContent className="grid gap-4">
               {/* Authentication Error Alert */}
               {authError && (
