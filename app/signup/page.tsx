@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useState, FormEvent } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { supabase } from "@/lib/supabaseClient"
@@ -21,12 +22,16 @@ export default function Component() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [passwordError, setPasswordError] = useState("");
+  const [emailError, setEmailError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [message, setMessage] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setPassword(e.target.value);
+    if (passwordError) setPasswordError("");
+    if (message) setMessage("");
     if (confirmPassword && e.target.value !== confirmPassword) {
       setPasswordError("パスワードが一致しません");
     } else {
@@ -36,6 +41,8 @@ export default function Component() {
 
   const handleConfirmPasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setConfirmPassword(e.target.value);
+    if (passwordError) setPasswordError("");
+    if (message) setMessage("");
     if (password && e.target.value !== password) {
       setPasswordError("パスワードが一致しません");
     } else {
@@ -43,55 +50,110 @@ export default function Component() {
     }
   };
 
+  const validateForm = () => {
+    let isValid = true;
+    
+    // Clear previous errors
+    setEmailError("");
+    setPasswordError("");
+    setMessage("");
+
+    // Validate email
+    if (!email.trim()) {
+      setEmailError("メールアドレスを入力してください");
+      isValid = false;
+    }
+
+    // Basic email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (email.trim() && !emailRegex.test(email.trim())) {
+      setEmailError("有効なメールアドレスを入力してください");
+      isValid = false;
+    }
+
+    // Validate password
+    if (!password.trim()) {
+      setPasswordError("パスワードを入力してください");
+      isValid = false;
+    }
+
+    // Validate password confirmation
+    if (password !== confirmPassword) {
+      setPasswordError("パスワードが一致しません");
+      isValid = false;
+    }
+
+    return isValid;
+  };
+
   const handleSignUp = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
   
-    if (password !== confirmPassword) {
-      setPasswordError("パスワードが一致しません");
+    if (!validateForm()) {
       return;
     }
-  
-    // 1. Sign up user in Supabase Auth
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName,
+
+    setIsLoading(true);
+    setMessage("");
+    setEmailError("");
+
+    try {
+      // 1. Sign up user in Supabase Auth
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+          },
         },
-      },
-    });
-  
-    if (error) {
-      setMessage(error.message);
-      return;
+      });
+    
+      if (error) {
+        // Handle specific Supabase auth errors
+        if (error.message.includes("User already registered")) {
+          setEmailError("このメールアドレスは既に登録されています");
+        } else if (error.message.includes("Invalid email")) {
+          setEmailError("有効なメールアドレスを入力してください");
+        } else if (error.message.includes("Password should be at least")) {
+          setPasswordError("パスワードは6文字以上で入力してください");
+        } else {
+          setMessage("サインアップに失敗しました");
+        }
+        return;
+      }
+    
+      const user = data.user;
+    
+      if (!user) {
+        setMessage("サインアップは成功しましたが、ユーザー情報が取得できませんでした。");
+        return;
+      }
+    
+      // 2. Insert into 'profiles' table using the user.id
+      const { error: profileError } = await supabase.from("profiles").insert([
+        {
+          id: user.id, // must match auth.users.id
+          timezone: "Asia/Tokyo", // optional - customize as needed
+          preferred_currency: "JPY", // optional
+        },
+      ]);
+    
+      if (profileError) {
+        setMessage("アカウントは作成されましたが、プロフィールの保存に失敗しました。");
+        console.error("Profile insert error:", profileError);
+        return;
+      }
+    
+      setMessage("サインアップに成功しました。確認メールをご確認ください。");
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Signup error:", error);
+      setMessage("サインアップに失敗しました");
+    } finally {
+      setIsLoading(false);
     }
-  
-    const user = data.user;
-  
-    if (!user) {
-      setMessage("サインアップは成功しましたが、ユーザー情報が取得できませんでした。");
-      return;
-    }
-  
-    // 2. Insert into 'profiles' table using the user.id
-    const { error: profileError } = await supabase.from("profiles").insert([
-      {
-        id: user.id, // must match auth.users.id
-        timezone: "Asia/Tokyo", // optional - customize as needed
-        preferred_currency: "JPY", // optional
-      },
-    ]);
-  
-    if (profileError) {
-      setMessage("アカウントは作成されましたが、プロフィールの保存に失敗しました。");
-      console.error("Profile insert error:", profileError);
-      return;
-    }
-  
-    setMessage("サインアップに成功しました。確認メールをご確認ください。");
-    router.push("/dashboard");
   };
   
 
@@ -133,8 +195,15 @@ export default function Component() {
           <CardHeader className="space-y-1 text-center">
             <CardTitle className="text-3xl font-bold">新規登録</CardTitle>
           </CardHeader>
-          <form onSubmit={handleSignUp}>
+          <form onSubmit={handleSignUp} noValidate>
             <CardContent className="grid gap-4">
+              {/* General Message Alert */}
+              {message && (
+                <Alert variant={message.includes("成功") ? "default" : "destructive"}>
+                  <AlertDescription>{message}</AlertDescription>
+                </Alert>
+              )}
+              
               <div className="flex gap-2">
                 <div className="flex-1 grid gap-2">
                   <Label htmlFor="firstName">名</Label>
@@ -147,7 +216,21 @@ export default function Component() {
               </div>
               <div className="grid gap-2">
                 <Label htmlFor="email">メールアドレス</Label>
-                <Input id="email" type="email" placeholder="m@example.com" value={email} onChange={e => setEmail(e.target.value)} required />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="m@example.com" 
+                  value={email} 
+                  onChange={e => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError("");
+                    if (message) setMessage("");
+                  }}
+                  className={emailError ? "border-red-500 focus:border-red-500" : ""}
+                />
+                {emailError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{emailError}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
@@ -159,8 +242,7 @@ export default function Component() {
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={handlePasswordChange}
-                    required
-                    className="pr-10"
+                    className={`pr-10 ${passwordError ? "border-red-500 focus:border-red-500" : ""}`}
                   />
                   <button
                     type="button"
@@ -181,8 +263,7 @@ export default function Component() {
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmPassword}
                     onChange={handleConfirmPasswordChange}
-                    required
-                    className="pr-10"
+                    className={`pr-10 ${passwordError ? "border-red-500 focus:border-red-500" : ""}`}
                   />
                   <button
                     type="button"
@@ -195,7 +276,7 @@ export default function Component() {
                   </button>
                 </div>
                 {passwordError && (
-                  <span className="text-sm text-red-600">{passwordError}</span>
+                  <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
                 )}
               </div>
               <div className="flex gap-2">
@@ -204,8 +285,8 @@ export default function Component() {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5" fill="none"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.97 32.833 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.045 0 19.824-8.955 19.824-20 0-1.341-.138-2.651-.213-3.917z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.084 19.002 13 24 13c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4c-7.732 0-14.41 4.41-17.694 10.691z"/><path fill="#FBBC05" d="M24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C34.418 32.833 29.418 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/></g></svg>
                   Googleでサインイン
                 </Button>
-                <Button type="submit" className="w-1/2">
-                  Login
+                <Button type="submit" className="w-1/2" disabled={isLoading}>
+                  {isLoading ? "登録中..." : "新規登録"}
                 </Button>
               </div>
             </CardContent>
