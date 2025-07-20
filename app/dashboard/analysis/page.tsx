@@ -103,39 +103,6 @@ function KeyStatsGrid() {
   )
 }
 
-function MaxDrawdownCard() {
-  return (
-    <Card className="md:col-span-2 lg:col-span-3">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <TrendingDown className="h-5 w-5 text-red-600" />
-          最大ドローダウン
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="text-center">
-            <div className="text-sm text-muted-foreground mb-1">Pips</div>
-            <div className="text-2xl font-bold text-red-600">-156.8 pips</div>
-          </div>
-          <div className="text-center">
-            <div className="text-sm text-muted-foreground mb-1">損失額</div>
-            <div className="text-2xl font-bold text-red-600">¥-45,230</div>
-          </div>
-          <div className="text-center">
-            <div className="text-sm text-muted-foreground mb-1">パーセンテージ</div>
-            <div className="text-2xl font-bold text-red-600">-12.4%</div>
-          </div>
-        </div>
-        <div className="mt-4">
-          <div className="text-sm text-muted-foreground mb-2">期間: 2024年4月15日 - 2024年4月22日</div>
-          <Progress value={12.4} className="w-full" />
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
 function TimeAnalysis() {
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -557,13 +524,12 @@ export default function AnalysisPage() {
             <h2 className="text-xl font-semibold mb-4">主要統計</h2>
             <div className="space-y-4">
               <KeyStatsGrid />
-              <MaxDrawdownCard />
             </div>
           </section>
 
           {/* Analysis Tabs */}
           <section>
-            <Tabs defaultValue="risk-reward" className="w-full">
+            <Tabs defaultValue="time" className="w-full">
               <TabsList className="grid w-full grid-cols-2 lg:grid-cols-2">
                 <TabsTrigger value="time">時間帯分析</TabsTrigger>
                 <TabsTrigger value="trend">月別分析</TabsTrigger>
