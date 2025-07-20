@@ -2,7 +2,6 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { Suspense } from "react"
 
 import { FormEvent, useState, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
@@ -13,11 +12,10 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabaseClient"
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
-function LoginForm() {
+export default function Component() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -30,13 +28,16 @@ function LoginForm() {
   const [authError, setAuthError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
 
-  // Check for success message from URL parameters
+  // Check for success message from URL parameters using useEffect
   useEffect(() => {
-    const message = searchParams.get('message');
-    if (message) {
-      setSuccessMessage(message);
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const message = urlParams.get('message');
+      if (message) {
+        setSuccessMessage(message);
+      }
     }
-  }, [searchParams]);
+  }, []);
 
   const validateForm = () => {
     let isValid = true;
@@ -221,20 +222,5 @@ function LoginForm() {
         </Card>
       </div>
     </main>
-  )
-}
-
-export default function Component() {
-  return (
-    <Suspense fallback={
-      <main className="relative flex flex-col min-h-screen items-center justify-center overflow-hidden bg-white dark:bg-gray-900">
-        <div className="flex flex-col items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          <p className="mt-4 text-muted-foreground">読み込み中...</p>
-        </div>
-      </main>
-    }>
-      <LoginForm />
-    </Suspense>
   )
 }
