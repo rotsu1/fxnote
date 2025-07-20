@@ -23,10 +23,15 @@ import {
 } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
+import { 
+  formatPerformanceValue, 
+  getPerformanceMetricColor, 
+  getAvailableMetrics 
+} from "@/utils/performanceUtils";
 
 function KeyStatsGrid() {
   const user = useAuth();
-  const [keyStats, setKeyStats] = useState<any[]>([]);
+  const [performanceData, setPerformanceData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
 
@@ -37,15 +42,16 @@ function KeyStatsGrid() {
     setError("");
     
     supabase
-      .from("user_key_stats")
+      .from("user_key_status")
       .select("*")
       .eq("user_id", user.id)
+      .single()
       .then(({ data, error }) => {
         if (error) {
           setError(error.message);
-          setKeyStats([]);
+          setPerformanceData(null);
         } else {
-          setKeyStats(data || []);
+          setPerformanceData(data);
         }
         setLoading(false);
       });
@@ -76,7 +82,7 @@ function KeyStatsGrid() {
     );
   }
 
-  if (keyStats.length === 0) {
+  if (!performanceData) {
     return (
       <div className="text-center text-muted-foreground py-10">
         統計データがありません
@@ -84,18 +90,21 @@ function KeyStatsGrid() {
     );
   }
 
+  // Get available metrics from the data
+  const availableMetrics = getAvailableMetrics(performanceData);
+
   return (
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {keyStats.map((stat, index) => (
+      {availableMetrics.map((metric, index) => (
         <Card key={index}>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">{stat.title}</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">{metric.title}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${stat.color}`}>
-              {stat.value}
-              {stat.unit && <span className="text-sm font-normal ml-1">{stat.unit}</span>}
+            <div className={`text-2xl font-bold ${getPerformanceMetricColor(metric.column, performanceData[metric.column])}`}>
+              {formatPerformanceValue(performanceData[metric.column], metric.column)}
             </div>
+            <div className="text-xs text-muted-foreground mt-1">{metric.description}</div>
           </CardContent>
         </Card>
       ))}
