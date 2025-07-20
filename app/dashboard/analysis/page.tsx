@@ -24,22 +24,6 @@ import {
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
-// Sample analytics data
-const timeAnalysisData = [
-  { time: "00:00-02:00", wins: 2, losses: 3, avgPips: -5.2, performance: "weak" },
-  { time: "02:00-04:00", wins: 1, losses: 1, avgPips: 2.1, performance: "neutral" },
-  { time: "04:00-06:00", wins: 4, losses: 1, avgPips: 18.5, performance: "strong" },
-  { time: "06:00-08:00", wins: 8, losses: 2, avgPips: 32.1, performance: "strong" },
-  { time: "08:00-10:00", wins: 12, losses: 4, avgPips: 28.7, performance: "strong" },
-  { time: "10:00-12:00", wins: 6, losses: 5, avgPips: 8.3, performance: "neutral" },
-  { time: "12:00-14:00", wins: 3, losses: 6, avgPips: -12.4, performance: "weak" },
-  { time: "14:00-16:00", wins: 9, losses: 3, avgPips: 25.6, performance: "strong" },
-  { time: "16:00-18:00", wins: 7, losses: 4, avgPips: 15.2, performance: "neutral" },
-  { time: "18:00-20:00", wins: 5, losses: 7, avgPips: -8.9, performance: "weak" },
-  { time: "20:00-22:00", wins: 4, losses: 2, avgPips: 12.3, performance: "neutral" },
-  { time: "22:00-00:00", wins: 2, losses: 4, avgPips: -15.6, performance: "weak" },
-]
-
 function KeyStatsGrid() {
   const user = useAuth();
   const [keyStats, setKeyStats] = useState<any[]>([]);
@@ -153,6 +137,75 @@ function MaxDrawdownCard() {
 }
 
 function TimeAnalysis() {
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [timeData, setTimeData] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const user = useAuth();
+
+  // Generate year options (current year and 5 years back)
+  const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
+  
+  // Generate month options
+  const monthOptions = [
+    { value: 1, label: "1月" },
+    { value: 2, label: "2月" },
+    { value: 3, label: "3月" },
+    { value: 4, label: "4月" },
+    { value: 5, label: "5月" },
+    { value: 6, label: "6月" },
+    { value: 7, label: "7月" },
+    { value: 8, label: "8月" },
+    { value: 9, label: "9月" },
+    { value: 10, label: "10月" },
+    { value: 11, label: "11月" },
+    { value: 12, label: "12月" },
+  ];
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    // Fetch time analysis data for the selected year and month
+    supabase
+      .from("time_analysis")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("year", selectedYear)
+      .eq("month", selectedMonth)
+      .order("time_range", { ascending: true })
+      .then(({ data, error }) => {
+        if (error) {
+          setError(error.message);
+          setTimeData([]);
+        } else {
+          // If no data, use default structure with zeros
+          const defaultTimeSlots = [
+            "00:00-02:00", "02:00-04:00", "04:00-06:00", "06:00-08:00",
+            "08:00-10:00", "10:00-12:00", "12:00-14:00", "14:00-16:00",
+            "16:00-18:00", "18:00-20:00", "20:00-22:00", "22:00-00:00"
+          ];
+          
+          const processedData = defaultTimeSlots.map(timeSlot => {
+            const timeData = data?.find(item => item.time_range === timeSlot);
+            return {
+              time: timeSlot,
+              wins: timeData?.wins || 0,
+              losses: timeData?.losses || 0,
+              avgPips: timeData?.avg_pips || 0,
+              performance: timeData?.avg_pips > 10 ? "strong" : timeData?.avg_pips < -10 ? "weak" : "neutral"
+            };
+          });
+          
+          setTimeData(processedData);
+        }
+        setLoading(false);
+      });
+  }, [user, selectedYear, selectedMonth]);
+
   const getPerformanceColor = (performance: string) => {
     switch (performance) {
       case "strong":
@@ -175,18 +228,93 @@ function TimeAnalysis() {
     }
   }
 
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-purple-600" />
+            時間帯別成績分析
+          </CardTitle>
+          <CardDescription>時間帯ごとのパフォーマンス分析</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            {[...Array(12)].map((_, index) => (
+              <div key={index} className="flex items-center gap-4 p-3 rounded-lg border">
+                <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                  <div className="h-2 bg-gray-200 rounded animate-pulse"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-purple-600" />
+            時間帯別成績分析
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-red-600 py-10">
+            エラーが発生しました: {error}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Clock className="h-5 w-5 text-purple-600" />
-          時間帯別成績分析
-        </CardTitle>
-        <CardDescription>時間帯ごとのパフォーマンス分析</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-purple-600" />
+              時間帯別成績分析
+            </CardTitle>
+            <CardDescription>時間帯ごとのパフォーマンス分析</CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(Number(value))}>
+              <SelectTrigger className="w-32">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {yearOptions.map((year) => (
+                  <SelectItem key={year} value={year.toString()}>
+                    {year}年
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(Number(value))}>
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map((month) => (
+                  <SelectItem key={month.value} value={month.value.toString()}>
+                    {month.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
-          {timeAnalysisData.map((data, index) => (
+          {timeData.map((data, index) => (
             <div key={index} className="flex items-center gap-4 p-3 rounded-lg border">
               <div className="w-20 text-sm font-medium">{data.time}</div>
 
