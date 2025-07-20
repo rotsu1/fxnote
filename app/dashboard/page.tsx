@@ -24,10 +24,6 @@ import {
 } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/hooks/useAuth"
-import { 
-  formatPerformanceValue, 
-  getDashboardMetrics 
-} from "@/utils/performanceUtils"
 
 
 function PLSummaryCards() {
@@ -219,7 +215,53 @@ function PerformanceMetrics() {
     );
   }
 
-  const performanceMetrics = getDashboardMetrics(performanceData);
+  // Handle old table structure (key-value format)
+  const performanceMetrics = [
+    { 
+      title: "今月の勝率", 
+      value: performanceData.monthly_win_rate ? `${performanceData.monthly_win_rate}%` : "N/A", 
+      description: performanceData.monthly_win_count && performanceData.monthly_trade_count 
+        ? `${performanceData.monthly_win_count}勝 / ${performanceData.monthly_trade_count}取引` 
+        : "データなし" 
+    },
+    { 
+      title: "平均利益/損失", 
+      value: performanceData.average_profit_loss ? `¥${performanceData.average_profit_loss.toLocaleString()}` : "N/A", 
+      description: "利益時平均" 
+    },
+    { 
+      title: "最大連勝・連敗", 
+      value: performanceData.max_win_streak && performanceData.max_loss_streak 
+        ? `${performanceData.max_win_streak}勝 / ${performanceData.max_loss_streak}敗` 
+        : "N/A", 
+      description: "現在の記録" 
+    },
+    { 
+      title: "今月の取引回数", 
+      value: performanceData.monthly_trade_count ? `${performanceData.monthly_trade_count}回` : "N/A", 
+      description: performanceData.previous_month_trade_count 
+        ? `前月比 ${performanceData.monthly_trade_count > performanceData.previous_month_trade_count ? '+' : ''}${((performanceData.monthly_trade_count - performanceData.previous_month_trade_count) / performanceData.previous_month_trade_count * 100).toFixed(0)}%` 
+        : "データなし" 
+    },
+  ];
+
+  // If no data is available, show a message
+  const hasData = performanceMetrics.some(metric => metric.value !== "N/A");
+  
+  if (!hasData) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>パフォーマンス指標</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-muted-foreground py-10">
+            パフォーマンスデータがありません。データが正しく設定されているか確認してください。
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -231,9 +273,7 @@ function PerformanceMetrics() {
           {performanceMetrics.map((metric, index) => (
             <div key={index} className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">{metric.title}</div>
-              <div className="text-2xl font-bold">
-                {formatPerformanceValue(performanceData[metric.column], metric.column)}
-              </div>
+              <div className="text-2xl font-bold">{metric.value}</div>
               <div className="text-xs text-muted-foreground">{metric.description}</div>
             </div>
           ))}
