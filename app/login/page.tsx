@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation";
 
@@ -19,16 +20,71 @@ export default function Component() {
   const [email, setEmail] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState("")
-  const [message, setMessage] = useState("")
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // Error states
+  const [emailError, setEmailError] = useState("")
+  const [passwordError, setPasswordError] = useState("")
+  const [authError, setAuthError] = useState("")
+
+  const validateForm = () => {
+    let isValid = true;
+    
+    // Clear previous errors
+    setEmailError("");
+    setPasswordError("");
+    setAuthError("");
+
+    // Validate email
+    if (!email.trim()) {
+      setEmailError("メールアドレスを入力してください");
+      isValid = false;
+    }
+
+    // Validate password
+    if (!password.trim()) {
+      setPasswordError("パスワードを入力してください");
+      isValid = false;
+    }
+
+    return isValid;
+  };
 
   const handleLogin = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      setMessage(error.message);
-    } else {
-      setMessage("Login successful!");
-      router.push("/dashboard");
+    
+    // Validate form before submission
+    if (!validateForm()) {
+      return;
+    }
+
+    setIsLoading(true);
+    setAuthError("");
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.trim(), 
+        password 
+      });
+      
+      if (error) {
+        // Handle specific Supabase auth errors
+        if (error.message.includes("Invalid login credentials")) {
+          setAuthError("メールアドレスまたはパスワードが正しくありません");
+        } else if (error.message.includes("Email not confirmed")) {
+          setAuthError("メールアドレスの確認が完了していません");
+        } else {
+          setAuthError("ログインに失敗しました");
+        }
+      } else {
+        // Login successful
+        router.push("/dashboard");
+      }
+    } catch (error) {
+      console.error("Login error:", error);
+      setAuthError("ログインに失敗しました");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -42,7 +98,7 @@ export default function Component() {
           width={960}
           height={1080}
           className="h-full w-full object-cover"
-          priority // Preload this image as it's a primary visual element [^1][^2]
+          priority
         />
       </div>
       {/* Right Background Image - visible on large screens and up */}
@@ -53,7 +109,7 @@ export default function Component() {
           width={960}
           height={1080}
           className="h-full w-full object-cover"
-          priority // Preload this image as it's a primary visual element [^1][^2]
+          priority
         />
       </div>
 
@@ -72,9 +128,29 @@ export default function Component() {
           </CardHeader>
           <form onSubmit={handleLogin}>
             <CardContent className="grid gap-4">
+              {/* Authentication Error Alert */}
+              {authError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{authError}</AlertDescription>
+                </Alert>
+              )}
               <div className="grid gap-2">
                 <Label htmlFor="email">メールアドレス</Label>
-                <Input id="email" type="email" placeholder="m@example.com" required value={email} onChange={e => setEmail(e.target.value)} />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  placeholder="m@example.com" 
+                  value={email} 
+                  onChange={e => {
+                    setEmail(e.target.value);
+                    if (emailError) setEmailError("");
+                    if (authError) setAuthError("");
+                  }}
+                  className={emailError ? "border-red-500 focus:border-red-500" : ""}
+                />
+                {emailError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{emailError}</p>
+                )}
               </div>
               <div className="grid gap-2">
                 <div className="flex items-center">
@@ -87,10 +163,13 @@ export default function Component() {
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    required
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="pr-10"
+                    onChange={e => {
+                      setPassword(e.target.value);
+                      if (passwordError) setPasswordError("");
+                      if (authError) setAuthError("");
+                    }}
+                    className={`pr-10 ${passwordError ? "border-red-500 focus:border-red-500" : ""}`}
                   />
                   <button
                     type="button"
@@ -102,14 +181,18 @@ export default function Component() {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {passwordError && (
+                  <p className="text-sm text-red-600 dark:text-red-400">{passwordError}</p>
+                )}
               </div>
+              
               <div className="flex gap-2">
                 <Button type="button" className="w-1/2 flex items-center justify-center gap-2" variant="outline">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5" fill="none"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.97 32.833 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.045 0 19.824-8.955 19.824-20 0-1.341-.138-2.651-.213-3.917z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.084 19.002 13 24 13c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4c-7.732 0-14.41 4.41-17.694 10.691z"/><path fill="#FBBC05" d="M24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C34.418 32.833 29.418 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/></g></svg>
                   Googleでサインイン
                 </Button>
-                <Button type="submit" className="w-1/2">
-                  Login
+                <Button type="submit" className="w-1/2" disabled={isLoading}>
+                  {isLoading ? "ログイン中..." : "Login"}
                 </Button>
               </div>
             </CardContent>
