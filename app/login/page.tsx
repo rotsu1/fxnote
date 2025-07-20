@@ -2,6 +2,7 @@
 
 import Image from "next/image"
 import Link from "next/link"
+import { Suspense } from "react"
 
 import { FormEvent, useState, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
@@ -14,7 +15,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabaseClient"
 import { useRouter, useSearchParams } from "next/navigation";
 
-export default function Component() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -220,5 +221,20 @@ export default function Component() {
         </Card>
       </div>
     </main>
+  )
+}
+
+export default function Component() {
+  return (
+    <Suspense fallback={
+      <main className="relative flex flex-col min-h-screen items-center justify-center overflow-hidden bg-white dark:bg-gray-900">
+        <div className="flex flex-col items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          <p className="mt-4 text-muted-foreground">読み込み中...</p>
+        </div>
+      </main>
+    }>
+      <LoginForm />
+    </Suspense>
   )
 }
