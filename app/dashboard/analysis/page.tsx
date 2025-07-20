@@ -40,15 +40,6 @@ const timeAnalysisData = [
   { time: "22:00-00:00", wins: 2, losses: 4, avgPips: -15.6, performance: "weak" },
 ]
 
-const monthlyData = [
-  { month: "1月", trades: 47, winRate: 68, profit: 128750, avgPips: 15.2 },
-  { month: "2月", trades: 52, winRate: 62, profit: 95420, avgPips: 12.8 },
-  { month: "3月", trades: 38, winRate: 71, profit: 156890, avgPips: 18.9 },
-  { month: "4月", trades: 44, winRate: 59, profit: 78340, avgPips: 9.4 },
-  { month: "5月", trades: 49, winRate: 65, profit: 112560, avgPips: 14.7 },
-  { month: "6月", trades: 41, winRate: 73, profit: 189230, avgPips: 21.3 },
-]
-
 function KeyStatsGrid() {
   const user = useAuth();
   const [keyStats, setKeyStats] = useState<any[]>([]);
@@ -239,14 +230,147 @@ function TimeAnalysis() {
 }
 
 function MonthlyBreakdown() {
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [monthlyData, setMonthlyData] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string>("");
+  const user = useAuth();
+
+  // Generate year options (current year and 5 years back)
+  const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    setLoading(true);
+    setError("");
+    
+    // Fetch monthly performance data for the selected year
+    supabase
+      .from("monthly_performance")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("year", selectedYear)
+      .order("month", { ascending: true })
+      .then(({ data, error }) => {
+        
+        if (error) {
+          setError(error.message);
+          setMonthlyData([]);
+        } else {
+          // Process the data to create monthly breakdown with default values for missing months
+          const monthlyStats = processMonthlyData(data || []);
+          setMonthlyData(monthlyStats);
+        }
+        setLoading(false);
+      });
+  }, [user, selectedYear]);
+
+  const processMonthlyData = (performanceData: any[]) => {
+    const months = [
+      "1月", "2月", "3月", "4月", "5月", "6月",
+      "7月", "8月", "9月", "10月", "11月", "12月"
+    ];
+    
+    const monthlyStats = months.map((month, index) => {
+      const monthNumber = index + 1;
+      
+      // Match by Japanese month string (e.g., '1月', '2月')
+      let monthData = performanceData.find(data => data.month === month);
+
+      if (!monthData) {
+        // Return default values for months without data
+        return {
+          month,
+          trades: 0,
+          winRate: 0,
+          profit: 0,
+          avgPips: 0
+        };
+      }
+
+      return {
+        month,
+        trades: monthData.trades || 0,
+        winRate: monthData.win_rate || 0,
+        profit: monthData.profit || 0,
+        avgPips: monthData.avg_pips || 0
+      };
+    });
+
+    return monthlyStats;
+  };
+
+  if (loading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-green-600" />
+            月別分析
+          </CardTitle>
+          <CardDescription>月ごとの取引統計</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {[...Array(12)].map((_, index) => (
+              <div key={index} className="flex items-center gap-4 p-3 rounded-lg border">
+                <div className="h-4 bg-gray-200 rounded animate-pulse w-12"></div>
+                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5 text-green-600" />
+            月別分析
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-red-600 py-10">
+            エラーが発生しました: {error}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5 text-green-600" />
-          月別分析
-        </CardTitle>
-        <CardDescription>月ごとの取引統計</CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5 text-green-600" />
+              月別分析
+            </CardTitle>
+            <CardDescription>月ごとの取引統計</CardDescription>
+          </div>
+          <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(Number(value))}>
+            <SelectTrigger className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}年
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
