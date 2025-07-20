@@ -403,8 +403,8 @@ function MonthlyBreakdown() {
     const monthlyStats = months.map((month, index) => {
       const monthNumber = index + 1;
       
-      // Match by Japanese month string (e.g., '1月', '2月')
-      let monthData = performanceData.find(data => data.month === month);
+      // Match by integer month number (1, 2, 3, etc.)
+      let monthData = performanceData.find(data => data.month === monthNumber);
 
       if (!monthData) {
         // Return default values for months without data
