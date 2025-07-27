@@ -291,22 +291,41 @@ function TradeCard({
   trade,
   onEdit,
   onDelete,
-}: { trade: any; onEdit: (trade: any) => void; onDelete: (id: number) => void }) {
+  displaySettings,
+}: { 
+  trade: any; 
+  onEdit: (trade: any) => void; 
+  onDelete: (id: number) => void;
+  displaySettings: Record<string, boolean>;
+}) {
   // Ensure pnl is a number
   const pnl = typeof trade.pnl === "number" ? trade.pnl : (typeof trade.profit_loss === "number" ? trade.profit_loss : 0);
   
   // Get symbol name from symbol ID
   const symbolName = trade.symbol_name || trade.pair || trade.currency_pair || "Unknown";
   
+  // Get long/short text
+  const getLongShortText = (type: string | number) => {
+    if (type === "買い" || type === 0) return "ロング";
+    if (type === "売り" || type === 1) return "ショート";
+    return type;
+  };
+
   return (
     <Card className="mb-3">
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
             <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
-            <span className="font-medium">{symbolName}</span>
-            <span className="text-sm text-gray-500">{getJapaneseTradeType(trade.type || trade.trade_type)}</span>
-            <span className="text-sm text-gray-500">{trade.exit_time?.split("T")[1]?.slice(0,5) || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.time}</span>
+            {displaySettings.show_symbol && (
+              <span className="font-medium">{symbolName}</span>
+            )}
+            {displaySettings.show_direction && (
+              <span className="text-sm text-gray-500">{getLongShortText(trade.type || trade.trade_type)}</span>
+            )}
+            {displaySettings.show_exit_time && (
+              <span className="text-sm text-gray-500">{trade.exit_time?.split("T")[1]?.slice(0,5) || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.time}</span>
+            )}
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => onEdit(trade)}>
@@ -318,22 +337,28 @@ function TradeCard({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-          <div>エントリー: {trade.entry || trade.entry_price}</div>
-          <div>エグジット: {trade.exit || trade.exit_price}</div>
-        </div>
+        {displaySettings.show_entry_price && displaySettings.show_exit_price && (
+          <div className="grid grid-cols-2 gap-2 text-sm mb-2">
+            {displaySettings.show_entry_price && <div>エントリー: {trade.entry || trade.entry_price}</div>}
+            {displaySettings.show_exit_price && <div>エグジット: {trade.exit || trade.exit_price}</div>}
+          </div>
+        )}
 
-        <div className={`text-lg font-bold mb-2 ${pnl > 0 ? "text-green-600" : "text-red-600"}`}>
-          {pnl > 0 ? "+" : ""}¥{Number(pnl).toLocaleString()}
-        </div>
+        {displaySettings.show_profit && (
+          <div className={`text-lg font-bold mb-2 ${pnl > 0 ? "text-green-600" : "text-red-600"}`}>
+            {pnl > 0 ? "+" : ""}¥{Number(pnl).toLocaleString()}
+          </div>
+        )}
 
-        <div className="flex flex-wrap gap-1">
-          {(trade.tags || (trade.trade_memo ? [trade.trade_memo] : [])).map((tag: string, index: number) => (
-            <Badge key={index} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-        </div>
+        {displaySettings.show_tag && (
+          <div className="flex flex-wrap gap-1">
+            {(trade.tags || (trade.trade_memo ? [trade.trade_memo] : [])).map((tag: string, index: number) => (
+              <Badge key={index} variant="outline" className="text-xs">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -349,6 +374,7 @@ function RightSidebar({
   onAddTrade,
   onImportCSV,
   onDisplaySettings,
+  displaySettings,
 }: {
   isOpen: boolean
   onClose: () => void
@@ -359,6 +385,7 @@ function RightSidebar({
   onAddTrade: () => void
   onImportCSV: () => void
   onDisplaySettings: () => void
+  displaySettings: Record<string, boolean>
 }) {
   if (!isOpen) return null
 
@@ -417,7 +444,7 @@ function RightSidebar({
         <div className="p-4">
           <h4 className="font-medium mb-3">取引履歴</h4>
           {trades.map((trade) => (
-            <TradeCard key={trade.id} trade={trade} onEdit={onEditTrade} onDelete={onDeleteTrade} />
+            <TradeCard key={trade.id} trade={trade} onEdit={onEditTrade} onDelete={onDeleteTrade} displaySettings={displaySettings} />
           ))}
         </div>
       </div>
@@ -1327,7 +1354,28 @@ function CSVImportDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => 
   )
 }
 
-function DisplaySettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function DisplaySettingsDialog({ 
+  isOpen, 
+  onClose, 
+  displaySettings, 
+  onSaveSettings 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void;
+  displaySettings: Record<string, boolean>;
+  onSaveSettings: (settings: Record<string, boolean>) => void;
+}) {
+  const [settings, setSettings] = useState<Record<string, boolean>>(displaySettings);
+
+  useEffect(() => {
+    setSettings(displaySettings);
+  }, [displaySettings]);
+
+  const handleSave = () => {
+    onSaveSettings(settings);
+    onClose();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent>
@@ -1338,17 +1386,33 @@ function DisplaySettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
         <div className="space-y-4">
           {[
-            { id: "pair", label: "通貨ペア", checked: true },
-            { id: "entry", label: "エントリー価格", checked: true },
-            { id: "exit", label: "エグジット価格", checked: true },
-            { id: "time", label: "取引時間", checked: true },
-            { id: "tags", label: "タグ", checked: true },
-            { id: "volume", label: "取引量", checked: false },
-            { id: "commission", label: "手数料", checked: false },
+            { id: "show_symbol", label: "シンボル", checked: true, disabled: true },
+            { id: "show_profit", label: "損益", checked: true, disabled: true },
+            { id: "show_direction", label: "ロング/ショート", checked: true, disabled: false },
+            { id: "show_entry_price", label: "エントリー価格", checked: true, disabled: false },
+            { id: "show_exit_price", label: "エグジット価格", checked: true, disabled: false },
+            { id: "show_entry_time", label: "エントリー時間", checked: true, disabled: false },
+            { id: "show_exit_time", label: "エグジット時間", checked: true, disabled: false },
+            { id: "show_emotion", label: "感情", checked: true, disabled: false },
+            { id: "show_tag", label: "タグ", checked: true, disabled: false },
+            { id: "show_lot", label: "ロット", checked: true, disabled: false },
+            { id: "show_pips", label: "pips", checked: true, disabled: false },
+            { id: "show_note", label: "メモ", checked: true, disabled: false },
           ].map((item) => (
             <div key={item.id} className="flex items-center space-x-2">
-              <Checkbox id={item.id} defaultChecked={item.checked} />
-              <Label htmlFor={item.id}>{item.label}</Label>
+              <Checkbox 
+                id={item.id} 
+                checked={settings[item.id] || false}
+                disabled={item.disabled}
+                onCheckedChange={(checked) => {
+                  if (!item.disabled) {
+                    setSettings(prev => ({ ...prev, [item.id]: checked as boolean }));
+                  }
+                }}
+              />
+              <Label htmlFor={item.id} className={item.disabled ? "text-gray-500" : ""}>
+                {item.label}
+              </Label>
             </div>
           ))}
         </div>
@@ -1357,7 +1421,7 @@ function DisplaySettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
           <Button variant="outline" onClick={onClose}>
             キャンセル
           </Button>
-          <Button>保存</Button>
+          <Button onClick={handleSave}>保存</Button>
         </div>
       </DialogContent>
     </Dialog>
@@ -1378,6 +1442,57 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [isEditingLoading, setIsEditingLoading] = useState<boolean>(false);
+  const [displaySettings, setDisplaySettings] = useState<Record<string, boolean>>({
+    show_symbol: true,
+    show_direction: true,
+    show_entry_price: true,
+    show_exit_price: true,
+    show_entry_time: true,
+    show_exit_time: true,
+    show_emotion: true,
+    show_tag: true,
+    show_lot: true,
+    show_pips: true,
+    show_profit: true,
+    show_note: true,
+  });
+
+  // Load display settings from database
+  const loadDisplaySettings = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("trade_settings")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') {
+        console.error("Error loading display settings:", error);
+        return;
+      }
+      
+      if (data) {
+        setDisplaySettings({
+          show_symbol: data.show_symbol ?? true,
+          show_direction: data.show_direction ?? true,
+          show_entry_price: data.show_entry_price ?? true,
+          show_exit_price: data.show_exit_price ?? true,
+          show_entry_time: data.show_entry_time ?? true,
+          show_exit_time: data.show_exit_time ?? true,
+          show_emotion: data.show_emotion ?? true,
+          show_tag: data.show_tag ?? true,
+          show_lot: data.show_lot ?? true,
+          show_pips: data.show_pips ?? true,
+          show_profit: data.show_profit ?? true,
+          show_note: data.show_note ?? true,
+        });
+      }
+    } catch (error) {
+      console.error("Error loading display settings:", error);
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -1404,6 +1519,11 @@ export default function CalendarPage() {
         }
         setLoading(false);
       });
+  }, [user]);
+
+  // Load display settings when user changes
+  useEffect(() => {
+    loadDisplaySettings();
   }, [user]);
 
   const groupedTrades = groupTradesByDate(trades);
@@ -1883,6 +2003,73 @@ export default function CalendarPage() {
     setDeleteTradeId(null);
   };
 
+  const handleSaveDisplaySettings = async (settings: Record<string, boolean>) => {
+    if (!user) return;
+    
+    try {
+      // Check if settings exist for this user
+      const { data: existingSettings, error: checkError } = await supabase
+        .from("trade_settings")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error("Error checking existing settings:", checkError);
+        return;
+      }
+      
+      const settingsData = {
+        user_id: user.id,
+        show_symbol: settings.show_symbol,
+        show_direction: settings.show_direction,
+        show_entry_price: settings.show_entry_price,
+        show_exit_price: settings.show_exit_price,
+        show_entry_time: settings.show_entry_time,
+        show_exit_time: settings.show_exit_time,
+        show_emotion: settings.show_emotion,
+        show_tag: settings.show_tag,
+        show_lot: settings.show_lot,
+        show_pips: settings.show_pips,
+        show_profit: settings.show_profit,
+        show_note: settings.show_note,
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (existingSettings) {
+        // Update existing settings
+        const { error: updateError } = await supabase
+          .from("trade_settings")
+          .update(settingsData)
+          .eq("user_id", user.id);
+        
+        if (updateError) {
+          console.error("Error updating display settings:", updateError);
+          return;
+        }
+      } else {
+        // Insert new settings
+        const { error: insertError } = await supabase
+          .from("trade_settings")
+          .insert([{
+            ...settingsData,
+            created_at: new Date().toISOString(),
+          }]);
+        
+        if (insertError) {
+          console.error("Error inserting display settings:", insertError);
+          return;
+        }
+      }
+      
+      // Update local state
+      setDisplaySettings(settings);
+      console.log("Display settings saved successfully");
+    } catch (error) {
+      console.error("Error saving display settings:", error);
+    }
+  };
+
   const selectedTrades = groupedTrades[selectedDate] || [];
 
   return (
@@ -1918,6 +2105,7 @@ export default function CalendarPage() {
           onAddTrade={handleAddTrade}
           onImportCSV={() => setIsCSVDialogOpen(true)}
           onDisplaySettings={() => setIsDisplaySettingsOpen(true)}
+          displaySettings={displaySettings}
         />
         <TradeEditDialog
           trade={editingTrade}
@@ -1928,7 +2116,12 @@ export default function CalendarPage() {
           user={user}
         />
         <CSVImportDialog isOpen={isCSVDialogOpen} onClose={() => setIsCSVDialogOpen(false)} />
-        <DisplaySettingsDialog isOpen={isDisplaySettingsOpen} onClose={() => setIsDisplaySettingsOpen(false)} />
+        <DisplaySettingsDialog 
+          isOpen={isDisplaySettingsOpen} 
+          onClose={() => setIsDisplaySettingsOpen(false)}
+          displaySettings={displaySettings}
+          onSaveSettings={handleSaveDisplaySettings}
+        />
         <AlertDialog open={deleteTradeId !== null} onOpenChange={() => setDeleteTradeId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
