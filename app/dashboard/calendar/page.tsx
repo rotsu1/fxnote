@@ -47,6 +47,8 @@ interface Trade {
   id: number
   date: string
   time: string
+  entryDateTime?: string
+  exitDateTime?: string
   pair: string
   type: "買い" | "売り"
   entry: number
@@ -55,6 +57,8 @@ interface Trade {
   profit: number
   emotion: string
   holdingTime: string
+  holdingHours?: number
+  holdingMinutes?: number
   notes?: string
   tags: string[]
 }
@@ -412,6 +416,9 @@ function TradeEditDialog({
   const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
       date: defaultDate || new Date().toISOString().split("T")[0],
+      time: "",
+      entryDateTime: "",
+      exitDateTime: "",
       pair: "",
       type: "買い",
       entry: undefined,
@@ -420,6 +427,8 @@ function TradeEditDialog({
       profit: undefined,
       emotion: "",
       holdingTime: "",
+      holdingHours: undefined,
+      holdingMinutes: undefined,
       notes: "",
       tags: [],
     },
@@ -430,6 +439,9 @@ function TradeEditDialog({
     setFormData(
       trade || {
         date: defaultDate || new Date().toISOString().split("T")[0],
+        time: "",
+        entryDateTime: "",
+        exitDateTime: "",
         pair: "",
         type: "買い",
         entry: undefined,
@@ -438,11 +450,31 @@ function TradeEditDialog({
         profit: undefined,
         emotion: "",
         holdingTime: "",
+        holdingHours: undefined,
+        holdingMinutes: undefined,
         notes: "",
         tags: [],
       },
     )
   }, [trade, defaultDate])
+
+  // Auto-calculate holding time when entry and exit datetimes change
+  useEffect(() => {
+    if (formData.entryDateTime && formData.exitDateTime) {
+      const entryDate = new Date(formData.entryDateTime);
+      const exitDate = new Date(formData.exitDateTime);
+      
+      const diffMs = exitDate.getTime() - entryDate.getTime();
+      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+      
+      setFormData(prev => ({
+        ...prev,
+        holdingHours: diffHours,
+        holdingMinutes: diffMinutes
+      }));
+    }
+  }, [formData.entryDateTime, formData.exitDateTime])
 
   const addTag = () => {
     if (newTag && !formData.tags?.includes(newTag)) {
@@ -468,12 +500,18 @@ function TradeEditDialog({
     const parsedPips = formData.pips !== undefined ? Number.parseFloat(String(formData.pips)) : undefined
     const parsedProfit = formData.profit !== undefined ? Number.parseFloat(String(formData.profit)) : undefined
 
+    // Format holding time for database
+    const holdingTime = formData.holdingHours !== undefined || formData.holdingMinutes !== undefined
+      ? `${formData.holdingHours || 0}h ${formData.holdingMinutes || 0}m`
+      : ""
+
     onSave({
       ...formData,
       entry: parsedEntry,
       exit: parsedExit,
       pips: parsedPips,
       profit: parsedProfit,
+      holdingTime,
     })
   }
 
@@ -488,21 +526,21 @@ function TradeEditDialog({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="date">日付</Label>
+              <Label htmlFor="entryDateTime">エントリー日時</Label>
               <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                id="entryDateTime"
+                type="datetime-local"
+                value={formData.entryDateTime}
+                onChange={(e) => setFormData({ ...formData, entryDateTime: e.target.value })}
               />
             </div>
             <div>
-              <Label htmlFor="time">時間</Label>
+              <Label htmlFor="exitDateTime">エグジット日時</Label>
               <Input
-                id="time"
-                type="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                id="exitDateTime"
+                type="datetime-local"
+                value={formData.exitDateTime}
+                onChange={(e) => setFormData({ ...formData, exitDateTime: e.target.value })}
               />
             </div>
           </div>
@@ -595,13 +633,39 @@ function TradeEditDialog({
           </div>
 
           <div>
-            <Label htmlFor="holdingTime">保有時間</Label>
-            <Input
-              id="holdingTime"
-              value={formData.holdingTime}
-              onChange={(e) => setFormData({ ...formData, holdingTime: e.target.value })}
-              placeholder="例: 1h 30m"
-            />
+            <Label>保有時間</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="holdingHours" className="text-sm text-muted-foreground">時間</Label>
+                <Input
+                  id="holdingHours"
+                  type="number"
+                  min="0"
+                  max="999"
+                  value={formData.holdingHours || ""}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">分</Label>
+                <Input
+                  id="holdingMinutes"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={formData.holdingMinutes || ""}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
+                  placeholder="0"
+                />
+              </div>
+            </div>
           </div>
 
           <div>
