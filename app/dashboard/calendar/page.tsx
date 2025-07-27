@@ -434,6 +434,32 @@ function TradeEditDialog({
     },
   )
   const [newTag, setNewTag] = useState("")
+  const [isTagEditOpen, setIsTagEditOpen] = useState(false)
+  const [availableTags, setAvailableTags] = useState<string[]>([
+    "USD/JPY",
+    "EUR/USD",
+    "GBP/JPY",
+    "AUD/USD",
+    "スキャルピング",
+    "デイトレード",
+    "スイング",
+    "ブレイクアウト",
+    "レンジブレイク",
+    "押し目買い",
+    "逆張り",
+    "トレンド",
+    "レンジ",
+    "興奮",
+    "焦り",
+    "冷静",
+    "満足",
+    "後悔",
+    "朝",
+    "昼",
+    "夜",
+    "失敗",
+    "成功",
+  ])
 
   useEffect(() => {
     setFormData(
@@ -493,6 +519,43 @@ function TradeEditDialog({
     }
   }
 
+  const toggleTag = (tag: string) => {
+    const currentTags = formData.tags || []
+    if (currentTags.includes(tag)) {
+      setFormData({ ...formData, tags: currentTags.filter(t => t !== tag) })
+    } else {
+      setFormData({ ...formData, tags: [...currentTags, tag] })
+    }
+  }
+
+  const addNewTagToDatabase = async (tagName: string) => {
+    if (!tagName.trim()) return
+    
+    try {
+      // Add to local state first
+      setAvailableTags(prev => [...prev, tagName.trim()])
+      setNewTag("")
+      
+      // Here you would typically save to database
+      // For now, we'll just add to local state
+      console.log(`Adding new tag to database: ${tagName.trim()}`)
+    } catch (error) {
+      console.error("Error adding tag to database:", error)
+    }
+  }
+
+  const deleteTagFromDatabase = async (tagName: string) => {
+    try {
+      // Remove from local state first
+      setAvailableTags(prev => prev.filter(tag => tag !== tagName))
+      
+      // Here you would typically delete from database
+      console.log(`Deleting tag from database: ${tagName}`)
+    } catch (error) {
+      console.error("Error deleting tag from database:", error)
+    }
+  }
+
   const handleSave = () => {
     // Basic validation for numbers
     const parsedEntry = formData.entry !== undefined ? Number.parseFloat(String(formData.entry)) : undefined
@@ -516,217 +579,268 @@ function TradeEditDialog({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
-          <DialogDescription>取引の詳細を入力または編集してください。</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
+            <DialogDescription>取引の詳細を入力または編集してください。</DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="entryDateTime">エントリー日時</Label>
-              <Input
-                id="entryDateTime"
-                type="datetime-local"
-                value={formData.entryDateTime}
-                onChange={(e) => setFormData({ ...formData, entryDateTime: e.target.value })}
-              />
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="entryDateTime">エントリー日時</Label>
+                <Input
+                  id="entryDateTime"
+                  type="datetime-local"
+                  value={formData.entryDateTime}
+                  onChange={(e) => setFormData({ ...formData, entryDateTime: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="exitDateTime">エグジット日時</Label>
+                <Input
+                  id="exitDateTime"
+                  type="datetime-local"
+                  value={formData.exitDateTime}
+                  onChange={(e) => setFormData({ ...formData, exitDateTime: e.target.value })}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="exitDateTime">エグジット日時</Label>
-              <Input
-                id="exitDateTime"
-                type="datetime-local"
-                value={formData.exitDateTime}
-                onChange={(e) => setFormData({ ...formData, exitDateTime: e.target.value })}
-              />
-            </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="pair">通貨ペア</Label>
-              <Input
-                id="pair"
-                value={formData.pair}
-                onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="pair">通貨ペア</Label>
+                <Input
+                  id="pair"
+                  value={formData.pair}
+                  onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="type">取引種別</Label>
+                <Select
+                  value={formData.type}
+                  onValueChange={(value) => setFormData({ ...formData, type: value as "買い" | "売り" })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="買い">買い</SelectItem>
+                    <SelectItem value="売り">売り</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="entry">エントリー価格</Label>
+                <Input
+                  id="entry"
+                  type="number"
+                  step="0.0001"
+                  value={formData.entry}
+                  onChange={(e) => setFormData({ ...formData, entry: Number.parseFloat(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="exit">エグジット価格</Label>
+                <Input
+                  id="exit"
+                  type="number"
+                  step="0.0001"
+                  value={formData.exit}
+                  onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="pips">pips</Label>
+                <Input
+                  id="pips"
+                  type="number"
+                  step="0.1"
+                  value={formData.pips}
+                  onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
+                />
+              </div>
+              <div>
+                <Label htmlFor="profit">損益 (¥)</Label>
+                <Input
+                  id="profit"
+                  type="number"
+                  value={formData.profit}
+                  onChange={(e) => setFormData({ ...formData, profit: Number.parseFloat(e.target.value) })}
+                />
+              </div>
+            </div>
+
             <div>
-              <Label htmlFor="type">取引種別</Label>
-              <Select
-                value={formData.type}
-                onValueChange={(value) => setFormData({ ...formData, type: value as "買い" | "売り" })}
-              >
+              <Label htmlFor="emotion">感情</Label>
+              <Select value={formData.emotion} onValueChange={(value) => setFormData({ ...formData, emotion: value })}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="買い">買い</SelectItem>
-                  <SelectItem value="売り">売り</SelectItem>
+                  {emotions.map((e) => (
+                    <SelectItem key={e} value={e}>
+                      {e}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="entry">エントリー価格</Label>
-              <Input
-                id="entry"
-                type="number"
-                step="0.0001"
-                value={formData.entry}
-                onChange={(e) => setFormData({ ...formData, entry: Number.parseFloat(e.target.value) })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="exit">エグジット価格</Label>
-              <Input
-                id="exit"
-                type="number"
-                step="0.0001"
-                value={formData.exit}
-                onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="pips">pips</Label>
-              <Input
-                id="pips"
-                type="number"
-                step="0.1"
-                value={formData.pips}
-                onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="profit">損益 (¥)</Label>
-              <Input
-                id="profit"
-                type="number"
-                value={formData.profit}
-                onChange={(e) => setFormData({ ...formData, profit: Number.parseFloat(e.target.value) })}
-              />
-            </div>
-          </div>
-
-          <div>
-            <Label htmlFor="emotion">感情</Label>
-            <Select value={formData.emotion} onValueChange={(value) => setFormData({ ...formData, emotion: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {emotions.map((e) => (
-                  <SelectItem key={e} value={e}>
-                    {e}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label>保有時間</Label>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="holdingHours" className="text-sm text-muted-foreground">時間</Label>
-                <Input
-                  id="holdingHours"
-                  type="number"
-                  min="0"
-                  max="999"
-                  value={formData.holdingHours || ""}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
-                  placeholder="0"
-                />
-              </div>
-              <div>
-                <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">分</Label>
-                <Input
-                  id="holdingMinutes"
-                  type="number"
-                  min="0"
-                  max="59"
-                  value={formData.holdingMinutes || ""}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
-                    holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
-                  })}
-                  placeholder="0"
-                />
+              <Label>保有時間</Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="holdingHours" className="text-sm text-muted-foreground">時間</Label>
+                  <Input
+                    id="holdingHours"
+                    type="number"
+                    min="0"
+                    max="999"
+                    value={formData.holdingHours || ""}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
+                    })}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">分</Label>
+                  <Input
+                    id="holdingMinutes"
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={formData.holdingMinutes || ""}
+                    onChange={(e) => setFormData({ 
+                      ...formData, 
+                      holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
+                    })}
+                    placeholder="0"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div>
-            <Label htmlFor="notes">メモ</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              placeholder="取引に関するメモ"
-              rows={3}
-            />
-          </div>
-
-          <div>
-            <Label>タグ</Label>
-            <div className="flex gap-2 mb-2">
-              <Input
-                placeholder="新しいタグ"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && addTag()}
+            <div>
+              <Label htmlFor="notes">メモ</Label>
+              <Textarea
+                id="notes"
+                value={formData.notes}
+                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                placeholder="取引に関するメモ"
+                rows={3}
               />
-              <Button type="button" onClick={addTag}>
-                <Tag className="h-4 w-4" />
-              </Button>
             </div>
 
-            <div className="mb-3">
-              <div className="text-sm text-muted-foreground mb-2">既存のタグから選択:</div>
-              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <Label>タグ</Label>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setIsTagEditOpen(true)}
+                >
+                  <Edit className="h-4 w-4 mr-1" />
+                  編集
+                </Button>
+              </div>
+              <div className="flex flex-wrap gap-1 min-h-[32px] p-2 border rounded">
                 {availableTags.map((tag, index) => (
                   <Badge
                     key={index}
                     variant={formData.tags?.includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer text-xs"
-                    onClick={() => addExistingTag(tag)}
+                    className={`cursor-pointer text-xs ${
+                      formData.tags?.includes(tag) ? "bg-black text-white hover:bg-black/90" : ""
+                    }`}
+                    onClick={() => toggleTag(tag)}
                   >
                     {tag}
                   </Badge>
                 ))}
               </div>
             </div>
+          </div>
 
-            <div className="flex flex-wrap gap-1">
-              {formData.tags?.map((tag: string, index: number) => (
-                <Badge key={index} variant="default" className="cursor-pointer" onClick={() => removeTag(tag)}>
-                  {tag} ×
-                </Badge>
-              ))}
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={onClose}>
+              キャンセル
+            </Button>
+            <Button onClick={handleSave}>保存</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+            {/* Tag Edit Dialog */}
+      <Dialog open={isTagEditOpen} onOpenChange={setIsTagEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>タグ管理</DialogTitle>
+            <DialogDescription>データベースのタグを追加または削除してください。</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Add new tag */}
+            <div>
+              <Label htmlFor="newTagInput">新しいタグを追加</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  id="newTagInput"
+                  placeholder="新しいタグ名を入力"
+                  value={newTag}
+                  onChange={(e) => setNewTag(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addNewTagToDatabase(newTag)}
+                />
+                <Button type="button" onClick={() => addNewTagToDatabase(newTag)} size="sm">
+                  <Tag className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* All available tags with delete option */}
+            <div>
+              <Label className="text-sm text-muted-foreground mb-2 block">利用可能なタグ:</Label>
+              <div className="flex flex-wrap gap-1 max-h-64 overflow-y-auto border rounded p-2">
+                {availableTags.length > 0 ? (
+                  availableTags.map((tag, index) => (
+                    <Badge
+                      key={index}
+                      variant="outline"
+                      className="cursor-pointer text-xs hover:bg-red-50 hover:border-red-300"
+                      onClick={() => deleteTagFromDatabase(tag)}
+                    >
+                      {tag} ×
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">タグがありません</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                タグをクリックして削除
+              </p>
             </div>
           </div>
-        </div>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button onClick={handleSave}>保存</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={() => setIsTagEditOpen(false)}>
+              閉じる
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
