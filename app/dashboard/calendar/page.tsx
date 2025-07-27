@@ -93,6 +93,26 @@ const availableTags = [
 
 // Remove the hardcoded emotions array since we'll load from database
 
+// Helper to convert UTC datetime to local datetime string for input
+function utcToLocalDateTime(utcString: string): string {
+  if (!utcString) return "";
+  const date = new Date(utcString);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
+// Helper to convert local datetime string to UTC ISO string
+function localDateTimeToUTC(localDateTimeString: string): string {
+  if (!localDateTimeString) return new Date().toISOString();
+  // Create a date object from the local datetime string
+  const date = new Date(localDateTimeString);
+  return date.toISOString();
+}
+
 // Helper to group trades by date (entry_time)
 function groupTradesByDate(trades: any[]): Record<string, any[]> {
   return trades.reduce((acc: Record<string, any[]>, trade: any) => {
@@ -1423,8 +1443,8 @@ export default function CalendarPage() {
         id: trade.id,
         date: trade.entry_time?.split("T")[0] || "",
         time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
-        entryDateTime: trade.entry_time ? new Date(trade.entry_time).toISOString().slice(0, 16) : "",
-        exitDateTime: trade.exit_time ? new Date(trade.exit_time).toISOString().slice(0, 16) : "",
+              entryDateTime: utcToLocalDateTime(trade.entry_time),
+      exitDateTime: utcToLocalDateTime(trade.exit_time),
         pair: trade.symbol_name || "", // Use symbol name for display
         type: trade.trade_type === 0 ? "買い" : "売り",
         entry: trade.entry_price,
@@ -1520,8 +1540,8 @@ export default function CalendarPage() {
           profit_loss: tradeData.profit,
           hold_time: tradeData.holdingTime,
           trade_memo: tradeData.notes,
-          entry_time: tradeData.entryDateTime ? new Date(tradeData.entryDateTime).toISOString() : new Date().toISOString(),
-          exit_time: tradeData.exitDateTime ? new Date(tradeData.exitDateTime).toISOString() : new Date().toISOString(),
+          entry_time: localDateTimeToUTC(tradeData.entryDateTime || ""),
+          exit_time: localDateTimeToUTC(tradeData.exitDateTime || ""),
           updated_at: new Date().toISOString(),
         };
         
@@ -1698,8 +1718,8 @@ export default function CalendarPage() {
           profit_loss: tradeData.profit,
           hold_time: tradeData.holdingTime,
           trade_memo: tradeData.notes,
-          entry_time: tradeData.entryDateTime ? new Date(tradeData.entryDateTime).toISOString() : new Date().toISOString(),
-          exit_time: tradeData.exitDateTime ? new Date(tradeData.exitDateTime).toISOString() : new Date().toISOString(),
+          entry_time: localDateTimeToUTC(tradeData.entryDateTime || ""),
+          exit_time: localDateTimeToUTC(tradeData.exitDateTime || ""),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
