@@ -66,11 +66,20 @@ const getPLColor = (pnl: number) => {
   return "bg-gray-100 text-gray-600"
 }
 
-function MonthlyNavigation({ currentDate, onDateChange }: { currentDate: Date; onDateChange: (date: Date) => void }) {
+function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate: Date; onDateChange: (date: Date) => void; trades: any[] }) {
   const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth()
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i) // 10 years before and after
+
+  // Calculate monthly P/L
+  const monthlyPL = trades.reduce((sum, trade) => {
+    const tradeDate = new Date(trade.entry_time || trade.created_at);
+    if (tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === currentMonth) {
+      return sum + (trade.profit_loss || trade.pnl || 0);
+    }
+    return sum;
+  }, 0);
 
   const handleYearChange = (year: number) => {
     const newDate = new Date(currentDate)
@@ -116,19 +125,17 @@ function MonthlyNavigation({ currentDate, onDateChange }: { currentDate: Date; o
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-      <div className="text-lg font-semibold text-green-600">月間損益: +¥128,750</div>
-      {/* use this later */}
-      {/* <div
-          className={`text-lg font-semibold ${
-            monthlyPL > 0
-              ? "text-green-600"
-              : monthlyPL < 0
-              ? "text-red-600"
-              : "text-gray-500"
-          }`}
-        >
-          月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
-      </div> */}
+      <div
+        className={`text-lg font-semibold ${
+          monthlyPL > 0
+            ? "text-green-600"
+            : monthlyPL < 0
+            ? "text-red-600"
+            : "text-gray-500"
+        }`}
+      >
+        月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
+      </div>
     </div>
   )
 }
@@ -684,7 +691,7 @@ export default function CalendarPage() {
             <div className="text-center text-red-600 py-10">{error}</div>
           ) : (
             <>
-              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} />
+              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} trades={trades} />
               <CalendarGrid currentDate={currentDate} onDateClick={handleDateClick} groupedTrades={groupedTrades} />
             </>
           )}
