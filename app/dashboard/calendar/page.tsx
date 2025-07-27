@@ -113,6 +113,22 @@ function localDateTimeToUTC(localDateTimeString: string): string {
   return date.toISOString();
 }
 
+// Helper to format hold time from seconds to readable format
+function formatHoldTime(seconds: number): string {
+  if (!seconds || seconds <= 0) return "0分";
+  
+  const days = Math.floor(seconds / (24 * 60 * 60));
+  const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
+  const minutes = Math.floor((seconds % (60 * 60)) / 60);
+  
+  let result = "";
+  if (days > 0) result += `${days}日`;
+  if (hours > 0) result += `${hours}時間`;
+  if (minutes > 0) result += `${minutes}分`;
+  
+  return result || "0分";
+}
+
 // Helper to group trades by date (exit_time)
 function groupTradesByDate(trades: any[]): Record<string, any[]> {
   return trades.reduce((acc: Record<string, any[]>, trade: any) => {
@@ -298,6 +314,10 @@ function TradeCard({
   onDelete: (id: number) => void;
   displaySettings: Record<string, boolean>;
 }) {
+  const [tradeTags, setTradeTags] = useState<string[]>([]);
+  const [tradeEmotion, setTradeEmotion] = useState<string>("");
+  const [loadingData, setLoadingData] = useState(true);
+
   // Ensure pnl is a number
   const pnl = typeof trade.pnl === "number" ? trade.pnl : (typeof trade.profit_loss === "number" ? trade.profit_loss : 0);
   
@@ -311,20 +331,89 @@ function TradeCard({
     return type;
   };
 
+  // Load trade tags and emotion
+  useEffect(() => {
+    const loadTradeData = async () => {
+      if (!trade.id) {
+        setLoadingData(false);
+        return;
+      }
+
+      try {
+        // Load tags
+        const { data: tagLinks, error: tagError } = await supabase
+          .from("trade_tag_links")
+          .select(`
+            trade_tags!inner(tag_name)
+          `)
+          .eq("trade_id", trade.id);
+
+        if (tagError) {
+          console.error("Error loading trade tags:", tagError);
+        } else {
+          const tags = tagLinks?.map(link => (link.trade_tags as any)?.tag_name).filter(Boolean) || [];
+          setTradeTags(tags);
+        }
+
+        // Load emotion
+        const { data: emotionLink, error: emotionError } = await supabase
+          .from("trade_emotion_links")
+          .select(`
+            emotions!inner(emotion)
+          `)
+          .eq("trade_id", trade.id)
+          .single();
+
+        if (emotionError && emotionError.code !== 'PGRST116') {
+          console.error("Error loading trade emotion:", emotionError);
+        } else if (emotionLink) {
+          setTradeEmotion((emotionLink.emotions as any)?.emotion || "");
+        }
+      } catch (error) {
+        console.error("Error loading trade data:", error);
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    loadTradeData();
+  }, [trade.id]);
+
   return (
     <Card className="mb-3">
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
-          <div className="flex items-center gap-2">
-            <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
-            {displaySettings.show_symbol && (
-              <span className="font-medium">{symbolName}</span>
-            )}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
+              {displaySettings.show_symbol && (
+                <span className="font-medium">{symbolName}</span>
+              )}
+            </div>
             {displaySettings.show_direction && (
-              <span className="text-sm text-gray-500">{getLongShortText(trade.type || trade.trade_type)}</span>
+              <div className="font-medium text-sm">{getLongShortText(trade.type || trade.trade_type)}</div>
+            )}
+            {displaySettings.show_entry_time && (
+              <div className="font-medium text-sm">
+                エントリー: {trade.entry_time ? new Date(trade.entry_time).toLocaleString('ja-JP', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) : trade.time}
+              </div>
             )}
             {displaySettings.show_exit_time && (
-              <span className="text-sm text-gray-500">{trade.exit_time?.split("T")[1]?.slice(0,5) || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.time}</span>
+              <div className="font-medium text-sm">
+                エグジット: {trade.exit_time ? new Date(trade.exit_time).toLocaleString('ja-JP', {
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) : ""}
+              </div>
             )}
           </div>
           <div className="flex gap-1">
@@ -337,10 +426,33 @@ function TradeCard({
           </div>
         </div>
 
-        {displaySettings.show_entry_price && displaySettings.show_exit_price && (
-          <div className="grid grid-cols-2 gap-2 text-sm mb-2">
-            {displaySettings.show_entry_price && <div>エントリー: {trade.entry || trade.entry_price}</div>}
-            {displaySettings.show_exit_price && <div>エグジット: {trade.exit || trade.exit_price}</div>}
+        {displaySettings.show_entry_price && (
+          <div className="text-sm mb-1">
+            エントリー価格: {trade.entry || trade.entry_price}
+          </div>
+        )}
+
+        {displaySettings.show_exit_price && (
+          <div className="text-sm mb-1">
+            エグジット価格: {trade.exit || trade.exit_price}
+          </div>
+        )}
+
+        {displaySettings.show_lot && trade.lot_size && (
+          <div className="text-sm mb-1">
+            ロット: {trade.lot_size}
+          </div>
+        )}
+
+        {displaySettings.show_pips && trade.pips && (
+          <div className="text-sm mb-1">
+            pips: {trade.pips}
+          </div>
+        )}
+
+        {displaySettings.show_hold_time && trade.hold_time && (
+          <div className="text-sm mb-1">
+            保有時間: {formatHoldTime(trade.hold_time)}
           </div>
         )}
 
@@ -350,13 +462,25 @@ function TradeCard({
           </div>
         )}
 
-        {displaySettings.show_tag && (
-          <div className="flex flex-wrap gap-1">
-            {(trade.tags || (trade.trade_memo ? [trade.trade_memo] : [])).map((tag: string, index: number) => (
+        {displaySettings.show_emotion && tradeEmotion && !loadingData && (
+          <div className="text-sm mb-1">
+            感情: {tradeEmotion}
+          </div>
+        )}
+
+        {displaySettings.show_tag && tradeTags.length > 0 && !loadingData && (
+          <div className="flex flex-wrap gap-1 mb-1">
+            {tradeTags.map((tag: string, index: number) => (
               <Badge key={index} variant="outline" className="text-xs">
                 {tag}
               </Badge>
             ))}
+          </div>
+        )}
+
+        {displaySettings.show_note && trade.trade_memo && (
+          <div className="text-sm text-gray-600">
+            メモ: {trade.trade_memo}
           </div>
         )}
       </CardContent>
@@ -1453,6 +1577,7 @@ function DisplaySettingsDialog({
             { id: "show_exit_price", label: "エグジット価格", checked: true, disabled: false },
             { id: "show_entry_time", label: "エントリー時間", checked: true, disabled: false },
             { id: "show_exit_time", label: "エグジット時間", checked: true, disabled: false },
+            { id: "show_hold_time", label: "保有時間", checked: true, disabled: false },
             { id: "show_emotion", label: "感情", checked: true, disabled: false },
             { id: "show_tag", label: "タグ", checked: true, disabled: false },
             { id: "show_lot", label: "ロット", checked: true, disabled: false },
@@ -1509,6 +1634,7 @@ export default function CalendarPage() {
     show_exit_price: true,
     show_entry_time: true,
     show_exit_time: true,
+    show_hold_time: true,
     show_emotion: true,
     show_tag: true,
     show_lot: true,
@@ -1541,6 +1667,7 @@ export default function CalendarPage() {
           show_exit_price: data.show_exit_price ?? true,
           show_entry_time: data.show_entry_time ?? true,
           show_exit_time: data.show_exit_time ?? true,
+          show_hold_time: data.show_hold_time ?? true,
           show_emotion: data.show_emotion ?? true,
           show_tag: data.show_tag ?? true,
           show_lot: data.show_lot ?? true,
@@ -2087,6 +2214,7 @@ export default function CalendarPage() {
         show_exit_price: settings.show_exit_price,
         show_entry_time: settings.show_entry_time,
         show_exit_time: settings.show_exit_time,
+        show_hold_time: settings.show_hold_time,
         show_emotion: settings.show_emotion,
         show_tag: settings.show_tag,
         show_lot: settings.show_lot,
