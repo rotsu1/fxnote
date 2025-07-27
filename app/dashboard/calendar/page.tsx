@@ -1559,9 +1559,21 @@ export default function CalendarPage() {
         }
         
         // Handle tag relationships
+        console.log("Processing tags:", tradeData.tags);
+        
+        // Always delete existing tag links first
+        const { error: deleteError } = await supabase
+          .from("trade_tag_links")
+          .delete()
+          .eq("trade_id", editingTrade.id);
+        
+        if (deleteError) {
+          console.error("Error deleting existing tag links:", deleteError);
+        }
+        
+        // Only insert new tag links if there are tags selected
         if (tradeData.tags && tradeData.tags.length > 0) {
-          console.log("Processing tags:", tradeData.tags);
-          // First, get tag IDs for the selected tags
+          // Get tag IDs for the selected tags
           const { data: tagData, error: tagError } = await supabase
             .from("trade_tags")
             .select("id")
@@ -1575,16 +1587,6 @@ export default function CalendarPage() {
           console.log("Found tag data:", tagData);
           
           if (tagData && tagData.length > 0) {
-            // Delete existing tag links
-            const { error: deleteError } = await supabase
-              .from("trade_tag_links")
-              .delete()
-              .eq("trade_id", editingTrade.id);
-            
-            if (deleteError) {
-              console.error("Error deleting existing tag links:", deleteError);
-            }
-            
             // Insert new tag links
             const tagLinks = tagData.map(tag => ({
               trade_id: editingTrade.id,
@@ -1604,8 +1606,20 @@ export default function CalendarPage() {
         }
         
                 // Handle emotion relationship
+        console.log("Processing emotion:", tradeData.emotion);
+        
+        // Always delete existing emotion link first
+        const { error: deleteEmotionError } = await supabase
+          .from("trade_emotion_links")
+          .delete()
+          .eq("trade_id", editingTrade.id);
+        
+        if (deleteEmotionError) {
+          console.error("Error deleting existing emotion link:", deleteEmotionError);
+        }
+        
+        // Only insert new emotion link if there is an emotion selected
         if (tradeData.emotion) {
-          console.log("Processing emotion:", tradeData.emotion);
           // Get emotion ID
           console.log("Fetching emotion with criteria:", {
             user_id: user.id,
@@ -1626,16 +1640,6 @@ export default function CalendarPage() {
           console.log("Found emotion data:", emotionData);
           
           if (emotionData) {
-            // Delete existing emotion link
-            const { error: deleteError } = await supabase
-              .from("trade_emotion_links")
-              .delete()
-              .eq("trade_id", editingTrade.id);
-            
-            if (deleteError) {
-              console.error("Error deleting existing emotion link:", deleteError);
-            }
-            
             // Insert new emotion link
             const emotionLinkData = {
               trade_id: editingTrade.id,
