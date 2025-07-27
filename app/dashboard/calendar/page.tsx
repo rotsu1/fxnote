@@ -389,6 +389,11 @@ function TradeCard({
               {displaySettings.show_symbol && (
                 <span className="font-medium">{symbolName}</span>
               )}
+              {displaySettings.show_profit && (
+                <span className={`font-bold ${pnl > 0 ? "text-green-600" : "text-red-600"}`}>
+                  {pnl > 0 ? "+" : ""}¥{Number(pnl).toLocaleString()}
+                </span>
+              )}
             </div>
             {displaySettings.show_direction && (
               <div className="font-medium text-sm">{getLongShortText(trade.type || trade.trade_type)}</div>
@@ -453,12 +458,6 @@ function TradeCard({
         {displaySettings.show_hold_time && trade.hold_time && (
           <div className="text-sm mb-1">
             保有時間: {formatHoldTime(trade.hold_time)}
-          </div>
-        )}
-
-        {displaySettings.show_profit && (
-          <div className={`text-lg font-bold mb-2 ${pnl > 0 ? "text-green-600" : "text-red-600"}`}>
-            {pnl > 0 ? "+" : ""}¥{Number(pnl).toLocaleString()}
           </div>
         )}
 
@@ -1573,15 +1572,15 @@ function DisplaySettingsDialog({
             { id: "show_symbol", label: "シンボル", checked: true, disabled: true },
             { id: "show_profit", label: "損益", checked: true, disabled: true },
             { id: "show_direction", label: "ロング/ショート", checked: true, disabled: false },
-            { id: "show_entry_price", label: "エントリー価格", checked: true, disabled: false },
-            { id: "show_exit_price", label: "エグジット価格", checked: true, disabled: false },
             { id: "show_entry_time", label: "エントリー時間", checked: true, disabled: false },
             { id: "show_exit_time", label: "エグジット時間", checked: true, disabled: false },
+            { id: "show_entry_price", label: "エントリー価格", checked: true, disabled: false },
+            { id: "show_exit_price", label: "エグジット価格", checked: true, disabled: false },
+            { id: "show_lot", label: "ロット", checked: true, disabled: false },
+            { id: "show_pips", label: "pips", checked: true, disabled: false },
             { id: "show_hold_time", label: "保有時間", checked: true, disabled: false },
             { id: "show_emotion", label: "感情", checked: true, disabled: false },
             { id: "show_tag", label: "タグ", checked: true, disabled: false },
-            { id: "show_lot", label: "ロット", checked: true, disabled: false },
-            { id: "show_pips", label: "pips", checked: true, disabled: false },
             { id: "show_note", label: "メモ", checked: true, disabled: false },
           ].map((item) => (
             <div key={item.id} className="flex items-center space-x-2">
