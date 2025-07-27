@@ -770,7 +770,7 @@ function TradeEditDialog({
     
     // Validation: Check if required fields are filled
     if (!formData.pair || !formData.pair.trim()) {
-      setValidationError("通貨ペアを入力してください")
+      setValidationError("シンボルを選択してください")
       return
     }
     
@@ -833,31 +833,46 @@ function TradeEditDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="pair">通貨ペア</Label>
-                <Input
-                  id="pair"
-                  value={formData.pair}
-                  onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="type">取引種別</Label>
+                      <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pair">シンボル</Label>
+              <Select
+                value={formData.pair}
+                onValueChange={(value) => setFormData({ ...formData, pair: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="シンボルを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="EUR/USD">EUR/USD</SelectItem>
+                  <SelectItem value="USD/JPY">USD/JPY</SelectItem>
+                  <SelectItem value="GBP/USD">GBP/USD</SelectItem>
+                  <SelectItem value="USD/CHF">USD/CHF</SelectItem>
+                  <SelectItem value="AUD/USD">AUD/USD</SelectItem>
+                  <SelectItem value="USD/CAD">USD/CAD</SelectItem>
+                  <SelectItem value="NZD/USD">NZD/USD</SelectItem>
+                  <SelectItem value="EUR/JPY">EUR/JPY</SelectItem>
+                  <SelectItem value="GBP/JPY">GBP/JPY</SelectItem>
+                  <SelectItem value="EUR/GBP">EUR/GBP</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="type">取引種別</Label>
                 <Select
                   value={formData.type}
                   onValueChange={(value) => setFormData({ ...formData, type: value as "買い" | "売り" })}
                 >
-                  <SelectTrigger>
+                <SelectTrigger>
                     <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
+                </SelectTrigger>
+                <SelectContent>
                     <SelectItem value="買い">買い</SelectItem>
                     <SelectItem value="売り">売り</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+                </SelectContent>
+              </Select>
             </div>
+          </div>
 
                       <div className="grid grid-cols-2 gap-4">
             <div>
@@ -1485,7 +1500,7 @@ export default function CalendarPage() {
     
     // Validate required fields
     if (!tradeData.pair || !tradeData.pair.trim()) {
-      setError("通貨ペアは必須です");
+      setError("シンボルは必須です");
       return;
     }
     
