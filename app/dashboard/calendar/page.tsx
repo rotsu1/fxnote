@@ -53,10 +53,11 @@ interface Trade {
   type: "買い" | "売り"
   entry: number
   exit: number
+  lotSize?: number
   pips: number
   profit: number
   emotion: string
-  holdingTime: string
+  holdingTime: number
   holdingDays?: number
   holdingHours?: number
   holdingMinutes?: number
@@ -273,13 +274,17 @@ function TradeCard({
 }: { trade: any; onEdit: (trade: any) => void; onDelete: (id: number) => void }) {
   // Ensure pnl is a number
   const pnl = typeof trade.pnl === "number" ? trade.pnl : (typeof trade.profit_loss === "number" ? trade.profit_loss : 0);
+  
+  // Get symbol name from symbol ID
+  const symbolName = trade.symbol_name || trade.pair || trade.currency_pair || "Unknown";
+  
   return (
     <Card className="mb-3">
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
             <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
-            <span className="font-medium">{trade.pair || trade.currency_pair}</span>
+            <span className="font-medium">{symbolName}</span>
             <span className="text-sm text-gray-500">{getJapaneseTradeType(trade.type || trade.trade_type)}</span>
             <span className="text-sm text-gray-500">{trade.time || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.exit_time?.split("T")[1]?.slice(0,5)}</span>
           </div>
@@ -416,20 +421,21 @@ function TradeEditDialog({
   defaultDate?: string
   user: any
 }) {
-  const [formData, setFormData] = useState<Partial<Trade>>(
+    const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
       date: defaultDate || new Date().toISOString().split("T")[0],
       time: "",
       entryDateTime: "",
       exitDateTime: "",
-      pair: "",
+    pair: "",
       type: "買い",
       entry: undefined,
       exit: undefined,
+      lotSize: undefined,
       pips: undefined,
       profit: undefined,
       emotion: "",
-      holdingTime: "",
+      holdingTime: 0,
       holdingDays: undefined,
       holdingHours: undefined,
       holdingMinutes: undefined,
@@ -449,22 +455,24 @@ function TradeEditDialog({
   const [newEmotion, setNewEmotion] = useState("")
   const [emotionError, setEmotionError] = useState("")
   const [emotionToDelete, setEmotionToDelete] = useState<string | null>(null)
+  const [validationError, setValidationError] = useState("")
 
-  useEffect(() => {
+    useEffect(() => {
     setFormData(
       trade || {
         date: defaultDate || new Date().toISOString().split("T")[0],
-        time: "",
+    time: "",
         entryDateTime: "",
         exitDateTime: "",
         pair: "",
         type: "買い",
         entry: undefined,
         exit: undefined,
+        lotSize: undefined,
         pips: undefined,
         profit: undefined,
         emotion: "",
-        holdingTime: "",
+        holdingTime: 0,
         holdingDays: undefined,
         holdingHours: undefined,
         holdingMinutes: undefined,
@@ -737,24 +745,40 @@ function TradeEditDialog({
   }
 
   const handleSave = () => {
+    // Clear previous validation errors
+    setValidationError("")
+    
+    // Validation: Check if required fields are filled
+    if (!formData.pair || !formData.pair.trim()) {
+      setValidationError("通貨ペアを入力してください")
+      return
+    }
+    
+    if (formData.profit === undefined || formData.profit === null) {
+      setValidationError("損益を入力してください")
+      return
+    }
+    
     // Basic validation for numbers
     const parsedEntry = formData.entry !== undefined ? Number.parseFloat(String(formData.entry)) : undefined
     const parsedExit = formData.exit !== undefined ? Number.parseFloat(String(formData.exit)) : undefined
+    const parsedLotSize = formData.lotSize !== undefined ? Number.parseFloat(String(formData.lotSize)) : undefined
     const parsedPips = formData.pips !== undefined ? Number.parseFloat(String(formData.pips)) : undefined
     const parsedProfit = formData.profit !== undefined ? Number.parseFloat(String(formData.profit)) : undefined
 
-    // Format holding time for database
-    const holdingTime = (formData.holdingDays !== undefined || formData.holdingHours !== undefined || formData.holdingMinutes !== undefined)
-      ? `${formData.holdingDays || 0}d ${formData.holdingHours || 0}h ${formData.holdingMinutes || 0}m`
-      : ""
+    // Calculate holding time in seconds
+    const holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
+                                (formData.holdingHours || 0) * 60 * 60 + 
+                                (formData.holdingMinutes || 0) * 60
 
     onSave({
       ...formData,
       entry: parsedEntry,
       exit: parsedExit,
+      lotSize: parsedLotSize,
       pips: parsedPips,
       profit: parsedProfit,
-      holdingTime,
+      holdingTime: holdingTimeInSeconds,
     })
   }
 
@@ -815,50 +839,68 @@ function TradeEditDialog({
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="entry">エントリー価格</Label>
-                <Input
-                  id="entry"
-                  type="number"
+                      <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="entry">エントリー価格</Label>
+              <Input
+                id="entry"
+                type="number"
                   step="0.0001"
-                  value={formData.entry}
+                value={formData.entry}
                   onChange={(e) => setFormData({ ...formData, entry: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-              <div>
-                <Label htmlFor="exit">エグジット価格</Label>
-                <Input
-                  id="exit"
-                  type="number"
-                  step="0.0001"
-                  value={formData.exit}
-                  onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
-                />
-              </div>
+              />
             </div>
+            <div>
+              <Label htmlFor="exit">エグジット価格</Label>
+              <Input
+                id="exit"
+                type="number"
+                  step="0.0001"
+                value={formData.exit}
+                  onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="pips">pips</Label>
-                <Input
-                  id="pips"
-                  type="number"
-                  step="0.1"
-                  value={formData.pips}
-                  onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
-                />
-              </div>
-              <div>
+                    <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="lotSize">ロットサイズ</Label>
+              <Input
+                id="lotSize"
+                type="number"
+                step="0.01"
+                value={formData.lotSize}
+                onChange={(e) => setFormData({ ...formData, lotSize: Number.parseFloat(e.target.value) })}
+                placeholder="0.01"
+              />
+            </div>
+            <div>
+              <Label htmlFor="pips">pips</Label>
+              <Input
+                id="pips"
+                type="number"
+                step="0.1"
+                value={formData.pips}
+                onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
                 <Label htmlFor="profit">損益 (¥)</Label>
-                <Input
+              <Input
                   id="profit"
                   type="number"
                   value={formData.profit}
                   onChange={(e) => setFormData({ ...formData, profit: Number.parseFloat(e.target.value) })}
-                />
-              </div>
+              />
             </div>
+          </div>
+          
+          {validationError && (
+            <div className="text-red-600 text-sm mt-1">{validationError}</div>
+          )}
 
                       <div>
             <div className="flex items-center justify-between mb-2">
@@ -1307,14 +1349,22 @@ export default function CalendarPage() {
     setError("");
     supabase
       .from("trades")
-      .select("*")
+      .select(`
+        *,
+        symbols!inner(symbol)
+      `)
       .eq("user_id", user.id)
       .then(({ data, error }) => {
         if (error) {
           setError(error.message);
           setTrades([]);
         } else {
-          setTrades(data || []);
+          // Transform data to include symbol_name
+          const transformedData = data?.map(trade => ({
+            ...trade,
+            symbol_name: trade.symbols?.symbol
+          })) || [];
+          setTrades(transformedData);
         }
         setLoading(false);
       });
@@ -1340,78 +1390,378 @@ export default function CalendarPage() {
   const handleSaveTrade = async (tradeData: Partial<Trade>) => {
     if (!user) return;
     
+    console.log("Saving trade data:", tradeData);
+    console.log("User ID:", user.id);
+    
+    // Validate required fields
+    if (!tradeData.pair || !tradeData.pair.trim()) {
+      setError("通貨ペアは必須です");
+      return;
+    }
+    
+    if (tradeData.profit === undefined || tradeData.profit === null) {
+      setError("損益は必須です");
+      return;
+    }
+    
     try {
       if (editingTrade?.id) {
         // Update existing trade
+        // Get or create symbol ID from symbols table
+        let symbolId = null;
+        if (tradeData.pair) {
+          // First try to find existing symbol
+          let { data: symbolData, error: symbolError } = await supabase
+            .from("symbols")
+            .select("id")
+            .eq("symbol", tradeData.pair)
+            .single();
+          
+          if (symbolError && symbolError.code === 'PGRST116') {
+            // Symbol doesn't exist, create it
+            console.log("Symbol not found, creating new symbol:", tradeData.pair);
+            const { data: newSymbol, error: createError } = await supabase
+              .from("symbols")
+              .insert([{ symbol: tradeData.pair }])
+              .select()
+              .single();
+            
+            if (createError) {
+              console.error("Error creating symbol:", createError);
+            } else {
+              symbolId = newSymbol?.id;
+              console.log("Created new symbol ID:", symbolId, "for symbol:", tradeData.pair);
+            }
+          } else if (symbolError) {
+            console.error("Error fetching symbol:", symbolError);
+          } else {
+            symbolId = symbolData?.id;
+            console.log("Found symbol ID:", symbolId, "for symbol:", tradeData.pair);
+          }
+        }
+
+        const updateData = {
+          symbol: symbolId,
+          trade_type: tradeData.type === "買い" ? 0 : 1,
+          entry_price: tradeData.entry,
+          exit_price: tradeData.exit,
+          lot_size: tradeData.lotSize,
+          pips: tradeData.pips,
+          profit_loss: tradeData.profit,
+          hold_time: tradeData.holdingTime,
+          trade_memo: tradeData.notes,
+          entry_time: tradeData.entryDateTime ? new Date(tradeData.entryDateTime).toISOString() : new Date().toISOString(),
+          exit_time: tradeData.exitDateTime ? new Date(tradeData.exitDateTime).toISOString() : new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        
+        console.log("Updating trade with data:", updateData);
+        
         const { error } = await supabase
           .from("trades")
-          .update({
-            currency_pair: tradeData.pair,
-            trade_type: tradeData.type === "買い" ? 0 : 1,
-            entry_price: tradeData.entry,
-            exit_price: tradeData.exit,
-            pips: tradeData.pips,
-            profit_loss: tradeData.profit,
-            emotion: tradeData.emotion,
-            holding_time: tradeData.holdingTime,
-            trade_memo: tradeData.notes,
-            tags: tradeData.tags,
-            updated_at: new Date().toISOString(),
-          })
+          .update(updateData)
           .eq("id", editingTrade.id)
           .eq("user_id", user.id);
         
-        if (error) throw error;
+        if (error) {
+          console.error("Error updating trade:", error);
+          throw error;
+        }
+        
+        // Handle tag relationships
+        if (tradeData.tags && tradeData.tags.length > 0) {
+          console.log("Processing tags:", tradeData.tags);
+          // First, get tag IDs for the selected tags
+          const { data: tagData, error: tagError } = await supabase
+            .from("trade_tags")
+            .select("id")
+            .eq("user_id", user.id)
+            .in("tag_name", tradeData.tags);
+          
+          if (tagError) {
+            console.error("Error fetching tags:", tagError);
+          }
+          
+          console.log("Found tag data:", tagData);
+          
+          if (tagData && tagData.length > 0) {
+            // Delete existing tag links
+            const { error: deleteError } = await supabase
+              .from("trade_tag_links")
+              .delete()
+              .eq("trade_id", editingTrade.id);
+            
+            if (deleteError) {
+              console.error("Error deleting existing tag links:", deleteError);
+            }
+            
+            // Insert new tag links
+            const tagLinks = tagData.map(tag => ({
+              trade_id: editingTrade.id,
+              tag_id: tag.id
+            }));
+            
+            console.log("Inserting tag links:", tagLinks);
+            
+            const { error: insertError } = await supabase
+              .from("trade_tag_links")
+              .insert(tagLinks);
+            
+            if (insertError) {
+              console.error("Error inserting tag links:", insertError);
+            }
+          }
+        }
+        
+                // Handle emotion relationship
+        if (tradeData.emotion) {
+          console.log("Processing emotion:", tradeData.emotion);
+          // Get emotion ID
+          console.log("Fetching emotion with criteria:", {
+            user_id: user.id,
+            emotion: tradeData.emotion
+          });
+          
+          const { data: emotionData, error: emotionError } = await supabase
+            .from("emotions")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("emotion", tradeData.emotion)
+            .single();
+          
+          if (emotionError) {
+            console.error("Error fetching emotion:", emotionError);
+          }
+          
+          console.log("Found emotion data:", emotionData);
+          
+          if (emotionData) {
+            // Delete existing emotion link
+            const { error: deleteError } = await supabase
+              .from("trade_emotion_links")
+              .delete()
+              .eq("trade_id", editingTrade.id);
+            
+            if (deleteError) {
+              console.error("Error deleting existing emotion link:", deleteError);
+            }
+            
+            // Insert new emotion link
+            const emotionLinkData = {
+              trade_id: editingTrade.id,
+              emotion_id: emotionData.id
+            };
+            
+            console.log("Attempting to insert emotion link:", emotionLinkData);
+            
+            const { error: insertError } = await supabase
+              .from("trade_emotion_links")
+              .insert(emotionLinkData);
+            
+            if (insertError) {
+              console.error("Error inserting emotion link:", insertError);
+              console.error("Emotion link data:", emotionLinkData);
+            }
+          }
+        }
         
         // Refresh trades data
         const { data } = await supabase
           .from("trades")
-          .select("*")
+          .select(`
+            *,
+            symbols!inner(symbol)
+          `)
           .eq("user_id", user.id);
         
         if (data) {
-          setTrades(data);
+          // Transform data to include symbol_name
+          const transformedData = data.map(trade => ({
+            ...trade,
+            symbol_name: trade.symbols?.symbol
+          }));
+          setTrades(transformedData);
         }
       } else {
         // Add new trade
-        const { data, error } = await supabase
-          .from("trades")
-          .insert([{
-            user_id: user.id,
-            currency_pair: tradeData.pair,
-            trade_type: tradeData.type === "買い" ? 0 : 1,
-            entry_price: tradeData.entry,
-            exit_price: tradeData.exit,
-            pips: tradeData.pips,
-            profit_loss: tradeData.profit,
-            emotion: tradeData.emotion,
-            holding_time: tradeData.holdingTime,
-            trade_memo: tradeData.notes,
-            tags: tradeData.tags,
-            entry_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
-            exit_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          }])
-          .select();
+        // Get or create symbol ID from symbols table
+        let symbolId = null;
+        if (tradeData.pair) {
+          // First try to find existing symbol
+          let { data: symbolData, error: symbolError } = await supabase
+            .from("symbols")
+            .select("id")
+            .eq("symbol", tradeData.pair)
+            .single();
+          
+          if (symbolError && symbolError.code === 'PGRST116') {
+            // Symbol doesn't exist, create it
+            console.log("Symbol not found, creating new symbol:", tradeData.pair);
+            const { data: newSymbol, error: createError } = await supabase
+              .from("symbols")
+              .insert([{ symbol: tradeData.pair }])
+              .select()
+              .single();
+            
+            if (createError) {
+              console.error("Error creating symbol:", createError);
+            } else {
+              symbolId = newSymbol?.id;
+              console.log("Created new symbol ID:", symbolId, "for symbol:", tradeData.pair);
+            }
+          } else if (symbolError) {
+            console.error("Error fetching symbol:", symbolError);
+          } else {
+            symbolId = symbolData?.id;
+            console.log("Found symbol ID:", symbolId, "for symbol:", tradeData.pair);
+          }
+        }
+
+        const insertData = {
+          user_id: user.id,
+          symbol: symbolId,
+          trade_type: tradeData.type === "買い" ? 0 : 1,
+          entry_price: tradeData.entry,
+          exit_price: tradeData.exit,
+          lot_size: tradeData.lotSize,
+          pips: tradeData.pips,
+          profit_loss: tradeData.profit,
+          hold_time: tradeData.holdingTime,
+          trade_memo: tradeData.notes,
+          entry_time: tradeData.entryDateTime ? new Date(tradeData.entryDateTime).toISOString() : new Date().toISOString(),
+          exit_time: tradeData.exitDateTime ? new Date(tradeData.exitDateTime).toISOString() : new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
         
-        if (error) throw error;
+        console.log("Inserting new trade with data:", insertData);
+        
+        const { data: newTrade, error } = await supabase
+          .from("trades")
+          .insert([insertData])
+          .select()
+          .single();
+        
+        if (error) {
+          console.error("Error inserting trade:", error);
+          throw error;
+        }
+        
+        if (newTrade) {
+          console.log("New trade created:", newTrade);
+          
+          // Handle tag relationships
+          if (tradeData.tags && tradeData.tags.length > 0) {
+            console.log("Processing tags for new trade:", tradeData.tags);
+            // Get tag IDs for the selected tags
+            const { data: tagData, error: tagError } = await supabase
+              .from("trade_tags")
+              .select("id")
+              .eq("user_id", user.id)
+              .in("tag_name", tradeData.tags);
+            
+            if (tagError) {
+              console.error("Error fetching tags for new trade:", tagError);
+            }
+            
+            console.log("Found tag data for new trade:", tagData);
+            
+            if (tagData && tagData.length > 0) {
+              // Insert tag links
+              const tagLinks = tagData.map(tag => ({
+                trade_id: newTrade.id,
+                tag_id: tag.id
+              }));
+              
+              console.log("Inserting tag links for new trade:", tagLinks);
+              
+              const { error: insertError } = await supabase
+                .from("trade_tag_links")
+                .insert(tagLinks);
+              
+              if (insertError) {
+                console.error("Error inserting tag links for new trade:", insertError);
+              }
+            }
+          }
+          
+          // Handle emotion relationship
+          if (tradeData.emotion) {
+            console.log("Processing emotion for new trade:", tradeData.emotion);
+            // Get emotion ID
+            console.log("Fetching emotion with criteria:", {
+              user_id: user.id,
+              emotion: tradeData.emotion
+            });
+            
+            const { data: emotionData, error: emotionError } = await supabase
+              .from("emotions")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("emotion", tradeData.emotion)
+              .single();
+            
+            if (emotionError) {
+              console.error("Error fetching emotion for new trade:", emotionError);
+            }
+            
+            console.log("Found emotion data for new trade:", emotionData);
+            console.log("Emotion ID:", emotionData?.id);
+            console.log("Trade ID:", newTrade?.id);
+            
+            if (emotionData) {
+              // Insert emotion link
+              const emotionLinkData = {
+                trade_id: newTrade.id,
+                emotion_id: emotionData.id
+              };
+              
+              console.log("Attempting to insert emotion link:", emotionLinkData);
+              
+              const { error: insertError } = await supabase
+                .from("trade_emotion_links")
+                .insert(emotionLinkData);
+              
+              if (insertError) {
+                console.error("Error inserting emotion link for new trade:", insertError);
+                console.error("Emotion link data:", {
+                  trade_id: newTrade.id,
+                  emotion_id: emotionData.id
+                });
+              }
+            }
+          }
+        }
         
         // Refresh trades data
         const { data: refreshedData } = await supabase
           .from("trades")
-          .select("*")
+          .select(`
+            *,
+            symbols!inner(symbol)
+          `)
           .eq("user_id", user.id);
         
         if (refreshedData) {
-          setTrades(refreshedData);
+          // Transform data to include symbol_name
+          const transformedData = refreshedData.map(trade => ({
+            ...trade,
+            symbol_name: trade.symbols?.symbol
+          }));
+          setTrades(transformedData);
         }
       }
       setIsTradeDialogOpen(false);
       setEditingTrade(null);
     } catch (error: any) {
       console.error("Error saving trade:", error);
-      setError(error.message);
+      console.error("Error details:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      setError(error.message || "取引の保存中にエラーが発生しました");
     }
   };
 
