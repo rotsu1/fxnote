@@ -468,6 +468,8 @@ function TradeEditDialog({
   defaultDate?: string
   user: any
 }) {
+  const [showDiscardWarning, setShowDiscardWarning] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
       date: defaultDate || new Date().toISOString().split("T")[0],
@@ -527,7 +529,8 @@ function TradeEditDialog({
         tags: [],
       },
     )
-  }, [trade, defaultDate])
+    setHasUnsavedChanges(false);
+  }, [trade, defaultDate, isOpen])
 
   // Load tags from database
   const loadTagsFromDatabase = async () => {
@@ -791,6 +794,11 @@ function TradeEditDialog({
     }
   }
 
+  const handleFormChange = (updates: Partial<Trade>) => {
+    setFormData(prev => ({ ...prev, ...updates }));
+    setHasUnsavedChanges(true);
+  };
+
   const handleSave = () => {
     // Clear previous validation errors
     setValidationError("")
@@ -827,11 +835,26 @@ function TradeEditDialog({
       profit: parsedProfit,
       holdingTime: holdingTimeInSeconds,
     })
+    setHasUnsavedChanges(false);
   }
+
+  const handleClose = () => {
+    if (hasUnsavedChanges) {
+      setShowDiscardWarning(true);
+    } else {
+      onClose();
+    }
+  };
+
+  const handleDiscard = () => {
+    setShowDiscardWarning(false);
+    setHasUnsavedChanges(false);
+    onClose();
+  };
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
@@ -846,7 +869,7 @@ function TradeEditDialog({
                   id="entryDateTime"
                   type="datetime-local"
                   value={formData.entryDateTime}
-                  onChange={(e) => setFormData({ ...formData, entryDateTime: e.target.value })}
+                  onChange={(e) => handleFormChange({ entryDateTime: e.target.value })}
                 />
               </div>
               <div>
@@ -855,7 +878,7 @@ function TradeEditDialog({
                   id="exitDateTime"
                   type="datetime-local"
                   value={formData.exitDateTime}
-                  onChange={(e) => setFormData({ ...formData, exitDateTime: e.target.value })}
+                  onChange={(e) => handleFormChange({ exitDateTime: e.target.value })}
                 />
               </div>
             </div>
@@ -865,7 +888,7 @@ function TradeEditDialog({
               <Label htmlFor="pair">シンボル</Label>
               <Select
                 value={formData.pair}
-                onValueChange={(value) => setFormData({ ...formData, pair: value })}
+                onValueChange={(value) => handleFormChange({ pair: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="シンボルを選択" />
@@ -888,7 +911,7 @@ function TradeEditDialog({
               <Label htmlFor="type">取引種別</Label>
                 <Select
                   value={formData.type}
-                  onValueChange={(value) => setFormData({ ...formData, type: value as "買い" | "売り" })}
+                  onValueChange={(value) => handleFormChange({ type: value as "買い" | "売り" })}
                 >
                 <SelectTrigger>
                     <SelectValue />
@@ -909,7 +932,7 @@ function TradeEditDialog({
                 type="number"
                   step="0.0001"
                 value={formData.entry}
-                  onChange={(e) => setFormData({ ...formData, entry: Number.parseFloat(e.target.value) })}
+                  onChange={(e) => handleFormChange({ entry: Number.parseFloat(e.target.value) })}
               />
             </div>
             <div>
@@ -919,7 +942,7 @@ function TradeEditDialog({
                 type="number"
                   step="0.0001"
                 value={formData.exit}
-                  onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
+                  onChange={(e) => handleFormChange({ exit: Number.parseFloat(e.target.value) })}
               />
             </div>
           </div>
@@ -932,7 +955,7 @@ function TradeEditDialog({
                 type="number"
                 step="0.01"
                 value={formData.lotSize}
-                onChange={(e) => setFormData({ ...formData, lotSize: Number.parseFloat(e.target.value) })}
+                onChange={(e) => handleFormChange({ lotSize: Number.parseFloat(e.target.value) })}
                 placeholder="0.01"
               />
             </div>
@@ -943,7 +966,7 @@ function TradeEditDialog({
                 type="number"
                 step="0.1"
                 value={formData.pips}
-                onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
+                onChange={(e) => handleFormChange({ pips: Number.parseFloat(e.target.value) })}
               />
             </div>
           </div>
@@ -955,7 +978,7 @@ function TradeEditDialog({
                   id="profit"
                   type="number"
                   value={formData.profit}
-                  onChange={(e) => setFormData({ ...formData, profit: Number.parseFloat(e.target.value) })}
+                  onChange={(e) => handleFormChange({ profit: Number.parseFloat(e.target.value) })}
               />
             </div>
           </div>
@@ -991,10 +1014,10 @@ function TradeEditDialog({
                     onClick={() => {
                       if (formData.emotion === emotion) {
                         // If already selected, unselect it
-                        setFormData({ ...formData, emotion: "" })
+                        handleFormChange({ emotion: "" })
                       } else {
                         // If not selected, select it
-                        setFormData({ ...formData, emotion: emotion })
+                        handleFormChange({ emotion: emotion })
                       }
                     }}
                   >
@@ -1012,14 +1035,13 @@ function TradeEditDialog({
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="holdingDays" className="text-sm text-muted-foreground">日</Label>
-                <Input
+                                  <Input
                   id="holdingDays"
                   type="number"
                   min="0"
                   max="365"
                   value={formData.holdingDays || ""}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
+                  onChange={(e) => handleFormChange({ 
                     holdingDays: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
                   placeholder="0"
@@ -1033,8 +1055,7 @@ function TradeEditDialog({
                   min="0"
                   max="23"
                   value={formData.holdingHours || ""}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
+                  onChange={(e) => handleFormChange({ 
                     holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
                   placeholder="0"
@@ -1048,8 +1069,7 @@ function TradeEditDialog({
                   min="0"
                   max="59"
                   value={formData.holdingMinutes || ""}
-                  onChange={(e) => setFormData({ 
-                    ...formData, 
+                  onChange={(e) => handleFormChange({ 
                     holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
                   })}
                   placeholder="0"
@@ -1063,7 +1083,7 @@ function TradeEditDialog({
               <Textarea
                 id="notes"
                 value={formData.notes}
-                onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                onChange={(e) => handleFormChange({ notes: e.target.value })}
                 placeholder="取引に関するメモ"
                 rows={3}
               />
@@ -1093,7 +1113,14 @@ function TradeEditDialog({
                       className={`cursor-pointer text-xs ${
                         formData.tags?.includes(tag) ? "bg-black text-white hover:bg-black/90" : ""
                       }`}
-                      onClick={() => toggleTag(tag)}
+                      onClick={() => {
+                        const currentTags = formData.tags || []
+                        if (currentTags.includes(tag)) {
+                          handleFormChange({ tags: currentTags.filter(t => t !== tag) })
+                        } else {
+                          handleFormChange({ tags: [...currentTags, tag] })
+                        }
+                      }}
                     >
                       {tag}
                     </Badge>
@@ -1106,7 +1133,7 @@ function TradeEditDialog({
           </div>
 
           <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={onClose}>
+            <Button variant="outline" onClick={handleClose}>
               キャンセル
             </Button>
             <Button onClick={handleSave}>保存</Button>
@@ -1308,6 +1335,37 @@ function TradeEditDialog({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Discard Changes Warning Dialog */}
+      <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="mb-2">
+                保存されていない変更があります。
+              </p>
+              <p className="text-red-600">
+                ⚠️ 現在入力されているデータは破棄されます。
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                この操作は取り消すことができません。
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowDiscardWarning(false)}>
+              キャンセル
+            </AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDiscard}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              破棄
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
@@ -1368,8 +1426,10 @@ function DisplaySettingsDialog({
   const [settings, setSettings] = useState<Record<string, boolean>>(displaySettings);
 
   useEffect(() => {
-    setSettings(displaySettings);
-  }, [displaySettings]);
+    if (isOpen) {
+      setSettings(displaySettings);
+    }
+  }, [displaySettings, isOpen]);
 
   const handleSave = () => {
     onSaveSettings(settings);
