@@ -1494,44 +1494,172 @@ function TradeEditDialog({
 }
 
 function CSVImportDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [isCustomBrokerOpen, setIsCustomBrokerOpen] = useState(false);
+  const [customBrokerName, setCustomBrokerName] = useState("");
+  const [customBrokerEmail, setCustomBrokerEmail] = useState("");
+  const [customBrokerCSV, setCustomBrokerCSV] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleCustomBrokerSubmit = async () => {
+    if (!customBrokerName.trim() || !customBrokerEmail.trim() || !customBrokerCSV) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      // Here you would typically send this data to your backend
+      // For now, we'll just simulate a submission
+      console.log("Custom broker request:", {
+        brokerName: customBrokerName,
+        email: customBrokerEmail,
+        csvFile: customBrokerCSV.name
+      });
+
+      // Reset form
+      setCustomBrokerName("");
+      setCustomBrokerEmail("");
+      setCustomBrokerCSV(null);
+      setIsCustomBrokerOpen(false);
+      
+      // Show success message (you can implement a toast notification here)
+      alert("リクエストが送信されました。開発チームが確認次第、対応いたします。");
+    } catch (error) {
+      console.error("Error submitting custom broker request:", error);
+      alert("エラーが発生しました。もう一度お試しください。");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCSVFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file && file.type === "text/csv") {
+      setCustomBrokerCSV(file);
+    }
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>CSV インポート</DialogTitle>
-          <DialogDescription>取引データをCSVファイルからインポートします</DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>CSV インポート</DialogTitle>
+            <DialogDescription>取引データをCSVファイルからインポートします</DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="broker">ブローカー</Label>
-            <Select>
-              <SelectTrigger>
-                <SelectValue placeholder="ブローカーを選択" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="mt4">MetaTrader 4</SelectItem>
-                <SelectItem value="mt5">MetaTrader 5</SelectItem>
-                <SelectItem value="oanda">OANDA</SelectItem>
-                <SelectItem value="custom">カスタム</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="broker">ブローカー</Label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="ブローカーを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mt4">MetaTrader 4</SelectItem>
+                  <SelectItem value="mt5">MetaTrader 5</SelectItem>
+                  <SelectItem value="oanda">OANDA</SelectItem>
+                  <SelectItem value="custom">カスタム</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button 
+                variant="link" 
+                className="p-0 h-auto text-sm text-blue-600 hover:text-blue-800 mt-2"
+                onClick={() => setIsCustomBrokerOpen(true)}
+              >
+                ブローカーがない？
+              </Button>
+            </div>
+
+            <div>
+              <Label htmlFor="csvFile">CSVファイル</Label>
+              <Input id="csvFile" type="file" accept=".csv" />
+            </div>
           </div>
 
-          <div>
-            <Label htmlFor="csvFile">CSVファイル</Label>
-            <Input id="csvFile" type="file" accept=".csv" />
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={onClose}>
+              キャンセル
+            </Button>
+            <Button>インポート</Button>
           </div>
-        </div>
+        </DialogContent>
+      </Dialog>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button>インポート</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Custom Broker Request Dialog */}
+      <Dialog open={isCustomBrokerOpen} onOpenChange={setIsCustomBrokerOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>新しいブローカーの追加リクエスト</DialogTitle>
+            <DialogDescription>
+              サポートされていないブローカーのCSVファイルを送信して、自動インポート機能の追加をリクエストできます。
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="brokerName">ブローカー名 *</Label>
+              <Input
+                id="brokerName"
+                placeholder="例: FXCM, IG, Saxo Bank"
+                value={customBrokerName}
+                onChange={(e) => setCustomBrokerName(e.target.value)}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="email">メールアドレス *</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="your.email@example.com"
+                value={customBrokerEmail}
+                onChange={(e) => setCustomBrokerEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                対応完了時に通知をお送りします
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="csvSample">CSVファイルサンプル *</Label>
+              <Input
+                id="csvSample"
+                type="file"
+                accept=".csv"
+                onChange={handleCSVFileChange}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                取引履歴のCSVファイルをアップロードしてください
+              </p>
+            </div>
+
+            <div className="bg-blue-50 p-3 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>注意:</strong> 開発チームがCSVファイルの形式を確認し、
+                自動インポート機能を実装いたします。対応には数日かかる場合があります。
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsCustomBrokerOpen(false)}
+              disabled={isSubmitting}
+            >
+              キャンセル
+            </Button>
+            <Button 
+              onClick={handleCustomBrokerSubmit}
+              disabled={!customBrokerName.trim() || !customBrokerEmail.trim() || !customBrokerCSV || isSubmitting}
+            >
+              {isSubmitting ? "送信中..." : "リクエスト送信"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
