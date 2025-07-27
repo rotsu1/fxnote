@@ -601,16 +601,16 @@ export default function TradingDashboard() {
           </section>
 
           {/* Mini Calendar and P/L Trend Chart */}
-          <section className="grid gap-4 lg:grid-cols-2">
+          {/* <section className="grid gap-4 lg:grid-cols-2">
             <MiniCalendar />
             <PLTrendChart />
-          </section>
+          </section> */}
 
           {/* Alerts & Notifications */}
-          <section>
+          {/* <section>
             <h2 className="text-xl font-semibold mb-4">アラート・通知</h2>
             <AlertsNotifications />
-          </section>
+          </section> */}
         </main>
       </SidebarInset>
     </SidebarProvider>
