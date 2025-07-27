@@ -57,6 +57,7 @@ interface Trade {
   profit: number
   emotion: string
   holdingTime: string
+  holdingDays?: number
   holdingHours?: number
   holdingMinutes?: number
   notes?: string
@@ -89,7 +90,7 @@ const availableTags = [
   "成功",
 ]
 
-const emotions = ["興奮", "焦り", "冷静", "満足", "後悔", "不安", "自信"]
+// Remove the hardcoded emotions array since we'll load from database
 
 // Helper to group trades by date (entry_time)
 function groupTradesByDate(trades: any[]): Record<string, any[]> {
@@ -429,6 +430,7 @@ function TradeEditDialog({
       profit: undefined,
       emotion: "",
       holdingTime: "",
+      holdingDays: undefined,
       holdingHours: undefined,
       holdingMinutes: undefined,
       notes: "",
@@ -441,6 +443,12 @@ function TradeEditDialog({
   const [availableTags, setAvailableTags] = useState<string[]>([])
   const [loadingTags, setLoadingTags] = useState(false)
   const [tagError, setTagError] = useState("")
+  const [isEmotionEditOpen, setIsEmotionEditOpen] = useState(false)
+  const [availableEmotions, setAvailableEmotions] = useState<string[]>([])
+  const [loadingEmotions, setLoadingEmotions] = useState(false)
+  const [newEmotion, setNewEmotion] = useState("")
+  const [emotionError, setEmotionError] = useState("")
+  const [emotionToDelete, setEmotionToDelete] = useState<string | null>(null)
 
   useEffect(() => {
     setFormData(
@@ -457,6 +465,7 @@ function TradeEditDialog({
         profit: undefined,
         emotion: "",
         holdingTime: "",
+        holdingDays: undefined,
         holdingHours: undefined,
         holdingMinutes: undefined,
         notes: "",
@@ -495,6 +504,36 @@ function TradeEditDialog({
     loadTagsFromDatabase()
   }, [user])
 
+  // Load emotions from database
+  const loadEmotionsFromDatabase = async () => {
+    if (!user) return
+    
+    setLoadingEmotions(true)
+    try {
+      const { data, error } = await supabase
+        .from("emotions")
+        .select("emotion")
+        .eq("user_id", user.id)
+        .order("emotion")
+      
+      if (error) {
+        console.error("Error loading emotions:", error)
+        return
+      }
+      
+      const emotions = data?.map(item => item.emotion) || []
+      setAvailableEmotions(emotions)
+    } catch (error) {
+      console.error("Error loading emotions:", error)
+    } finally {
+      setLoadingEmotions(false)
+    }
+  }
+
+  useEffect(() => {
+    loadEmotionsFromDatabase()
+  }, [user])
+
   // Auto-calculate holding time when entry and exit datetimes change
   useEffect(() => {
     if (formData.entryDateTime && formData.exitDateTime) {
@@ -502,11 +541,13 @@ function TradeEditDialog({
       const exitDate = new Date(formData.exitDateTime);
       
       const diffMs = exitDate.getTime() - entryDate.getTime();
-      const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+      const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+      const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
       const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
       
       setFormData(prev => ({
         ...prev,
+        holdingDays: diffDays,
         holdingHours: diffHours,
         holdingMinutes: diffMinutes
       }));
@@ -617,6 +658,84 @@ function TradeEditDialog({
     }
   }
 
+  const addNewEmotionToDatabase = async (emotionName: string) => {
+    if (!emotionName.trim() || !user) return
+    
+    const trimmedEmotionName = emotionName.trim()
+    
+    // Check if emotion already exists
+    if (availableEmotions.includes(trimmedEmotionName)) {
+      setEmotionError("この感情名は既に存在します")
+      return
+    }
+    
+    // Clear any previous errors
+    setEmotionError("")
+    
+    try {
+      // Add to database first
+      const { error } = await supabase
+        .from("emotions")
+        .insert([{
+          user_id: user.id,
+          emotion: trimmedEmotionName
+        }])
+      
+      if (error) {
+        console.error("Error adding emotion to database:", error)
+        setEmotionError("感情の追加に失敗しました")
+        return
+      }
+      
+      // Add to local state
+      setAvailableEmotions(prev => [...prev, trimmedEmotionName])
+      setNewEmotion("")
+      
+      console.log(`Added new emotion to database: ${trimmedEmotionName}`)
+    } catch (error) {
+      console.error("Error adding emotion to database:", error)
+      setEmotionError("感情の追加に失敗しました")
+    }
+  }
+
+  const confirmDeleteEmotion = (emotionName: string) => {
+    setEmotionToDelete(emotionName)
+  }
+
+  const deleteEmotionFromDatabase = async () => {
+    if (!emotionToDelete || !user) return
+    
+    try {
+      // Delete from database first
+      const { error } = await supabase
+        .from("emotions")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("emotion", emotionToDelete)
+      
+      if (error) {
+        console.error("Error deleting emotion from database:", error)
+        return
+      }
+      
+      // Remove from local state
+      setAvailableEmotions(prev => prev.filter(emotion => emotion !== emotionToDelete))
+      
+      console.log(`Deleted emotion from database: ${emotionToDelete}`)
+      setEmotionToDelete(null)
+    } catch (error) {
+      console.error("Error deleting emotion from database:", error)
+    }
+  }
+
+  const handleNewEmotionChange = (value: string) => {
+    setNewEmotion(value)
+    // Clear error when user starts typing
+    if (emotionError) {
+      setEmotionError("")
+    }
+  }
+
   const handleSave = () => {
     // Basic validation for numbers
     const parsedEntry = formData.entry !== undefined ? Number.parseFloat(String(formData.entry)) : undefined
@@ -625,8 +744,8 @@ function TradeEditDialog({
     const parsedProfit = formData.profit !== undefined ? Number.parseFloat(String(formData.profit)) : undefined
 
     // Format holding time for database
-    const holdingTime = formData.holdingHours !== undefined || formData.holdingMinutes !== undefined
-      ? `${formData.holdingHours || 0}h ${formData.holdingMinutes || 0}m`
+    const holdingTime = (formData.holdingDays !== undefined || formData.holdingHours !== undefined || formData.holdingMinutes !== undefined)
+      ? `${formData.holdingDays || 0}d ${formData.holdingHours || 0}h ${formData.holdingMinutes || 0}m`
       : ""
 
     onSave({
@@ -741,57 +860,99 @@ function TradeEditDialog({
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="emotion">感情</Label>
-              <Select value={formData.emotion} onValueChange={(value) => setFormData({ ...formData, emotion: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {emotions.map((e) => (
-                    <SelectItem key={e} value={e}>
-                      {e}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                      <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label>感情</Label>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm"
+                onClick={() => setIsEmotionEditOpen(true)}
+              >
+                <Edit className="h-4 w-4 mr-1" />
+                編集
+              </Button>
             </div>
+            <div className="flex flex-wrap gap-1 min-h-[32px] p-2 border rounded">
+              {loadingEmotions ? (
+                <span className="text-sm text-muted-foreground">感情を読み込み中...</span>
+              ) : availableEmotions.length > 0 ? (
+                availableEmotions.map((emotion, index) => (
+                  <Badge
+                    key={index}
+                    variant={formData.emotion === emotion ? "default" : "outline"}
+                    className={`cursor-pointer text-xs ${
+                      formData.emotion === emotion ? "bg-black text-white hover:bg-black/90" : ""
+                    }`}
+                    onClick={() => {
+                      if (formData.emotion === emotion) {
+                        // If already selected, unselect it
+                        setFormData({ ...formData, emotion: "" })
+                      } else {
+                        // If not selected, select it
+                        setFormData({ ...formData, emotion: emotion })
+                      }
+                    }}
+                  >
+                    {emotion}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-sm text-muted-foreground">感情がありません</span>
+              )}
+            </div>
+          </div>
 
-            <div>
-              <Label>保有時間</Label>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="holdingHours" className="text-sm text-muted-foreground">時間</Label>
-                  <Input
-                    id="holdingHours"
-                    type="number"
-                    min="0"
-                    max="999"
-                    value={formData.holdingHours || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
-                    placeholder="0"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">分</Label>
-                  <Input
-                    id="holdingMinutes"
-                    type="number"
-                    min="0"
-                    max="59"
-                    value={formData.holdingMinutes || ""}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
-                    placeholder="0"
-                  />
-                </div>
+                      <div>
+            <Label>保有時間</Label>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <Label htmlFor="holdingDays" className="text-sm text-muted-foreground">日</Label>
+                <Input
+                  id="holdingDays"
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={formData.holdingDays || ""}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    holdingDays: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="holdingHours" className="text-sm text-muted-foreground">時間</Label>
+                <Input
+                  id="holdingHours"
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={formData.holdingHours || ""}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
+                  placeholder="0"
+                />
+              </div>
+              <div>
+                <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">分</Label>
+                <Input
+                  id="holdingMinutes"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={formData.holdingMinutes || ""}
+                  onChange={(e) => setFormData({ 
+                    ...formData, 
+                    holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
+                  })}
+                  placeholder="0"
+                />
               </div>
             </div>
+          </div>
 
             <div>
               <Label htmlFor="notes">メモ</Label>
@@ -911,6 +1072,81 @@ function TradeEditDialog({
         </DialogContent>
       </Dialog>
 
+      {/* Emotion Edit Dialog */}
+      <Dialog open={isEmotionEditOpen} onOpenChange={setIsEmotionEditOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>感情管理</DialogTitle>
+            <DialogDescription>感情を選択、追加、または削除してください。</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Add new emotion */}
+            <div>
+              <Label htmlFor="newEmotionInput">新しい感情を追加</Label>
+              <div className="flex gap-2 mt-1">
+                <Input
+                  id="newEmotionInput"
+                  placeholder="新しい感情名を入力"
+                  value={newEmotion}
+                  onChange={(e) => handleNewEmotionChange(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && addNewEmotionToDatabase(newEmotion)}
+                />
+                <Button type="button" onClick={() => addNewEmotionToDatabase(newEmotion)} size="sm">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </div>
+              {emotionError && (
+                <p className="text-red-600 text-sm mt-1">{emotionError}</p>
+              )}
+            </div>
+
+            {/* Available emotions */}
+            <div>
+              <Label className="text-sm text-muted-foreground mb-2 block">利用可能な感情:</Label>
+              <div className="flex flex-wrap gap-1 max-h-64 overflow-y-auto border rounded p-2">
+                {loadingEmotions ? (
+                  <span className="text-sm text-muted-foreground">感情を読み込み中...</span>
+                ) : availableEmotions.length > 0 ? (
+                  availableEmotions.map((emotion, index) => (
+                    <Badge
+                      key={index}
+                      variant={formData.emotion === emotion ? "default" : "outline"}
+                      className={`cursor-pointer text-xs ${
+                        formData.emotion === emotion ? "bg-black text-white hover:bg-black/90" : "hover:bg-red-50 hover:border-red-300"
+                      }`}
+                      onClick={() => {
+                        if (formData.emotion === emotion) {
+                          // If already selected, allow deletion
+                          confirmDeleteEmotion(emotion)
+                        } else {
+                          // If not selected, select it
+                          setFormData({ ...formData, emotion: emotion })
+                          setIsEmotionEditOpen(false)
+                        }
+                      }}
+                    >
+                      {emotion} {formData.emotion === emotion ? "" : "×"}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">感情がありません</span>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                選択済みの感情をクリックして削除、未選択の感情をクリックして選択
+              </p>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2 mt-6">
+            <Button variant="outline" onClick={() => setIsEmotionEditOpen(false)}>
+              閉じる
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* Tag Delete Warning Dialog */}
       <AlertDialog open={tagToDelete !== null} onOpenChange={() => setTagToDelete(null)}>
         <AlertDialogContent>
@@ -932,6 +1168,35 @@ function TradeEditDialog({
             <AlertDialogCancel>キャンセル</AlertDialogCancel>
             <AlertDialogAction 
               onClick={deleteTagFromDatabase}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              削除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Emotion Delete Warning Dialog */}
+      <AlertDialog open={emotionToDelete !== null} onOpenChange={() => setEmotionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>感情を削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="mb-2">
+                <strong>「{emotionToDelete}」</strong> 感情を削除しようとしています。
+              </p>
+              <p className="text-red-600">
+                ⚠️ この感情は、この感情を使用しているすべての取引から削除されます。
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                この操作は取り消すことができません。
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={deleteEmotionFromDatabase}
               className="bg-red-600 hover:bg-red-700"
             >
               削除
