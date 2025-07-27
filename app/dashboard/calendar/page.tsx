@@ -406,12 +406,14 @@ function TradeEditDialog({
   onClose,
   onSave,
   defaultDate,
+  user,
 }: {
   trade: Partial<Trade> | null
   isOpen: boolean
   onClose: () => void
   onSave: (trade: Partial<Trade>) => void
   defaultDate?: string
+  user: any
 }) {
   const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
@@ -436,31 +438,9 @@ function TradeEditDialog({
   const [newTag, setNewTag] = useState("")
   const [isTagEditOpen, setIsTagEditOpen] = useState(false)
   const [tagToDelete, setTagToDelete] = useState<string | null>(null)
-  const [availableTags, setAvailableTags] = useState<string[]>([
-    "USD/JPY",
-    "EUR/USD",
-    "GBP/JPY",
-    "AUD/USD",
-    "スキャルピング",
-    "デイトレード",
-    "スイング",
-    "ブレイクアウト",
-    "レンジブレイク",
-    "押し目買い",
-    "逆張り",
-    "トレンド",
-    "レンジ",
-    "興奮",
-    "焦り",
-    "冷静",
-    "満足",
-    "後悔",
-    "朝",
-    "昼",
-    "夜",
-    "失敗",
-    "成功",
-  ])
+  const [availableTags, setAvailableTags] = useState<string[]>([])
+  const [loadingTags, setLoadingTags] = useState(false)
+  const [tagError, setTagError] = useState("")
 
   useEffect(() => {
     setFormData(
@@ -484,6 +464,36 @@ function TradeEditDialog({
       },
     )
   }, [trade, defaultDate])
+
+  // Load tags from database
+  const loadTagsFromDatabase = async () => {
+    if (!user) return
+    
+    setLoadingTags(true)
+    try {
+      const { data, error } = await supabase
+        .from("trade_tags")
+        .select("tag_name")
+        .eq("user_id", user.id)
+        .order("tag_name")
+      
+      if (error) {
+        console.error("Error loading tags:", error)
+        return
+      }
+      
+      const tags = data?.map(item => item.tag_name) || []
+      setAvailableTags(tags)
+    } catch (error) {
+      console.error("Error loading tags:", error)
+    } finally {
+      setLoadingTags(false)
+    }
+  }
+
+  useEffect(() => {
+    loadTagsFromDatabase()
+  }, [user])
 
   // Auto-calculate holding time when entry and exit datetimes change
   useEffect(() => {
@@ -530,18 +540,42 @@ function TradeEditDialog({
   }
 
   const addNewTagToDatabase = async (tagName: string) => {
-    if (!tagName.trim()) return
+    if (!tagName.trim() || !user) return
+    
+    const trimmedTagName = tagName.trim()
+    
+    // Check if tag already exists
+    if (availableTags.includes(trimmedTagName)) {
+      setTagError("このタグ名は既に存在します")
+      return
+    }
+    
+    // Clear any previous errors
+    setTagError("")
     
     try {
-      // Add to local state first
-      setAvailableTags(prev => [...prev, tagName.trim()])
+      // Add to database first
+      const { error } = await supabase
+        .from("trade_tags")
+        .insert([{
+          user_id: user.id,
+          tag_name: trimmedTagName
+        }])
+      
+      if (error) {
+        console.error("Error adding tag to database:", error)
+        setTagError("タグの追加に失敗しました")
+        return
+      }
+      
+      // Add to local state
+      setAvailableTags(prev => [...prev, trimmedTagName])
       setNewTag("")
       
-      // Here you would typically save to database
-      // For now, we'll just add to local state
-      console.log(`Adding new tag to database: ${tagName.trim()}`)
+      console.log(`Added new tag to database: ${trimmedTagName}`)
     } catch (error) {
       console.error("Error adding tag to database:", error)
+      setTagError("タグの追加に失敗しました")
     }
   }
 
@@ -550,18 +584,36 @@ function TradeEditDialog({
   }
 
   const deleteTagFromDatabase = async () => {
-    if (!tagToDelete) return
+    if (!tagToDelete || !user) return
     
     try {
-      // Remove from local state first
+      // Delete from database first
+      const { error } = await supabase
+        .from("trade_tags")
+        .delete()
+        .eq("user_id", user.id)
+        .eq("tag_name", tagToDelete)
+      
+      if (error) {
+        console.error("Error deleting tag from database:", error)
+        return
+      }
+      
+      // Remove from local state
       setAvailableTags(prev => prev.filter(tag => tag !== tagToDelete))
       
-      // Here you would typically delete from database
-      console.log(`Deleting tag from database: ${tagToDelete}`)
-      
+      console.log(`Deleted tag from database: ${tagToDelete}`)
       setTagToDelete(null)
     } catch (error) {
       console.error("Error deleting tag from database:", error)
+    }
+  }
+
+  const handleNewTagChange = (value: string) => {
+    setNewTag(value)
+    // Clear error when user starts typing
+    if (tagError) {
+      setTagError("")
     }
   }
 
@@ -766,18 +818,24 @@ function TradeEditDialog({
                 </Button>
               </div>
               <div className="flex flex-wrap gap-1 min-h-[32px] p-2 border rounded">
-                {availableTags.map((tag, index) => (
-                  <Badge
-                    key={index}
-                    variant={formData.tags?.includes(tag) ? "default" : "outline"}
-                    className={`cursor-pointer text-xs ${
-                      formData.tags?.includes(tag) ? "bg-black text-white hover:bg-black/90" : ""
-                    }`}
-                    onClick={() => toggleTag(tag)}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
+                {loadingTags ? (
+                  <span className="text-sm text-muted-foreground">タグを読み込み中...</span>
+                ) : availableTags.length > 0 ? (
+                  availableTags.map((tag, index) => (
+                    <Badge
+                      key={index}
+                      variant={formData.tags?.includes(tag) ? "default" : "outline"}
+                      className={`cursor-pointer text-xs ${
+                        formData.tags?.includes(tag) ? "bg-black text-white hover:bg-black/90" : ""
+                      }`}
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-sm text-muted-foreground">タグがありません</span>
+                )}
               </div>
             </div>
           </div>
@@ -808,13 +866,16 @@ function TradeEditDialog({
                   id="newTagInput"
                   placeholder="新しいタグ名を入力"
                   value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
+                  onChange={(e) => handleNewTagChange(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && addNewTagToDatabase(newTag)}
                 />
                 <Button type="button" onClick={() => addNewTagToDatabase(newTag)} size="sm">
                   <Tag className="h-4 w-4" />
                 </Button>
               </div>
+              {tagError && (
+                <p className="text-red-600 text-sm mt-1">{tagError}</p>
+              )}
             </div>
 
             {/* All available tags with delete option */}
@@ -1140,6 +1201,7 @@ export default function CalendarPage() {
           onClose={() => setIsTradeDialogOpen(false)}
           onSave={handleSaveTrade}
           defaultDate={selectedDate}
+          user={user}
         />
         <CSVImportDialog isOpen={isCSVDialogOpen} onClose={() => setIsCSVDialogOpen(false)} />
         <DisplaySettingsDialog isOpen={isDisplaySettingsOpen} onClose={() => setIsDisplaySettingsOpen(false)} />
