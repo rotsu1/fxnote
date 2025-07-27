@@ -113,10 +113,10 @@ function localDateTimeToUTC(localDateTimeString: string): string {
   return date.toISOString();
 }
 
-// Helper to group trades by date (entry_time)
+// Helper to group trades by date (exit_time)
 function groupTradesByDate(trades: any[]): Record<string, any[]> {
   return trades.reduce((acc: Record<string, any[]>, trade: any) => {
-    const date = trade.entry_time?.split("T")[0];
+    const date = trade.exit_time?.split("T")[0];
     if (!date) return acc;
     if (!acc[date]) acc[date] = [];
     acc[date].push(trade);
@@ -146,7 +146,7 @@ function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate:
 
   // Calculate monthly P/L
   const monthlyPL = trades.reduce((sum, trade) => {
-    const tradeDate = new Date(trade.entry_time || trade.created_at);
+    const tradeDate = new Date(trade.exit_time || trade.entry_time || trade.created_at);
     if (tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === currentMonth) {
       return sum + (trade.profit_loss || trade.pnl || 0);
     }
@@ -306,7 +306,7 @@ function TradeCard({
             <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
             <span className="font-medium">{symbolName}</span>
             <span className="text-sm text-gray-500">{getJapaneseTradeType(trade.type || trade.trade_type)}</span>
-            <span className="text-sm text-gray-500">{trade.time || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.exit_time?.split("T")[1]?.slice(0,5)}</span>
+            <span className="text-sm text-gray-500">{trade.exit_time?.split("T")[1]?.slice(0,5) || trade.entry_time?.split("T")[1]?.slice(0,5) || trade.time}</span>
           </div>
           <div className="flex gap-1">
             <Button variant="ghost" size="sm" onClick={() => onEdit(trade)}>
