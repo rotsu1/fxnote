@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -40,6 +41,51 @@ import {
 } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
+
+// Sample trade data (expanded for table view)
+interface Trade {
+  id: number
+  date: string
+  time: string
+  pair: string
+  type: "買い" | "売り"
+  entry: number
+  exit: number
+  pips: number
+  profit: number
+  emotion: string
+  holdingTime: string
+  notes?: string
+  tags: string[]
+}
+
+const availableTags = [
+  "USD/JPY",
+  "EUR/USD",
+  "GBP/JPY",
+  "AUD/USD",
+  "スキャルピング",
+  "デイトレード",
+  "スイング",
+  "ブレイクアウト",
+  "レンジブレイク",
+  "押し目買い",
+  "逆張り",
+  "トレンド",
+  "レンジ",
+  "興奮",
+  "焦り",
+  "冷静",
+  "満足",
+  "後悔",
+  "朝",
+  "昼",
+  "夜",
+  "失敗",
+  "成功",
+]
+
+const emotions = ["興奮", "焦り", "冷静", "満足", "後悔", "不安", "自信"]
 
 // Helper to group trades by date (entry_time)
 function groupTradesByDate(trades: any[]): Record<string, any[]> {
@@ -349,124 +395,105 @@ function RightSidebar({
   )
 }
 
+// Reusing TradeEditDialog from calendar page, slightly modified for new fields
 function TradeEditDialog({
   trade,
   isOpen,
   onClose,
   onSave,
+  defaultDate,
 }: {
-  trade: any
+  trade: Partial<Trade> | null
   isOpen: boolean
   onClose: () => void
-  onSave: (trade: any) => void
+  onSave: (trade: Partial<Trade>) => void
+  defaultDate?: string
 }) {
-  const defaultForm = {
-    pair: "",
-    type: "buy",
-    entry: "",
-    exit: "",
-    pnl: "",
-    status: "利確",
-    time: "",
-    tags: [] as string[],
-  };
-  const [formData, setFormData] = useState<typeof defaultForm>(defaultForm);
-  const [newTag, setNewTag] = useState("");
+  const [formData, setFormData] = useState<Partial<Trade>>(
+    trade || {
+      date: defaultDate || new Date().toISOString().split("T")[0],
+      pair: "",
+      type: "買い",
+      entry: undefined,
+      exit: undefined,
+      pips: undefined,
+      profit: undefined,
+      emotion: "",
+      holdingTime: "",
+      notes: "",
+      tags: [],
+    },
+  )
+  const [newTag, setNewTag] = useState("")
 
-  // Sync formData with trade prop when dialog opens or trade changes
   useEffect(() => {
-    if (isOpen) {
-      if (trade) {
-        setFormData({
-          pair: trade.pair || trade.currency_pair || "",
-          type: trade.type || trade.trade_type || "buy",
-          entry: trade.entry || trade.entry_price || "",
-          exit: trade.exit || trade.exit_price || "",
-          pnl: trade.pnl || trade.profit_loss || "",
-          status: trade.status || "利確",
-          time: trade.time || trade.entry_time?.split("T")[1]?.slice(0,5) || "",
-          tags: trade.tags || (trade.trade_memo ? [trade.trade_memo] : []),
-        });
-      } else {
-        setFormData(defaultForm);
-      }
-      setNewTag("");
-    }
-  }, [isOpen, trade]);
+    setFormData(
+      trade || {
+        date: defaultDate || new Date().toISOString().split("T")[0],
+        pair: "",
+        type: "買い",
+        entry: undefined,
+        exit: undefined,
+        pips: undefined,
+        profit: undefined,
+        emotion: "",
+        holdingTime: "",
+        notes: "",
+        tags: [],
+      },
+    )
+  }, [trade, defaultDate])
 
   const addTag = () => {
-    if (newTag && !formData.tags.includes(newTag)) {
-      setFormData({ ...formData, tags: [...formData.tags, newTag] });
-      setNewTag("");
+    if (newTag && !formData.tags?.includes(newTag)) {
+      setFormData({ ...formData, tags: [...(formData.tags || []), newTag] })
+      setNewTag("")
     }
-  };
+  }
 
   const removeTag = (tagToRemove: string) => {
-    setFormData({ ...formData, tags: formData.tags.filter((tag: string) => tag !== tagToRemove) });
-  };
+    setFormData({ ...formData, tags: (formData.tags || []).filter((tag: string) => tag !== tagToRemove) })
+  }
+
+  const addExistingTag = (tag: string) => {
+    if (!formData.tags?.includes(tag)) {
+      setFormData({ ...formData, tags: [...(formData.tags || []), tag] })
+    }
+  }
+
+  const handleSave = () => {
+    // Basic validation for numbers
+    const parsedEntry = formData.entry !== undefined ? Number.parseFloat(String(formData.entry)) : undefined
+    const parsedExit = formData.exit !== undefined ? Number.parseFloat(String(formData.exit)) : undefined
+    const parsedPips = formData.pips !== undefined ? Number.parseFloat(String(formData.pips)) : undefined
+    const parsedProfit = formData.profit !== undefined ? Number.parseFloat(String(formData.profit)) : undefined
+
+    onSave({
+      ...formData,
+      entry: parsedEntry,
+      exit: parsedExit,
+      pips: parsedPips,
+      profit: parsedProfit,
+    })
+  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{trade ? "取引編集" : "新規取引"}</DialogTitle>
+          <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
+          <DialogDescription>取引の詳細を入力または編集してください。</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="pair">通貨ペア</Label>
+              <Label htmlFor="date">日付</Label>
               <Input
-                id="pair"
-                value={formData.pair}
-                onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="type">取引種別</Label>
-              <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-                <SelectTrigger>
-                  <SelectValue>{getJapaneseTradeType(formData.type)}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="buy">買い</SelectItem>
-                  <SelectItem value="sell">売り</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="entry">エントリー価格</Label>
-              <Input
-                id="entry"
-                type="number"
-                step="0.01"
-                value={formData.entry}
-                onChange={(e) => setFormData({ ...formData, entry: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label htmlFor="exit">エグジット価格</Label>
-              <Input
-                id="exit"
-                type="number"
-                step="0.01"
-                value={formData.exit}
-                onChange={(e) => setFormData({ ...formData, exit: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="pnl">損益</Label>
-              <Input
-                id="pnl"
-                type="number"
-                value={formData.pnl}
-                onChange={(e) => setFormData({ ...formData, pnl: e.target.value })}
+                id="date"
+                type="date"
+                value={formData.date}
+                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
               />
             </div>
             <div>
@@ -480,17 +507,112 @@ function TradeEditDialog({
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pair">通貨ペア</Label>
+              <Input
+                id="pair"
+                value={formData.pair}
+                onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="type">取引種別</Label>
+              <Select
+                value={formData.type}
+                onValueChange={(value) => setFormData({ ...formData, type: value as "買い" | "売り" })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="買い">買い</SelectItem>
+                  <SelectItem value="売り">売り</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="entry">エントリー価格</Label>
+              <Input
+                id="entry"
+                type="number"
+                step="0.0001"
+                value={formData.entry}
+                onChange={(e) => setFormData({ ...formData, entry: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="exit">エグジット価格</Label>
+              <Input
+                id="exit"
+                type="number"
+                step="0.0001"
+                value={formData.exit}
+                onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="pips">pips</Label>
+              <Input
+                id="pips"
+                type="number"
+                step="0.1"
+                value={formData.pips}
+                onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="profit">損益 (¥)</Label>
+              <Input
+                id="profit"
+                type="number"
+                value={formData.profit}
+                onChange={(e) => setFormData({ ...formData, profit: Number.parseFloat(e.target.value) })}
+              />
+            </div>
+          </div>
+
           <div>
-            <Label htmlFor="status">ステータス</Label>
-            <Select value={formData.status} onValueChange={(value) => setFormData({ ...formData, status: value })}>
+            <Label htmlFor="emotion">感情</Label>
+            <Select value={formData.emotion} onValueChange={(value) => setFormData({ ...formData, emotion: value })}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="利確">利確</SelectItem>
-                <SelectItem value="損切">損切</SelectItem>
+                {emotions.map((e) => (
+                  <SelectItem key={e} value={e}>
+                    {e}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="holdingTime">保有時間</Label>
+            <Input
+              id="holdingTime"
+              value={formData.holdingTime}
+              onChange={(e) => setFormData({ ...formData, holdingTime: e.target.value })}
+              placeholder="例: 1h 30m"
+            />
+          </div>
+
+          <div>
+            <Label htmlFor="notes">メモ</Label>
+            <Textarea
+              id="notes"
+              value={formData.notes}
+              onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+              placeholder="取引に関するメモ"
+              rows={3}
+            />
           </div>
 
           <div>
@@ -506,10 +628,27 @@ function TradeEditDialog({
                 <Tag className="h-4 w-4" />
               </Button>
             </div>
+
+            <div className="mb-3">
+              <div className="text-sm text-muted-foreground mb-2">既存のタグから選択:</div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
+                {availableTags.map((tag, index) => (
+                  <Badge
+                    key={index}
+                    variant={formData.tags?.includes(tag) ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => addExistingTag(tag)}
+                  >
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+
             <div className="flex flex-wrap gap-1">
-              {formData.tags.map((tag: string, index: number) => (
-                <Badge key={index} variant="outline" className="cursor-pointer" onClick={() => removeTag(tag)}>
-                  {tag}
+              {formData.tags?.map((tag: string, index: number) => (
+                <Badge key={index} variant="default" className="cursor-pointer" onClick={() => removeTag(tag)}>
+                  {tag} ×
                 </Badge>
               ))}
             </div>
@@ -520,11 +659,11 @@ function TradeEditDialog({
           <Button variant="outline" onClick={onClose}>
             キャンセル
           </Button>
-          <Button onClick={() => onSave(formData)}>保存</Button>
+          <Button onClick={handleSave}>保存</Button>
         </div>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
 function CSVImportDialog({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
@@ -656,10 +795,82 @@ export default function CalendarPage() {
     setIsTradeDialogOpen(true);
   };
 
-  const handleSaveTrade = (trade: any) => {
-    // Save trade logic here
-    setIsTradeDialogOpen(false);
-    setEditingTrade(null);
+  const handleSaveTrade = async (tradeData: Partial<Trade>) => {
+    if (!user) return;
+    
+    try {
+      if (editingTrade?.id) {
+        // Update existing trade
+        const { error } = await supabase
+          .from("trades")
+          .update({
+            currency_pair: tradeData.pair,
+            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            entry_price: tradeData.entry,
+            exit_price: tradeData.exit,
+            pips: tradeData.pips,
+            profit_loss: tradeData.profit,
+            emotion: tradeData.emotion,
+            holding_time: tradeData.holdingTime,
+            trade_memo: tradeData.notes,
+            tags: tradeData.tags,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", editingTrade.id)
+          .eq("user_id", user.id);
+        
+        if (error) throw error;
+        
+        // Refresh trades data
+        const { data } = await supabase
+          .from("trades")
+          .select("*")
+          .eq("user_id", user.id);
+        
+        if (data) {
+          setTrades(data);
+        }
+      } else {
+        // Add new trade
+        const { data, error } = await supabase
+          .from("trades")
+          .insert([{
+            user_id: user.id,
+            currency_pair: tradeData.pair,
+            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            entry_price: tradeData.entry,
+            exit_price: tradeData.exit,
+            pips: tradeData.pips,
+            profit_loss: tradeData.profit,
+            emotion: tradeData.emotion,
+            holding_time: tradeData.holdingTime,
+            trade_memo: tradeData.notes,
+            tags: tradeData.tags,
+            entry_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
+            exit_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }])
+          .select();
+        
+        if (error) throw error;
+        
+        // Refresh trades data
+        const { data: refreshedData } = await supabase
+          .from("trades")
+          .select("*")
+          .eq("user_id", user.id);
+        
+        if (refreshedData) {
+          setTrades(refreshedData);
+        }
+      }
+      setIsTradeDialogOpen(false);
+      setEditingTrade(null);
+    } catch (error: any) {
+      console.error("Error saving trade:", error);
+      setError(error.message);
+    }
   };
 
   const handleDeleteTrade = (id: number) => {
@@ -712,6 +923,7 @@ export default function CalendarPage() {
           isOpen={isTradeDialogOpen}
           onClose={() => setIsTradeDialogOpen(false)}
           onSave={handleSaveTrade}
+          defaultDate={selectedDate}
         />
         <CSVImportDialog isOpen={isCSVDialogOpen} onClose={() => setIsCSVDialogOpen(false)} />
         <DisplaySettingsDialog isOpen={isDisplaySettingsOpen} onClose={() => setIsDisplaySettingsOpen(false)} />
