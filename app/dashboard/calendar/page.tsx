@@ -260,9 +260,9 @@ function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate
   );
 }
 
-function getJapaneseTradeType(type: string) {
-  if (type === "buy") return "買い";
-  if (type === "sell") return "売り";
+function getJapaneseTradeType(type: string | number) {
+  if (type === "buy" || type === 0) return "買い";
+  if (type === "sell" || type === 1) return "売り";
   return type;
 }
 
@@ -1347,7 +1347,7 @@ export default function CalendarPage() {
           .from("trades")
           .update({
             currency_pair: tradeData.pair,
-            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            trade_type: tradeData.type === "買い" ? 0 : 1,
             entry_price: tradeData.entry,
             exit_price: tradeData.exit,
             pips: tradeData.pips,
@@ -1379,7 +1379,7 @@ export default function CalendarPage() {
           .insert([{
             user_id: user.id,
             currency_pair: tradeData.pair,
-            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            trade_type: tradeData.type === "買い" ? 0 : 1,
             entry_price: tradeData.entry,
             exit_price: tradeData.exit,
             pips: tradeData.pips,
