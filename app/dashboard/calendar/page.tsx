@@ -601,7 +601,7 @@ function DisplaySettingsDialog({ isOpen, onClose }: { isOpen: boolean; onClose: 
 
 export default function CalendarPage() {
   const user = useAuth();
-  const [currentDate, setCurrentDate] = useState<Date>(new Date(2024, 0, 1));
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
   const [editingTrade, setEditingTrade] = useState<any>(null);
