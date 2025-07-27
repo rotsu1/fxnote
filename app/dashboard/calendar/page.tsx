@@ -1732,7 +1732,7 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
             continue;
           }
           
-          // Parse Japanese date format and convert to local timezone
+          // Parse Japanese date format and convert to local datetime string for localDateTimeToUTC
           const parseJapaneseDateTime = (dateTimeStr: string): string => {
             const parts = dateTimeStr.split(' ');
             if (parts.length < 2) return new Date().toISOString();
@@ -1753,18 +1753,14 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
               }
             }
             
-            // Create date in local timezone (not UTC)
-            const localDate = new Date(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds));
+            // Format as local datetime string (YYYY-MM-DDTHH:MM format)
+            const yearStr = year.toString();
+            const monthStr = month.toString().padStart(2, '0');
+            const dayStr = day.toString().padStart(2, '0');
+            const hoursStr = hours.padStart(2, '0');
+            const minutesStr = minutes.padStart(2, '0');
             
-            // Convert to ISO string but preserve local time
-            const yearStr = localDate.getFullYear();
-            const monthStr = String(localDate.getMonth() + 1).padStart(2, '0');
-            const dayStr = String(localDate.getDate()).padStart(2, '0');
-            const hoursStr = String(localDate.getHours()).padStart(2, '0');
-            const minutesStr = String(localDate.getMinutes()).padStart(2, '0');
-            const secondsStr = String(localDate.getSeconds()).padStart(2, '0');
-            
-            return `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}:${secondsStr}.000Z`;
+            return `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}`;
           };
           
           // Convert lot size (10000 currency per lot to 1000 currency per lot)
@@ -1773,9 +1769,9 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
             return lotSize / 10;
           };
           
-          // Convert trade type
+          // Convert trade type (inverted because 決済約定日時 means exit, so 売買 is opposite)
           const convertTradeType = (buySellStr: string): number => {
-            return buySellStr === '買' ? 0 : 1;
+            return buySellStr === '売' ? 0 : 1; // 売 (sell) = 0 (buy), 買 (buy) = 1 (sell)
           };
           
           // Calculate holding time (difference between settlement and new contract times)
@@ -1821,8 +1817,10 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
           };
           
           // Parse trade data
-          const entryTime = parseJapaneseDateTime(values[11]); // 新規約定日時
-          const exitTime = parseJapaneseDateTime(values[0]);   // 決済約定日時
+          const entryDateTime = parseJapaneseDateTime(values[11]); // 新規約定日時
+          const exitDateTime = parseJapaneseDateTime(values[0]);   // 決済約定日時
+          const entryTime = localDateTimeToUTC(entryDateTime);
+          const exitTime = localDateTimeToUTC(exitDateTime);
           const lotSize = convertLotSize(values[10]);          // Lot数
           const tradeType = convertTradeType(values[9]);       // 売買
           const profitLoss = parseFloat(values[16]);           // 売買損益
