@@ -1342,6 +1342,7 @@ export default function CalendarPage() {
   const [trades, setTrades] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
+  const [isEditingLoading, setIsEditingLoading] = useState<boolean>(false);
 
   useEffect(() => {
     if (!user) return;
@@ -1377,9 +1378,78 @@ export default function CalendarPage() {
     setIsRightSidebarOpen(true);
   };
 
-  const handleEditTrade = (trade: any) => {
-    setEditingTrade(trade);
-    setIsTradeDialogOpen(true);
+  const handleEditTrade = async (trade: any) => {
+    setIsEditingLoading(true);
+    try {
+      // Load trade tags
+      let tradeTags: string[] = [];
+      let tradeEmotion: string = "";
+      
+      if (trade.id) {
+        // Load tags
+        const { data: tagLinks, error: tagError } = await supabase
+          .from("trade_tag_links")
+          .select(`
+            trade_tags!inner(tag_name)
+          `)
+          .eq("trade_id", trade.id);
+        
+        if (tagError) {
+          console.error("Error loading trade tags:", tagError);
+        } else {
+          tradeTags = tagLinks?.map(link => (link.trade_tags as any)?.tag_name).filter(Boolean) || [];
+          console.log("Loaded trade tags:", tradeTags);
+        }
+        
+        // Load emotion
+        const { data: emotionLink, error: emotionError } = await supabase
+          .from("trade_emotion_links")
+          .select(`
+            emotions!inner(emotion)
+          `)
+          .eq("trade_id", trade.id)
+          .single();
+        
+        if (emotionError && emotionError.code !== 'PGRST116') {
+          console.error("Error loading trade emotion:", emotionError);
+        } else if (emotionLink) {
+          tradeEmotion = (emotionLink.emotions as any)?.emotion || "";
+          console.log("Loaded trade emotion:", tradeEmotion);
+        }
+      }
+
+      // Transform database trade data to form format
+      const transformedTrade = {
+        id: trade.id,
+        date: trade.entry_time?.split("T")[0] || "",
+        time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
+        entryDateTime: trade.entry_time ? new Date(trade.entry_time).toISOString().slice(0, 16) : "",
+        exitDateTime: trade.exit_time ? new Date(trade.exit_time).toISOString().slice(0, 16) : "",
+        pair: trade.symbol_name || "", // Use symbol name for display
+        type: trade.trade_type === 0 ? "買い" : "売り",
+        entry: trade.entry_price,
+        exit: trade.exit_price,
+        lotSize: trade.lot_size,
+        pips: trade.pips,
+        profit: trade.profit_loss,
+        emotion: tradeEmotion,
+        holdingTime: trade.hold_time || 0,
+        holdingDays: trade.hold_time ? Math.floor(trade.hold_time / (24 * 60 * 60)) : 0,
+        holdingHours: trade.hold_time ? Math.floor((trade.hold_time % (24 * 60 * 60)) / (60 * 60)) : 0,
+        holdingMinutes: trade.hold_time ? Math.floor((trade.hold_time % (60 * 60)) / 60) : 0,
+        notes: trade.trade_memo || "",
+        tags: tradeTags,
+      };
+      
+      console.log("Transformed trade for editing:", transformedTrade);
+      setEditingTrade(transformedTrade);
+      setIsTradeDialogOpen(true);
+    } catch (error) {
+      console.error("Error preparing trade for editing:", error);
+      setError("取引の編集準備中にエラーが発生しました");
+    } finally {
+      setIsEditingLoading(false);
+    }
   };
 
   const handleAddTrade = () => {
