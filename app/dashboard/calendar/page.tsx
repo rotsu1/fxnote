@@ -435,6 +435,7 @@ function TradeEditDialog({
   )
   const [newTag, setNewTag] = useState("")
   const [isTagEditOpen, setIsTagEditOpen] = useState(false)
+  const [tagToDelete, setTagToDelete] = useState<string | null>(null)
   const [availableTags, setAvailableTags] = useState<string[]>([
     "USD/JPY",
     "EUR/USD",
@@ -544,13 +545,21 @@ function TradeEditDialog({
     }
   }
 
-  const deleteTagFromDatabase = async (tagName: string) => {
+  const confirmDeleteTag = (tagName: string) => {
+    setTagToDelete(tagName)
+  }
+
+  const deleteTagFromDatabase = async () => {
+    if (!tagToDelete) return
+    
     try {
       // Remove from local state first
-      setAvailableTags(prev => prev.filter(tag => tag !== tagName))
+      setAvailableTags(prev => prev.filter(tag => tag !== tagToDelete))
       
       // Here you would typically delete from database
-      console.log(`Deleting tag from database: ${tagName}`)
+      console.log(`Deleting tag from database: ${tagToDelete}`)
+      
+      setTagToDelete(null)
     } catch (error) {
       console.error("Error deleting tag from database:", error)
     }
@@ -818,7 +827,7 @@ function TradeEditDialog({
                       key={index}
                       variant="outline"
                       className="cursor-pointer text-xs hover:bg-red-50 hover:border-red-300"
-                      onClick={() => deleteTagFromDatabase(tag)}
+                      onClick={() => confirmDeleteTag(tag)}
                     >
                       {tag} ×
                     </Badge>
@@ -840,6 +849,35 @@ function TradeEditDialog({
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Tag Delete Warning Dialog */}
+      <AlertDialog open={tagToDelete !== null} onOpenChange={() => setTagToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>タグを削除しますか？</AlertDialogTitle>
+            <AlertDialogDescription>
+              <p className="mb-2">
+                <strong>「{tagToDelete}」</strong> タグを削除しようとしています。
+              </p>
+              <p className="text-red-600">
+                ⚠️ このタグは、このタグを使用しているすべての取引から削除されます。
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                この操作は取り消すことができません。
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>キャンセル</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={deleteTagFromDatabase}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              削除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
