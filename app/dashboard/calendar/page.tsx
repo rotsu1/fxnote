@@ -2925,9 +2925,58 @@ export default function CalendarPage() {
     setDeleteTradeId(id);
   };
 
-  const confirmDelete = () => {
-    // Delete trade logic here
-    setDeleteTradeId(null);
+  const confirmDelete = async () => {
+    if (!deleteTradeId || !user) {
+      setDeleteTradeId(null);
+      return;
+    }
+
+    try {
+      // Delete related records first (foreign key constraints)
+      
+      // Delete trade emotion links
+      const { error: emotionError } = await supabase
+        .from("trade_emotion_links")
+        .delete()
+        .eq("trade_id", deleteTradeId);
+
+      if (emotionError) {
+        console.error("Error deleting trade emotion links:", emotionError);
+      }
+
+      // Delete trade tag links
+      const { error: tagError } = await supabase
+        .from("trade_tag_links")
+        .delete()
+        .eq("trade_id", deleteTradeId);
+
+      if (tagError) {
+        console.error("Error deleting trade tag links:", tagError);
+      }
+
+      // Delete the main trade record
+      const { error: tradeError } = await supabase
+        .from("trades")
+        .delete()
+        .eq("id", deleteTradeId)
+        .eq("user_id", user.id);
+
+      if (tradeError) {
+        console.error("Error deleting trade:", tradeError);
+        setError("取引の削除中にエラーが発生しました");
+        return;
+      }
+
+      // Refresh the trades data
+      await loadTrades();
+      
+      console.log("Trade deleted successfully");
+    } catch (error) {
+      console.error("Error deleting trade:", error);
+      setError("取引の削除中にエラーが発生しました");
+    } finally {
+      setDeleteTradeId(null);
+    }
   };
 
   const handleSaveDisplaySettings = async (settings: Record<string, boolean>) => {
