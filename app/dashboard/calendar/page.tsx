@@ -135,11 +135,13 @@ function formatHoldTime(seconds: number): string {
   const days = Math.floor(seconds / (24 * 60 * 60));
   const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
   const minutes = Math.floor((seconds % (60 * 60)) / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
   
   let result = "";
   if (days > 0) result += `${days}日`;
   if (hours > 0) result += `${hours}時間`;
   if (minutes > 0) result += `${minutes}分`;
+  if (remainingSeconds > 0) result += `${remainingSeconds}秒`;
   
   return result || "0分";
 }
@@ -982,10 +984,29 @@ function TradeEditDialog({
       profit: parsedProfit
     });
 
-    // Calculate holding time in seconds
-    const holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
-                                (formData.holdingHours || 0) * 60 * 60 + 
-                                (formData.holdingMinutes || 0) * 60
+    // Calculate holding time in seconds from actual entry and exit times
+    let holdingTimeInSeconds = 0;
+    
+    if (formData.entryDateTime && formData.exitDateTime) {
+      const entryDate = new Date(formData.entryDateTime);
+      const exitDate = new Date(formData.exitDateTime);
+      
+      // Check if dates are valid
+      if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
+        const timeDiff = exitDate.getTime() - entryDate.getTime();
+        holdingTimeInSeconds = Math.floor(timeDiff / 1000); // Convert milliseconds to seconds
+        
+        // Ensure positive value
+        if (holdingTimeInSeconds < 0) {
+          holdingTimeInSeconds = 0;
+        }
+      }
+    } else {
+      // Fallback to manual calculation if datetime fields are not available
+      holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
+                            (formData.holdingHours || 0) * 60 * 60 + 
+                            (formData.holdingMinutes || 0) * 60
+    }
 
     console.log("Holding time in seconds:", holdingTimeInSeconds);
 
