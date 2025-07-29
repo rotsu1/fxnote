@@ -452,38 +452,130 @@ export default function TablePage() {
 
   useEffect(() => {
     if (!user) return;
-    setLoading(true);
-    setError("");
-    supabase
-      .from("trades")
-      .select("*")
-      .eq("user_id", user.id)
-      .order("entry_time", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
+    
+    const loadTrades = async () => {
+      setLoading(true);
+      setError("");
+      try {
+        // Fetch trades with symbol information
+        const { data: tradesData, error: tradesError } = await supabase
+          .from("trades")
+          .select(`
+            *,
+            symbols!inner(symbol)
+          `)
+          .eq("user_id", user.id)
+          .order("entry_time", { ascending: false });
+
+        if (tradesError) {
+          setError(tradesError.message);
           setTrades([]);
-        } else {
-          // Transform DB data to match Trade interface
-          const transformedTrades = (data || []).map((trade: any) => ({
+          return;
+        }
+
+        // Fetch tags for all trades
+        const { data: tagLinksData, error: tagLinksError } = await supabase
+          .from("trade_tag_links")
+          .select(`
+            trade_id,
+            trade_tags!inner(tag_name)
+          `);
+
+        if (tagLinksError) {
+          console.error("Error loading tags:", tagLinksError);
+        }
+
+        // Fetch emotions for all trades
+        const { data: emotionLinksData, error: emotionLinksError } = await supabase
+          .from("trade_emotion_links")
+          .select(`
+            trade_id,
+            emotions!inner(emotion)
+          `);
+
+        if (emotionLinksError) {
+          console.error("Error loading emotions:", emotionLinksError);
+        }
+
+        // Group tags and emotions by trade_id, but only for trades that belong to the current user
+        const userTradeIds = new Set((tradesData || []).map(trade => trade.id));
+        
+        const tagsByTradeId = (tagLinksData || []).reduce((acc: Record<number, string[]>, link: any) => {
+          // Only include tags for trades that belong to the current user
+          if (userTradeIds.has(link.trade_id)) {
+            if (!acc[link.trade_id]) acc[link.trade_id] = [];
+            acc[link.trade_id].push(link.trade_tags.tag_name);
+          }
+          return acc;
+        }, {});
+
+        const emotionsByTradeId = (emotionLinksData || []).reduce((acc: Record<number, string>, link: any) => {
+          // Only include emotions for trades that belong to the current user
+          if (userTradeIds.has(link.trade_id)) {
+            acc[link.trade_id] = link.emotions.emotion;
+          }
+          return acc;
+        }, {});
+
+        // Transform DB data to match Trade interface
+        const transformedTrades = (tradesData || []).map((trade: any) => {
+          const entryTime = new Date(trade.entry_time);
+          const exitTime = new Date(trade.exit_time);
+          
+          // Convert hold_time from seconds to readable format
+          const formatHoldTime = (seconds: number) => {
+            if (!seconds) return "";
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const remainingSeconds = seconds % 60;
+            
+            if (hours > 0) {
+              return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+              return `${minutes}m ${remainingSeconds}s`;
+            } else {
+              return `${remainingSeconds}s`;
+            }
+          };
+
+          return {
             id: trade.id,
-            date: trade.entry_time?.split("T")[0] || "",
-            time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
-            pair: trade.currency_pair || "",
-            type: (trade.trade_type === "buy" ? "買い" : trade.trade_type === "sell" ? "売り" : "買い") as "買い" | "売り",
+            date: entryTime.toISOString().split("T")[0],
+            time: entryTime.toTimeString().slice(0, 5),
+            pair: trade.symbols?.symbol || "",
+            type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
             entry: trade.entry_price,
             exit: trade.exit_price,
             pips: trade.pips || 0,
             profit: trade.profit_loss,
-            emotion: trade.emotion || "",
-            holdingTime: trade.holding_time || "",
+            emotion: emotionsByTradeId[trade.id] || "",
+            holdingTime: formatHoldTime(trade.hold_time),
             notes: trade.trade_memo || "",
-            tags: trade.tags || [],
-          })) as Trade[];
-          setTrades(transformedTrades);
-        }
+            tags: tagsByTradeId[trade.id] || [],
+          };
+        }) as Trade[];
+
+        setTrades(transformedTrades);
+      } catch (error: any) {
+        console.error("Error loading trades:", error);
+        setError(error.message || "取引データの読み込み中にエラーが発生しました");
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    loadTrades();
+    
+    // Listen for trade updates
+    const handleTradeUpdate = () => {
+      loadTrades();
+    };
+    
+    window.addEventListener('tradeUpdated', handleTradeUpdate);
+    
+    return () => {
+      window.removeEventListener('tradeUpdated', handleTradeUpdate);
+    };
   }, [user]);
 
   const filteredTrades = useMemo(() => {
@@ -535,21 +627,49 @@ export default function TablePage() {
     if (!user) return;
     
     try {
+      // Get or create symbol ID
+      let symbolId = null;
+      if (tradeData.pair) {
+        // First try to find existing symbol
+        let { data: symbolData, error: symbolError } = await supabase
+          .from("symbols")
+          .select("id")
+          .eq("symbol", tradeData.pair)
+          .single();
+        
+        if (symbolError && symbolError.code === 'PGRST116') {
+          // Symbol doesn't exist, create it
+          const { data: newSymbol, error: createError } = await supabase
+            .from("symbols")
+            .insert([{ symbol: tradeData.pair }])
+            .select()
+            .single();
+          
+          if (createError) {
+            console.error("Error creating symbol:", createError);
+            throw createError;
+          }
+          symbolId = newSymbol.id;
+        } else if (symbolError) {
+          console.error("Error finding symbol:", symbolError);
+          throw symbolError;
+        } else if (symbolData) {
+          symbolId = symbolData.id;
+        }
+      }
+
       if (editingTrade?.id) {
         // Update existing trade
         const { error } = await supabase
           .from("trades")
           .update({
-            currency_pair: tradeData.pair,
-            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            symbol: symbolId,
+            trade_type: tradeData.type === "買い" ? 0 : 1,
             entry_price: tradeData.entry,
             exit_price: tradeData.exit,
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
-            emotion: tradeData.emotion,
-            holding_time: tradeData.holdingTime,
             trade_memo: tradeData.notes,
-            tags: tradeData.tags,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingTrade.id)
@@ -557,27 +677,119 @@ export default function TablePage() {
         
         if (error) throw error;
         
-        setTrades((prevTrades) =>
-          prevTrades.map((t) => (t.id === editingTrade.id ? ({ ...t, ...tradeData } as Trade) : t)),
-        );
+        // Update tags
+        if (tradeData.tags) {
+          // Delete existing tags
+          await supabase
+            .from("trade_tag_links")
+            .delete()
+            .eq("trade_id", editingTrade.id);
+          
+          // Add new tags
+          for (const tagName of tradeData.tags) {
+            // Get or create tag
+            let { data: tagData, error: tagError } = await supabase
+              .from("trade_tags")
+              .select("id")
+              .eq("tag_name", tagName)
+              .eq("user_id", user.id)
+              .single();
+            
+            let tagId = null;
+            if (tagError && tagError.code === 'PGRST116') {
+              // Tag doesn't exist, create it
+              const { data: newTag, error: createTagError } = await supabase
+                .from("trade_tags")
+                .insert([{ tag_name: tagName, user_id: user.id }])
+                .select()
+                .single();
+              
+              if (createTagError) {
+                console.error("Error creating tag:", createTagError);
+                continue;
+              }
+              tagId = newTag.id;
+            } else if (tagError) {
+              console.error("Error finding tag:", tagError);
+              continue;
+            } else if (tagData) {
+              tagId = tagData.id;
+            }
+            
+            // Create link
+            await supabase
+              .from("trade_tag_links")
+              .insert([{ trade_id: editingTrade.id, tag_id: tagId }]);
+          }
+        }
+        
+        // Update emotion
+        if (tradeData.emotion) {
+          // Delete existing emotion
+          await supabase
+            .from("trade_emotion_links")
+            .delete()
+            .eq("trade_id", editingTrade.id);
+          
+          // Get or create emotion
+          let { data: emotionData, error: emotionError } = await supabase
+            .from("emotions")
+            .select("id")
+            .eq("emotion", tradeData.emotion)
+            .eq("user_id", user.id)
+            .single();
+          
+          let emotionId = null;
+          if (emotionError && emotionError.code === 'PGRST116') {
+            // Emotion doesn't exist, create it
+            const { data: newEmotion, error: createEmotionError } = await supabase
+              .from("emotions")
+              .insert([{ emotion: tradeData.emotion, user_id: user.id }])
+              .select()
+              .single();
+            
+            if (createEmotionError) {
+              console.error("Error creating emotion:", createEmotionError);
+            } else {
+              emotionId = newEmotion.id;
+            }
+          } else if (emotionError) {
+            console.error("Error finding emotion:", emotionError);
+          } else {
+            emotionId = emotionData.id;
+          }
+          
+          if (emotionId) {
+            // Create link
+            await supabase
+              .from("trade_emotion_links")
+              .insert([{ trade_id: editingTrade.id, emotion_id: emotionId }]);
+          }
+        }
+        
+        // Refresh the data
+        const event = new Event('tradeUpdated');
+        window.dispatchEvent(event);
+        
       } else {
         // Add new trade
+        const entryDateTime = tradeData.date && tradeData.time 
+          ? new Date(`${tradeData.date}T${tradeData.time}:00`).toISOString()
+          : new Date().toISOString();
+        
         const { data, error } = await supabase
           .from("trades")
           .insert([{
             user_id: user.id,
-            currency_pair: tradeData.pair,
-            trade_type: tradeData.type === "買い" ? "buy" : "sell",
+            symbol: symbolId,
+            trade_type: tradeData.type === "買い" ? 0 : 1,
             entry_price: tradeData.entry,
             exit_price: tradeData.exit,
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
-            emotion: tradeData.emotion,
-            holding_time: tradeData.holdingTime,
             trade_memo: tradeData.notes,
-            tags: tradeData.tags,
-            entry_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
-            exit_time: tradeData.date ? `${tradeData.date}T${tradeData.time || "00:00"}:00` : new Date().toISOString(),
+            entry_time: entryDateTime,
+            exit_time: entryDateTime,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
@@ -586,22 +798,88 @@ export default function TablePage() {
         if (error) throw error;
         
         if (data && data[0]) {
-          const newTrade: Trade = {
-            id: data[0].id,
-            date: data[0].entry_time?.split("T")[0] || "",
-            time: data[0].entry_time?.split("T")[1]?.slice(0, 5) || "",
-            pair: data[0].currency_pair || "",
-            type: (data[0].trade_type === "buy" ? "買い" : "売り") as "買い" | "売り",
-            entry: data[0].entry_price,
-            exit: data[0].exit_price,
-            pips: data[0].pips || 0,
-            profit: data[0].profit_loss,
-            emotion: data[0].emotion || "",
-            holdingTime: data[0].holding_time || "",
-            notes: data[0].trade_memo || "",
-            tags: data[0].tags || [],
-          };
-          setTrades((prevTrades) => [newTrade, ...prevTrades]);
+          const newTradeId = data[0].id;
+          
+          // Add tags
+          if (tradeData.tags) {
+            for (const tagName of tradeData.tags) {
+              // Get or create tag
+              let { data: tagData, error: tagError } = await supabase
+                .from("trade_tags")
+                .select("id")
+                .eq("tag_name", tagName)
+                .eq("user_id", user.id)
+                .single();
+              
+              let tagId = null;
+              if (tagError && tagError.code === 'PGRST116') {
+                // Tag doesn't exist, create it
+                const { data: newTag, error: createTagError } = await supabase
+                  .from("trade_tags")
+                  .insert([{ tag_name: tagName, user_id: user.id }])
+                  .select()
+                  .single();
+                
+                if (createTagError) {
+                  console.error("Error creating tag:", createTagError);
+                  continue;
+                }
+                tagId = newTag.id;
+              } else if (tagError) {
+                console.error("Error finding tag:", tagError);
+                continue;
+              } else {
+                tagId = tagData.id;
+              }
+              
+              // Create link
+              await supabase
+                .from("trade_tag_links")
+                .insert([{ trade_id: newTradeId, tag_id: tagId }]);
+            }
+          }
+          
+          // Add emotion
+          if (tradeData.emotion) {
+            // Get or create emotion
+            let { data: emotionData, error: emotionError } = await supabase
+              .from("emotions")
+              .select("id")
+              .eq("emotion", tradeData.emotion)
+              .eq("user_id", user.id)
+              .single();
+            
+            let emotionId = null;
+            if (emotionError && emotionError.code === 'PGRST116') {
+              // Emotion doesn't exist, create it
+              const { data: newEmotion, error: createEmotionError } = await supabase
+                .from("emotions")
+                .insert([{ emotion: tradeData.emotion, user_id: user.id }])
+                .select()
+                .single();
+              
+              if (createEmotionError) {
+                console.error("Error creating emotion:", createEmotionError);
+              } else {
+                emotionId = newEmotion.id;
+              }
+            } else if (emotionError) {
+              console.error("Error finding emotion:", emotionError);
+            } else if (emotionData) {
+              emotionId = emotionData.id;
+            }
+            
+            if (emotionId) {
+              // Create link
+              await supabase
+                .from("trade_emotion_links")
+                .insert([{ trade_id: newTradeId, emotion_id: emotionId }]);
+            }
+          }
+          
+          // Refresh the data
+          const event = new Event('tradeUpdated');
+          window.dispatchEvent(event);
         }
       }
       setIsTradeDialogOpen(false);
