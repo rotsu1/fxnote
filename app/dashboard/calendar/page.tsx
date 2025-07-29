@@ -366,7 +366,8 @@ function TradeCard({
         const { data: tagLinks, error: tagError } = await supabase
           .from("trade_tag_links")
           .select(`
-            trade_tags!inner(tag_name)
+            tag_id,
+            trade_tags(tag_name)
           `)
           .eq("trade_id", trade.id);
 
@@ -378,17 +379,18 @@ function TradeCard({
         }
 
         // Load emotion
-        const { data: emotionLink, error: emotionError } = await supabase
+        const { data: emotionLinks, error: emotionError } = await supabase
           .from("trade_emotion_links")
           .select(`
-            emotions!inner(emotion)
+            emotion_id,
+            emotions(emotion)
           `)
-          .eq("trade_id", trade.id)
-          .single();
+          .eq("trade_id", trade.id);
 
-        if (emotionError && emotionError.code !== 'PGRST116') {
+        if (emotionError) {
           console.error("Error loading trade emotion:", emotionError);
-        } else if (emotionLink) {
+        } else if (emotionLinks && emotionLinks.length > 0) {
+          const emotionLink = emotionLinks[0];
           setTradeEmotion((emotionLink.emotions as any)?.emotion || "");
         }
       } catch (error) {
@@ -2435,7 +2437,8 @@ export default function CalendarPage() {
         const { data: tagLinks, error: tagError } = await supabase
           .from("trade_tag_links")
           .select(`
-            trade_tags!inner(tag_name)
+            tag_id,
+            trade_tags(tag_name)
           `)
           .eq("trade_id", trade.id);
         
@@ -2447,17 +2450,18 @@ export default function CalendarPage() {
         }
         
         // Load emotion
-        const { data: emotionLink, error: emotionError } = await supabase
+        const { data: emotionLinks, error: emotionError } = await supabase
           .from("trade_emotion_links")
           .select(`
-            emotions!inner(emotion)
+            emotion_id,
+            emotions(emotion)
           `)
-          .eq("trade_id", trade.id)
-          .single();
+          .eq("trade_id", trade.id);
         
-        if (emotionError && emotionError.code !== 'PGRST116') {
+        if (emotionError) {
           console.error("Error loading trade emotion:", emotionError);
-        } else if (emotionLink) {
+        } else if (emotionLinks && emotionLinks.length > 0) {
+          const emotionLink = emotionLinks[0];
           tradeEmotion = (emotionLink.emotions as any)?.emotion || "";
           console.log("Loaded trade emotion:", tradeEmotion);
         }
