@@ -214,15 +214,15 @@ function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate:
         </Button>
       </div>
       <div
-        className={`text-lg font-semibold ${
-          monthlyPL > 0
-            ? "text-green-600"
-            : monthlyPL < 0
-            ? "text-red-600"
-            : "text-gray-500"
-        }`}
-      >
-        月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
+          className={`text-lg font-semibold ${
+            monthlyPL > 0
+              ? "text-green-600"
+              : monthlyPL < 0
+              ? "text-red-600"
+              : "text-gray-500"
+          }`}
+        >
+          月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
       </div>
     </div>
   )
@@ -384,8 +384,8 @@ function TradeCard({
       <CardContent className="p-4">
         <div className="flex justify-between items-start mb-2">
           <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
               {displaySettings.show_symbol && (
                 <span className="font-medium">{symbolName}</span>
               )}
@@ -434,13 +434,13 @@ function TradeCard({
         {displaySettings.show_entry_price && (
           <div className="text-sm mb-1">
             エントリー価格: {trade.entry || trade.entry_price}
-          </div>
+        </div>
         )}
 
         {displaySettings.show_exit_price && (
           <div className="text-sm mb-1">
             エグジット価格: {trade.exit || trade.exit_price}
-          </div>
+        </div>
         )}
 
         {displaySettings.show_lot && trade.lot_size && (
@@ -470,11 +470,11 @@ function TradeCard({
         {displaySettings.show_tag && tradeTags.length > 0 && !loadingData && (
           <div className="flex flex-wrap gap-1 mb-1">
             {tradeTags.map((tag: string, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
+            <Badge key={index} variant="outline" className="text-xs">
+              {tag}
+            </Badge>
+          ))}
+        </div>
         )}
 
         {displaySettings.show_note && trade.trade_memo && (
@@ -979,18 +979,19 @@ function TradeEditDialog({
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogHeader>
             <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
             <DialogDescription>取引の詳細を入力または編集してください。</DialogDescription>
-          </DialogHeader>
+        </DialogHeader>
 
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="entryDateTime">エントリー日時</Label>
                 <Input
                   id="entryDateTime"
                   type="datetime-local"
+                  step="1"
                   value={formData.entryDateTime}
                   onChange={(e) => handleFormChange({ entryDateTime: e.target.value })}
                 />
@@ -1000,6 +1001,7 @@ function TradeEditDialog({
                 <Input
                   id="exitDateTime"
                   type="datetime-local"
+                  step="1"
                   value={formData.exitDateTime}
                   onChange={(e) => handleFormChange({ exitDateTime: e.target.value })}
                 />
@@ -1047,7 +1049,7 @@ function TradeEditDialog({
             </div>
           </div>
 
-                      <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="entry">エントリー価格</Label>
               <Input
@@ -1070,7 +1072,7 @@ function TradeEditDialog({
             </div>
           </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="lotSize">ロットサイズ</Label>
               <Input
@@ -1095,7 +1097,7 @@ function TradeEditDialog({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div>
+          <div>
                 <Label htmlFor="profit">損益 (¥)</Label>
               <Input
                   id="profit"
@@ -1110,7 +1112,7 @@ function TradeEditDialog({
             <div className="text-red-600 text-sm mt-1">{validationError}</div>
           )}
 
-                      <div>
+          <div>
             <div className="flex items-center justify-between mb-2">
               <Label>感情</Label>
               <Button 
@@ -1214,7 +1216,7 @@ function TradeEditDialog({
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <Label>タグ</Label>
+            <Label>タグ</Label>
                 <Button 
                   type="button" 
                   variant="outline" 
@@ -1277,17 +1279,17 @@ function TradeEditDialog({
             <div>
               <Label htmlFor="newTagInput">新しいタグを追加</Label>
               <div className="flex gap-2 mt-1">
-                <Input
+              <Input
                   id="newTagInput"
                   placeholder="新しいタグ名を入力"
-                  value={newTag}
+                value={newTag}
                   onChange={(e) => handleNewTagChange(e.target.value)}
                   onKeyPress={(e) => e.key === "Enter" && addNewTagToDatabase(newTag)}
-                />
+              />
                 <Button type="button" onClick={() => addNewTagToDatabase(newTag)} size="sm">
-                  <Tag className="h-4 w-4" />
-                </Button>
-              </div>
+                <Tag className="h-4 w-4" />
+              </Button>
+            </div>
               {tagError && (
                 <p className="text-red-600 text-sm mt-1">{tagError}</p>
               )}
@@ -1306,25 +1308,25 @@ function TradeEditDialog({
                       onClick={() => confirmDeleteTag(tag)}
                     >
                       {tag} ×
-                    </Badge>
+                </Badge>
                   ))
                 ) : (
                   <span className="text-sm text-muted-foreground">タグがありません</span>
                 )}
-              </div>
+            </div>
               <p className="text-xs text-muted-foreground mt-1">
                 タグをクリックして削除
               </p>
-            </div>
           </div>
+        </div>
 
-          <div className="flex justify-end gap-2 mt-6">
+        <div className="flex justify-end gap-2 mt-6">
             <Button variant="outline" onClick={() => setIsTagEditOpen(false)}>
               閉じる
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
 
       {/* Emotion Edit Dialog */}
       <Dialog open={isEmotionEditOpen} onOpenChange={setIsEmotionEditOpen}>
@@ -1753,14 +1755,15 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
               }
             }
             
-            // Format as local datetime string (YYYY-MM-DDTHH:MM format)
+            // Format as local datetime string (YYYY-MM-DDTHH:MM:SS format)
             const yearStr = year.toString();
             const monthStr = month.toString().padStart(2, '0');
             const dayStr = day.toString().padStart(2, '0');
             const hoursStr = hours.padStart(2, '0');
             const minutesStr = minutes.padStart(2, '0');
+            const secondsStr = seconds.padStart(2, '0');
             
-            return `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}`;
+            return `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}:${secondsStr}`;
           };
           
           // Convert lot size (10000 currency per lot to 1000 currency per lot)
@@ -1901,26 +1904,26 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>CSV インポート</DialogTitle>
-            <DialogDescription>取引データをCSVファイルからインポートします</DialogDescription>
-          </DialogHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>CSV インポート</DialogTitle>
+          <DialogDescription>取引データをCSVファイルからインポートします</DialogDescription>
+        </DialogHeader>
 
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="broker">ブローカー</Label>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="broker">ブローカー</Label>
               <Select value={selectedBroker} onValueChange={setSelectedBroker}>
-                <SelectTrigger>
-                  <SelectValue placeholder="ブローカーを選択" />
-                </SelectTrigger>
-                <SelectContent>
+              <SelectTrigger>
+                <SelectValue placeholder="ブローカーを選択" />
+              </SelectTrigger>
+              <SelectContent>
                   <SelectItem value="hirose">ヒロセ通商</SelectItem>
-                  <SelectItem value="mt4">MetaTrader 4</SelectItem>
-                  <SelectItem value="mt5">MetaTrader 5</SelectItem>
-                </SelectContent>
-              </Select>
+                <SelectItem value="mt4">MetaTrader 4</SelectItem>
+                <SelectItem value="mt5">MetaTrader 5</SelectItem>
+              </SelectContent>
+            </Select>
               <Button 
                 variant="link" 
                 className="p-0 h-auto text-sm text-blue-600 hover:text-blue-800 mt-2"
@@ -1928,10 +1931,10 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
               >
                 ブローカーがない？
               </Button>
-            </div>
+          </div>
 
-            <div>
-              <Label htmlFor="csvFile">CSVファイル</Label>
+          <div>
+            <Label htmlFor="csvFile">CSVファイル</Label>
               <Input 
                 id="csvFile" 
                 type="file" 
@@ -1944,7 +1947,7 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
                   選択されたファイル: {csvFile.name}
                 </p>
               )}
-            </div>
+          </div>
 
             {importProgress && (
               <div className="bg-blue-50 p-3 rounded-md">
@@ -1963,21 +1966,21 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
                 <p className="text-sm text-green-800">{importSuccess}</p>
               </div>
             )}
-          </div>
+        </div>
 
-          <div className="flex justify-end gap-2 mt-6">
+        <div className="flex justify-end gap-2 mt-6">
             <Button variant="outline" onClick={onClose} disabled={isImporting}>
-              キャンセル
-            </Button>
+            キャンセル
+          </Button>
             <Button 
               onClick={handleImport} 
               disabled={!csvFile || !selectedBroker || isImporting}
             >
               {isImporting ? "インポート中..." : "インポート"}
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DialogContent>
+    </Dialog>
 
       {/* Custom Broker Request Dialog */}
       <Dialog open={isCustomBrokerOpen} onOpenChange={setIsCustomBrokerOpen}>
@@ -2106,14 +2109,14 @@ function DisplaySettingsDialog({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>表示設定</DialogTitle>
-            <DialogDescription>取引履歴カードの表示項目を設定します</DialogDescription>
-          </DialogHeader>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>表示設定</DialogTitle>
+          <DialogDescription>取引履歴カードの表示項目を設定します</DialogDescription>
+        </DialogHeader>
 
-          <div className="space-y-4">
-            {[
+        <div className="space-y-4">
+          {[
               { id: "show_symbol", label: "シンボル", checked: true, disabled: true },
               { id: "show_profit", label: "損益", checked: true, disabled: true },
               { id: "show_direction", label: "ロング/ショート", checked: true, disabled: false },
@@ -2127,8 +2130,8 @@ function DisplaySettingsDialog({
               { id: "show_emotion", label: "感情", checked: true, disabled: false },
               { id: "show_tag", label: "タグ", checked: true, disabled: false },
               { id: "show_note", label: "メモ", checked: true, disabled: false },
-            ].map((item) => (
-              <div key={item.id} className="flex items-center space-x-2">
+          ].map((item) => (
+            <div key={item.id} className="flex items-center space-x-2">
                 <Checkbox 
                   id={item.id} 
                   checked={settings[item.id] || false}
@@ -2142,18 +2145,18 @@ function DisplaySettingsDialog({
                 <Label htmlFor={item.id} className={item.disabled ? "text-gray-500" : ""}>
                   {item.label}
                 </Label>
-              </div>
-            ))}
-          </div>
+            </div>
+          ))}
+        </div>
 
-          <div className="flex justify-end gap-2 mt-6">
+        <div className="flex justify-end gap-2 mt-6">
             <Button variant="outline" onClick={handleClose}>
-              キャンセル
-            </Button>
+            キャンセル
+          </Button>
             <Button onClick={handleSave}>保存</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      </DialogContent>
+    </Dialog>
 
       {/* Discard Changes Warning Dialog */}
       <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
@@ -2361,7 +2364,7 @@ export default function CalendarPage() {
       
       console.log("Transformed trade for editing:", transformedTrade);
       setEditingTrade(transformedTrade);
-      setIsTradeDialogOpen(true);
+    setIsTradeDialogOpen(true);
     } catch (error) {
       console.error("Error preparing trade for editing:", error);
       setError("取引の編集準備中にエラーが発生しました");
@@ -2743,8 +2746,8 @@ export default function CalendarPage() {
           setTrades(transformedData);
         }
       }
-      setIsTradeDialogOpen(false);
-      setEditingTrade(null);
+    setIsTradeDialogOpen(false);
+    setEditingTrade(null);
     } catch (error: any) {
       console.error("Error saving trade:", error);
       console.error("Error details:", {
