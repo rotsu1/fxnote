@@ -101,25 +101,25 @@ const strategies = [
 
 // Column definitions for settings and table rendering
 const allColumns = [
-  { id: "date", label: "日付", type: "date", defaultVisible: true, minWidth: "min-w-[100px]" },
-  { id: "time", label: "時間", type: "time", defaultVisible: true, minWidth: "min-w-[80px]" },
-  { id: "pair", label: "通貨ペア", type: "text", defaultVisible: true, minWidth: "min-w-[100px]" },
+  { id: "date", label: "日付", type: "date", defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "time", label: "時間", type: "time", defaultVisible: true, minWidth: "min-w-[100px]" },
+  { id: "pair", label: "通貨ペア", type: "text", defaultVisible: true, minWidth: "min-w-[120px]" },
   {
     id: "type",
     label: "種別",
     type: "select",
     options: ["買い", "売り"],
     defaultVisible: true,
-    minWidth: "min-w-[60px]",
+    minWidth: "min-w-[80px]",
   },
-  { id: "entry", label: "エントリー", type: "number", defaultVisible: true, minWidth: "min-w-[90px]" },
-  { id: "exit", label: "エグジット", type: "number", defaultVisible: true, minWidth: "min-w-[90px]" },
-  { id: "pips", label: "pips", type: "number", defaultVisible: true, minWidth: "min-w-[70px]" },
-  { id: "profit", label: "損益 (¥)", type: "number", defaultVisible: true, minWidth: "min-w-[90px]" },
-  { id: "emotion", label: "感情", type: "select", options: emotions, defaultVisible: true, minWidth: "min-w-[90px]" },
-  { id: "holdingTime", label: "保有時間", type: "text", defaultVisible: true, minWidth: "min-w-[100px]" },
-  { id: "notes", label: "メモ", type: "textarea", defaultVisible: false, minWidth: "min-w-[200px]" },
-  { id: "tags", label: "タグ", type: "tags", defaultVisible: false, minWidth: "min-w-[150px]" },
+  { id: "entry", label: "エントリー", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "exit", label: "エグジット", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "pips", label: "pips", type: "number", defaultVisible: true, minWidth: "min-w-[100px]" },
+  { id: "profit", label: "損益 (¥)", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "emotion", label: "感情", type: "select", options: emotions, defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "holdingTime", label: "保有時間", type: "text", defaultVisible: true, minWidth: "min-w-[140px]" },
+  { id: "notes", label: "メモ", type: "textarea", defaultVisible: false, minWidth: "min-w-[250px]" },
+  { id: "tags", label: "タグ", type: "tags", defaultVisible: false, minWidth: "min-w-[200px]" },
 ]
 
 // Reusing TradeEditDialog from calendar page, slightly modified for new fields
@@ -678,7 +678,7 @@ export default function TablePage() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 p-4 md:p-6 w-full max-w-[calc(100vw-350px)] overflow-hidden responsive-main">
           {loading ? (
             <div className="text-center py-10">読み込み中...</div>
           ) : error ? (
@@ -719,27 +719,27 @@ export default function TablePage() {
               </div>
 
               {/* Trade History Table */}
-              <Card>
+              <Card className="w-full">
                 <CardHeader>
                   <CardTitle>
                     {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : "日付を選択"} の取引
                   </CardTitle>
                   <CardDescription>{filteredTrades.length}件の取引が見つかりました</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto max-h-[calc(100vh-250px)]">
-                    <Table className="min-w-full">
+                <CardContent className="p-0">
+                  <div className="overflow-y-auto">
+                    <Table className="w-full">
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                         <TableRow>
                           {visibleColumns.map((colId) => {
                             const column = allColumns.find((c) => c.id === colId);
                             return column ? (
-                              <TableHead key={column.id} className={column.minWidth}>
+                              <TableHead key={column.id} className={`${column.minWidth} text-left`}>
                                 {column.label}
                               </TableHead>
                             ) : null;
                           })}
-                          <TableHead className="min-w-[80px] text-right">アクション</TableHead>
+                          <TableHead className="min-w-[100px] text-right">アクション</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -757,7 +757,7 @@ export default function TablePage() {
                                   <TableCell
                                     key={column.id}
                                     onClick={() => handleCellClick(trade.id, column.id as keyof Trade)}
-                                    className="py-2 px-4 border-b border-r last:border-r-0"
+                                    className={`py-2 px-4 border-b border-r last:border-r-0 ${column.minWidth} text-left`}
                                   >
                                     {isEditing ? (
                                       column.type === "select" ? (
@@ -839,7 +839,7 @@ export default function TablePage() {
                                   </TableCell>
                                 );
                               })}
-                              <TableCell className="py-2 px-4 border-b text-right">
+                              <TableCell className="py-2 px-4 border-b text-right min-w-[100px]">
                                 <div className="flex justify-end gap-1">
                                   <Button variant="ghost" size="sm" onClick={() => handleEditTrade(trade)}>
                                     <Edit className="h-4 w-4" />

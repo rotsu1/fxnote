@@ -92,3 +92,15 @@ body {
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .responsive-main {
+    max-width: calc(100vw - 350px);
+  }
+  
+  @media (max-width: 767px) {
+    .responsive-main {
+      max-width: 100%;
+    }
+  }
+}
