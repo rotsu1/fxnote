@@ -107,10 +107,25 @@ function utcToLocalDateTime(utcString: string): string {
 
 // Helper to convert local datetime string to UTC ISO string
 function localDateTimeToUTC(localDateTimeString: string): string {
-  if (!localDateTimeString) return new Date().toISOString();
+  if (!localDateTimeString || localDateTimeString.trim() === "") {
+    console.log("localDateTimeToUTC: Empty input, using current time");
+    return new Date().toISOString();
+  }
+  
+  console.log("localDateTimeToUTC: Input:", localDateTimeString);
+  
   // Create a date object from the local datetime string
   const date = new Date(localDateTimeString);
-  return date.toISOString();
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    console.error("localDateTimeToUTC: Invalid date string:", localDateTimeString);
+    return new Date().toISOString();
+  }
+  
+  const result = date.toISOString();
+  console.log("localDateTimeToUTC: Output:", result);
+  return result;
 }
 
 // Helper to format hold time from seconds to readable format
@@ -599,18 +614,18 @@ function TradeEditDialog({
       time: "",
       entryDateTime: "",
       exitDateTime: "",
-    pair: "",
+      pair: "",
       type: "買い",
-      entry: undefined,
-      exit: undefined,
-      lotSize: undefined,
-      pips: undefined,
-      profit: undefined,
+      entry: 0,
+      exit: 0,
+      lotSize: 0,
+      pips: 0,
+      profit: 0,
       emotion: "",
       holdingTime: 0,
-      holdingDays: undefined,
-      holdingHours: undefined,
-      holdingMinutes: undefined,
+      holdingDays: 0,
+      holdingHours: 0,
+      holdingMinutes: 0,
       notes: "",
       tags: [],
     },
@@ -633,21 +648,21 @@ function TradeEditDialog({
     setFormData(
       trade || {
         date: defaultDate || new Date().toISOString().split("T")[0],
-    time: "",
+        time: "",
         entryDateTime: "",
         exitDateTime: "",
         pair: "",
         type: "買い",
-        entry: undefined,
-        exit: undefined,
-        lotSize: undefined,
-        pips: undefined,
-        profit: undefined,
+        entry: 0,
+        exit: 0,
+        lotSize: 0,
+        pips: 0,
+        profit: 0,
         emotion: "",
         holdingTime: 0,
-        holdingDays: undefined,
-        holdingHours: undefined,
-        holdingMinutes: undefined,
+        holdingDays: 0,
+        holdingHours: 0,
+        holdingMinutes: 0,
         notes: "",
         tags: [],
       },
@@ -926,30 +941,53 @@ function TradeEditDialog({
     // Clear previous validation errors
     setValidationError("")
     
+    console.log("=== TradeEditDialog handleSave Debug ===");
+    console.log("Form data:", formData);
+    
     // Validation: Check if required fields are filled
     if (!formData.pair || !formData.pair.trim()) {
+      console.log("Validation failed: Missing symbol");
       setValidationError("シンボルを選択してください")
       return
     }
     
     if (formData.profit === undefined || formData.profit === null) {
+      console.log("Validation failed: Missing profit");
       setValidationError("損益を入力してください")
       return
     }
     
+    // Additional validation: Check if profit is a valid number
+    const profitValue = Number.parseFloat(String(formData.profit));
+    if (isNaN(profitValue)) {
+      console.log("Validation failed: Invalid profit value");
+      setValidationError("損益は有効な数値を入力してください")
+      return
+    }
+    
     // Basic validation for numbers
-    const parsedEntry = formData.entry !== undefined ? Number.parseFloat(String(formData.entry)) : undefined
-    const parsedExit = formData.exit !== undefined ? Number.parseFloat(String(formData.exit)) : undefined
-    const parsedLotSize = formData.lotSize !== undefined ? Number.parseFloat(String(formData.lotSize)) : undefined
-    const parsedPips = formData.pips !== undefined ? Number.parseFloat(String(formData.pips)) : undefined
-    const parsedProfit = formData.profit !== undefined ? Number.parseFloat(String(formData.profit)) : undefined
+    const parsedEntry = formData.entry !== undefined && formData.entry !== null ? Number.parseFloat(String(formData.entry)) : 0
+    const parsedExit = formData.exit !== undefined && formData.exit !== null ? Number.parseFloat(String(formData.exit)) : 0
+    const parsedLotSize = formData.lotSize !== undefined && formData.lotSize !== null ? Number.parseFloat(String(formData.lotSize)) : 0
+    const parsedPips = formData.pips !== undefined && formData.pips !== null ? Number.parseFloat(String(formData.pips)) : 0
+    const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
+
+    console.log("Parsed values:", {
+      entry: parsedEntry,
+      exit: parsedExit,
+      lotSize: parsedLotSize,
+      pips: parsedPips,
+      profit: parsedProfit
+    });
 
     // Calculate holding time in seconds
     const holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
                                 (formData.holdingHours || 0) * 60 * 60 + 
                                 (formData.holdingMinutes || 0) * 60
 
-    onSave({
+    console.log("Holding time in seconds:", holdingTimeInSeconds);
+
+    const tradeDataToSave = {
       ...formData,
       entry: parsedEntry,
       exit: parsedExit,
@@ -957,7 +995,12 @@ function TradeEditDialog({
       pips: parsedPips,
       profit: parsedProfit,
       holdingTime: holdingTimeInSeconds,
-    })
+    };
+
+    console.log("Trade data to save:", tradeDataToSave);
+    console.log("=== End TradeEditDialog handleSave Debug ===");
+
+    onSave(tradeDataToSave)
     setHasUnsavedChanges(false);
   }
 
@@ -2381,8 +2424,11 @@ export default function CalendarPage() {
   const handleSaveTrade = async (tradeData: Partial<Trade>) => {
     if (!user) return;
     
+    console.log("=== handleSaveTrade Debug ===");
     console.log("Saving trade data:", tradeData);
     console.log("User ID:", user.id);
+    console.log("Trade data type:", typeof tradeData);
+    console.log("Trade data keys:", Object.keys(tradeData));
     
     // Validate required fields
     if (!tradeData.pair || !tradeData.pair.trim()) {
@@ -2441,8 +2487,16 @@ export default function CalendarPage() {
           profit_loss: tradeData.profit,
           hold_time: tradeData.holdingTime,
           trade_memo: tradeData.notes,
-          entry_time: localDateTimeToUTC(tradeData.entryDateTime || ""),
-          exit_time: localDateTimeToUTC(tradeData.exitDateTime || ""),
+          entry_time: (() => {
+            const result = localDateTimeToUTC(tradeData.entryDateTime || "");
+            console.log("Update - Entry time conversion:", { input: tradeData.entryDateTime, output: result });
+            return result;
+          })(),
+          exit_time: (() => {
+            const result = localDateTimeToUTC(tradeData.exitDateTime || "");
+            console.log("Update - Exit time conversion:", { input: tradeData.exitDateTime, output: result });
+            return result;
+          })(),
           updated_at: new Date().toISOString(),
         };
         
@@ -2623,8 +2677,16 @@ export default function CalendarPage() {
           profit_loss: tradeData.profit,
           hold_time: tradeData.holdingTime,
           trade_memo: tradeData.notes,
-          entry_time: localDateTimeToUTC(tradeData.entryDateTime || ""),
-          exit_time: localDateTimeToUTC(tradeData.exitDateTime || ""),
+          entry_time: (() => {
+            const result = localDateTimeToUTC(tradeData.entryDateTime || "");
+            console.log("Insert - Entry time conversion:", { input: tradeData.entryDateTime, output: result });
+            return result;
+          })(),
+          exit_time: (() => {
+            const result = localDateTimeToUTC(tradeData.exitDateTime || "");
+            console.log("Insert - Exit time conversion:", { input: tradeData.exitDateTime, output: result });
+            return result;
+          })(),
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -2639,6 +2701,13 @@ export default function CalendarPage() {
         
         if (error) {
           console.error("Error inserting trade:", error);
+          console.error("Error details:", {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          console.error("Insert data that failed:", insertData);
           throw error;
         }
         
