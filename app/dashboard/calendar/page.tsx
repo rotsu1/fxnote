@@ -1813,22 +1813,42 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
           
           // Parse Japanese date format and convert to local datetime string for localDateTimeToUTC
           const parseJapaneseDateTime = (dateTimeStr: string): string => {
-            const parts = dateTimeStr.split(' ');
-            if (parts.length < 2) return new Date().toISOString();
+            console.log("=== parseJapaneseDateTime Debug ===");
+            console.log("Input dateTimeStr:", dateTimeStr);
+            console.log("Input length:", dateTimeStr.length);
+            
+            // Split by multiple spaces and filter out empty parts
+            const parts = dateTimeStr.split(/\s+/).filter(part => part.trim() !== '');
+            console.log("Parts after split:", parts);
+            console.log("Parts length:", parts.length);
+            
+            if (parts.length < 2) {
+              console.log("Not enough parts, returning current time");
+              return new Date().toISOString();
+            }
             
             const datePart = parts[0];
             const timePart = parts[1];
-            const [day, month, year] = datePart.split('/').map(Number);
+            console.log("Date part:", datePart);
+            console.log("Time part:", timePart);
+            
+            const [year, month, day] = datePart.split('/').map(Number);
+            console.log("Parsed date:", { day, month, year });
+            
             let [hours, minutes, seconds = '00'] = timePart.split(':');
+            console.log("Parsed time components:", { hours, minutes, seconds });
             
             // Handle AM/PM if present
             if (parts.length > 2) {
               const ampm = parts[2];
+              console.log("AM/PM part:", ampm);
               const hour = parseInt(hours);
               if (ampm === '午後' && hour !== 12) {
                 hours = (hour + 12).toString();
+                console.log("Converted to 24-hour format:", hours);
               } else if (ampm === '午前' && hour === 12) {
                 hours = '00';
+                console.log("Converted 12 AM to 00:", hours);
               }
             }
             
@@ -1840,7 +1860,11 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
             const minutesStr = minutes.padStart(2, '0');
             const secondsStr = seconds.padStart(2, '0');
             
-            return `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}:${secondsStr}`;
+            const result = `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}:${secondsStr}`;
+            console.log("Final formatted result:", result);
+            console.log("=== End parseJapaneseDateTime Debug ===");
+            
+            return result;
           };
           
           // Convert lot size (10000 currency per lot to 1000 currency per lot)
@@ -1897,10 +1921,22 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
           };
           
           // Parse trade data
+          console.log("=== CSV Trade Data Parsing Debug ===");
+          console.log("Raw entry time from CSV:", values[11]); // 新規約定日時
+          console.log("Raw exit time from CSV:", values[0]);   // 決済約定日時
+          
           const entryDateTime = parseJapaneseDateTime(values[11]); // 新規約定日時
           const exitDateTime = parseJapaneseDateTime(values[0]);   // 決済約定日時
+          
+          console.log("Parsed entry datetime:", entryDateTime);
+          console.log("Parsed exit datetime:", exitDateTime);
+          
           const entryTime = localDateTimeToUTC(entryDateTime);
           const exitTime = localDateTimeToUTC(exitDateTime);
+          
+          console.log("Final entry time (UTC):", entryTime);
+          console.log("Final exit time (UTC):", exitTime);
+          console.log("=== End CSV Trade Data Parsing Debug ===");
           const lotSize = convertLotSize(values[10]);          // Lot数
           const tradeType = convertTradeType(values[9]);       // 売買
           const profitLoss = parseFloat(values[16]);           // 売買損益
