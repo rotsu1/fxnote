@@ -146,13 +146,17 @@ function formatHoldTime(seconds: number): string {
   return result || "0分";
 }
 
-// Helper to group trades by date (exit_time)
+// Helper to group trades by date (exit_time) with proper timezone handling
 function groupTradesByDate(trades: any[]): Record<string, any[]> {
   return trades.reduce((acc: Record<string, any[]>, trade: any) => {
-    const date = trade.exit_time?.split("T")[0];
-    if (!date) return acc;
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(trade);
+    if (!trade.exit_time) return acc;
+    
+    // Convert UTC timestamp to local date
+    const exitDate = new Date(trade.exit_time);
+    const localDate = exitDate.toLocaleDateString('en-CA'); // Returns YYYY-MM-DD format
+    
+    if (!acc[localDate]) acc[localDate] = [];
+    acc[localDate].push(trade);
     return acc;
   }, {});
 }
@@ -177,9 +181,10 @@ function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate:
   const currentMonth = currentDate.getMonth()
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i) // 10 years before and after
 
-  // Calculate monthly P/L
+  // Calculate monthly P/L with proper timezone handling
   const monthlyPL = trades.reduce((sum, trade) => {
     const tradeDate = new Date(trade.exit_time || trade.entry_time || trade.created_at);
+    // Use local date for comparison
     if (tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === currentMonth) {
       return sum + (trade.profit_loss || trade.pnl || 0);
     }
@@ -1852,19 +1857,14 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
               }
             }
             
-            // Format as local datetime string (YYYY-MM-DDTHH:MM:SS format)
-            const yearStr = year.toString();
-            const monthStr = month.toString().padStart(2, '0');
-            const dayStr = day.toString().padStart(2, '0');
-            const hoursStr = hours.padStart(2, '0');
-            const minutesStr = minutes.padStart(2, '0');
-            const secondsStr = seconds.padStart(2, '0');
-            
-            const result = `${yearStr}-${monthStr}-${dayStr}T${hoursStr}:${minutesStr}:${secondsStr}`;
-            console.log("Final formatted result:", result);
+            // Create a Date object in local timezone and convert to UTC ISO string
+            const localDate = new Date(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds));
+            const utcResult = localDate.toISOString();
+            console.log("Local date object:", localDate);
+            console.log("Final UTC result:", utcResult);
             console.log("=== End parseJapaneseDateTime Debug ===");
             
-            return result;
+            return utcResult;
           };
           
           // Convert lot size (10000 currency per lot to 1000 currency per lot)
