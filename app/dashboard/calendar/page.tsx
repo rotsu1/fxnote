@@ -1574,6 +1574,17 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
   const [importError, setImportError] = useState<string>("");
   const [importSuccess, setImportSuccess] = useState<string>("");
 
+  // Reset dialog state when it opens
+  useEffect(() => {
+    if (isOpen) {
+      setImportProgress("");
+      setImportError("");
+      setImportSuccess("");
+      setCsvFile(null);
+      setSelectedBroker("");
+    }
+  }, [isOpen]);
+
   const handleCustomBrokerSubmit = async () => {
     if (!customBrokerName.trim() || !customBrokerEmail.trim() || !customBrokerCSV) {
       return;
@@ -1941,10 +1952,11 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
       setImportProgress("");
       setImportSuccess(`${successCount}件の取引をインポートしました。${errorCount > 0 ? ` (${errorCount}件エラー)` : ''}`);
       
-      // Refresh trades list
+      // Close the dialog after successful import
       if (successCount > 0) {
-        // Trigger a page refresh or reload trades
-        window.location.reload();
+        setTimeout(() => {
+          onClose();
+        }, 2000); // Close after 2 seconds to show success message
       }
       
     } catch (error) {
@@ -2327,31 +2339,41 @@ export default function CalendarPage() {
   };
 
   useEffect(() => {
+    loadTrades();
+  }, [user]);
+
+  // Function to load trades
+  const loadTrades = async () => {
     if (!user) return;
     setLoading(true);
     setError("");
-    supabase
-      .from("trades")
-      .select(`
-        *,
-        symbols!inner(symbol)
-      `)
-      .eq("user_id", user.id)
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-          setTrades([]);
-        } else {
-          // Transform data to include symbol_name
-          const transformedData = data?.map(trade => ({
-            ...trade,
-            symbol_name: trade.symbols?.symbol
-          })) || [];
-          setTrades(transformedData);
-        }
-        setLoading(false);
-      });
-  }, [user]);
+    try {
+      const { data, error } = await supabase
+        .from("trades")
+        .select(`
+          *,
+          symbols!inner(symbol)
+        `)
+        .eq("user_id", user.id);
+      
+      if (error) {
+        setError(error.message);
+        setTrades([]);
+      } else {
+        // Transform data to include symbol_name
+        const transformedData = data?.map(trade => ({
+          ...trade,
+          symbol_name: trade.symbols?.symbol
+        })) || [];
+        setTrades(transformedData);
+      }
+    } catch (error) {
+      setError("Failed to load trades");
+      setTrades([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Load display settings when user changes
   useEffect(() => {
@@ -2974,7 +2996,15 @@ export default function CalendarPage() {
           defaultDate={selectedDate}
           user={user}
         />
-        <CSVImportDialog isOpen={isCSVDialogOpen} onClose={() => setIsCSVDialogOpen(false)} user={user} />
+        <CSVImportDialog 
+          isOpen={isCSVDialogOpen} 
+          onClose={() => {
+            setIsCSVDialogOpen(false);
+            // Refresh trades data after CSV import
+            loadTrades();
+          }} 
+          user={user} 
+        />
         <DisplaySettingsDialog 
           isOpen={isDisplaySettingsOpen} 
           onClose={() => setIsDisplaySettingsOpen(false)}
