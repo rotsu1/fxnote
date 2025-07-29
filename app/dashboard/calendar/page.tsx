@@ -592,9 +592,16 @@ function RightSidebar({
         {/* Trade History */}
         <div className="p-4">
           <h4 className="font-medium mb-3">取引履歴</h4>
-          {trades.map((trade) => (
-            <TradeCard key={trade.id} trade={trade} onEdit={onEditTrade} onDelete={onDeleteTrade} displaySettings={displaySettings} />
-          ))}
+          {trades
+            .sort((a, b) => {
+              // Sort by exit_time (earliest first), then by entry_time, then by created_at
+              const aTime = a.exit_time || a.entry_time || a.created_at;
+              const bTime = b.exit_time || b.entry_time || b.created_at;
+              return new Date(aTime).getTime() - new Date(bTime).getTime();
+            })
+            .map((trade) => (
+              <TradeCard key={trade.id} trade={trade} onEdit={onEditTrade} onDelete={onDeleteTrade} displaySettings={displaySettings} />
+            ))}
         </div>
       </div>
     </>
