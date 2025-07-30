@@ -674,6 +674,8 @@ function TradeEditDialog({
   const [emotionError, setEmotionError] = useState("")
   const [emotionToDelete, setEmotionToDelete] = useState<string | null>(null)
   const [validationError, setValidationError] = useState("")
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>([])
+  const [loadingSymbols, setLoadingSymbols] = useState(false)
 
     useEffect(() => {
     console.log("=== TradeEditDialog useEffect Debug ===");
@@ -775,8 +777,34 @@ function TradeEditDialog({
     }
   }
 
+  // Load symbols from database
+  const loadSymbolsFromDatabase = async () => {
+    if (!user) return
+    
+    setLoadingSymbols(true)
+    try {
+      const { data, error } = await supabase
+        .from("symbols")
+        .select("symbol")
+        .order("symbol")
+      
+      if (error) {
+        console.error("Error loading symbols:", error)
+        return
+      }
+      
+      const symbols = data?.map(item => item.symbol) || []
+      setAvailableSymbols(symbols)
+    } catch (error) {
+      console.error("Error loading symbols:", error)
+    } finally {
+      setLoadingSymbols(false)
+    }
+  }
+
   useEffect(() => {
     loadEmotionsFromDatabase()
+    loadSymbolsFromDatabase()
   }, [user])
 
   // Auto-calculate holding time when entry and exit datetimes change
@@ -1130,16 +1158,17 @@ function TradeEditDialog({
                   <SelectValue placeholder="シンボルを選択" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="EUR/USD">EUR/USD</SelectItem>
-                  <SelectItem value="USD/JPY">USD/JPY</SelectItem>
-                  <SelectItem value="GBP/USD">GBP/USD</SelectItem>
-                  <SelectItem value="USD/CHF">USD/CHF</SelectItem>
-                  <SelectItem value="AUD/USD">AUD/USD</SelectItem>
-                  <SelectItem value="USD/CAD">USD/CAD</SelectItem>
-                  <SelectItem value="NZD/USD">NZD/USD</SelectItem>
-                  <SelectItem value="EUR/JPY">EUR/JPY</SelectItem>
-                  <SelectItem value="GBP/JPY">GBP/JPY</SelectItem>
-                  <SelectItem value="EUR/GBP">EUR/GBP</SelectItem>
+                  {loadingSymbols ? (
+                    <SelectItem value="" disabled>読み込み中...</SelectItem>
+                  ) : availableSymbols.length > 0 ? (
+                    availableSymbols.map((symbol) => (
+                      <SelectItem key={symbol} value={symbol}>
+                        {symbol}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>シンボルがありません</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -114,7 +114,7 @@ const strategies = [
 const allColumns = [
   { id: "entryTime", label: "エントリー時間", type: "datetime-local", defaultVisible: true, minWidth: "min-w-[180px]" },
   { id: "exitTime", label: "エグジット時間", type: "datetime-local", defaultVisible: true, minWidth: "min-w-[180px]" },
-  { id: "pair", label: "シンボル", type: "text", defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "pair", label: "シンボル", type: "select", options: [], defaultVisible: true, minWidth: "min-w-[120px]" },
   {
     id: "type",
     label: "種別",
@@ -141,12 +141,14 @@ function TradeEditDialog({
   onClose,
   onSave,
   defaultDate,
+  user,
 }: {
   trade: Partial<Trade> | null
   isOpen: boolean
   onClose: () => void
   onSave: (trade: Partial<Trade>) => void
   defaultDate?: string
+  user: any
 }) {
   const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
@@ -167,6 +169,37 @@ function TradeEditDialog({
     },
   )
   const [newTag, setNewTag] = useState("")
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>([])
+  const [loadingSymbols, setLoadingSymbols] = useState(false)
+
+  // Load symbols from database
+  const loadSymbolsFromDatabase = async () => {
+    if (!user) return
+    
+    setLoadingSymbols(true)
+    try {
+      const { data, error } = await supabase
+        .from("symbols")
+        .select("symbol")
+        .order("symbol")
+      
+      if (error) {
+        console.error("Error loading symbols:", error)
+        return
+      }
+      
+      const symbols = data?.map(item => item.symbol) || []
+      setAvailableSymbols(symbols)
+    } catch (error) {
+      console.error("Error loading symbols:", error)
+    } finally {
+      setLoadingSymbols(false)
+    }
+  }
+
+  useEffect(() => {
+    loadSymbolsFromDatabase()
+  }, [user])
 
   useEffect(() => {
     setFormData(
@@ -265,11 +298,27 @@ function TradeEditDialog({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="pair">シンボル</Label>
-              <Input
-                id="pair"
+              <Select
                 value={formData.pair}
-                onChange={(e) => setFormData({ ...formData, pair: e.target.value })}
-              />
+                onValueChange={(value) => setFormData({ ...formData, pair: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="シンボルを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {loadingSymbols ? (
+                    <SelectItem value="" disabled>読み込み中...</SelectItem>
+                  ) : availableSymbols.length > 0 ? (
+                    availableSymbols.map((symbol) => (
+                      <SelectItem key={symbol} value={symbol}>
+                        {symbol}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <SelectItem value="" disabled>シンボルがありません</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="type">取引種別</Label>
@@ -569,9 +618,46 @@ export default function TablePage() {
   const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [originalValues, setOriginalValues] = useState<Record<string, any>>({});
+  const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
+
+  // Load symbols from database for table editing
+  const loadSymbolsForTable = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("symbols")
+        .select("symbol")
+        .order("symbol")
+      
+      if (error) {
+        console.error("Error loading symbols for table:", error)
+        return
+      }
+      
+      const symbols = data?.map(item => item.symbol) || []
+      setAvailableSymbols(symbols)
+      
+      // Update the pair column options
+      const updatedColumns = allColumns.map(col => {
+        if (col.id === 'pair') {
+          return { ...col, options: symbols }
+        }
+        return col
+      })
+      
+      // Update the allColumns array (this is a bit of a workaround since allColumns is const)
+      // We'll handle this in the cell rendering logic instead
+    } catch (error) {
+      console.error("Error loading symbols for table:", error)
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
+    
+    // Load symbols for table editing
+    loadSymbolsForTable();
     
     const loadTrades = async () => {
       setLoading(true);
@@ -2014,11 +2100,25 @@ export default function TablePage() {
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                              {(column.options || []).map((option) => (
-                                                <SelectItem key={option} value={option}>
-                                                  {option}
-                                                </SelectItem>
-                                              ))}
+                                              {column.id === "pair" ? (
+                                                // For pair field, use symbols from database
+                                                availableSymbols.length > 0 ? (
+                                                  availableSymbols.map((symbol) => (
+                                                    <SelectItem key={symbol} value={symbol}>
+                                                      {symbol}
+                                                    </SelectItem>
+                                                  ))
+                                                ) : (
+                                                  <SelectItem value="" disabled>読み込み中...</SelectItem>
+                                                )
+                                              ) : (
+                                                // For other select fields, use column options
+                                                (column.options || []).map((option) => (
+                                                  <SelectItem key={option} value={option}>
+                                                    {option}
+                                                  </SelectItem>
+                                                ))
+                                              )}
                                             </SelectContent>
                                           </Select>
                                         ) : column.type === "textarea" ? (
@@ -2158,6 +2258,7 @@ export default function TablePage() {
           onClose={() => setIsTradeDialogOpen(false)}
           onSave={handleSaveTrade}
           defaultDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
+          user={user}
         />
 
         <TableSettingsDialog
