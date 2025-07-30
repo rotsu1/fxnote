@@ -11,6 +11,9 @@ import {
   Tag,
   ChevronLeft,
   ChevronRight,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
@@ -473,6 +476,10 @@ export default function TablePage() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     allColumns.filter((col) => col.defaultVisible).map((col) => col.id),
   );
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Trade | null;
+    direction: 'asc' | 'desc';
+  }>({ key: null, direction: 'asc' });
 
   useEffect(() => {
     if (!user) return;
@@ -635,8 +642,38 @@ export default function TablePage() {
   const filteredTrades = useMemo(() => {
     if (!selectedDate) return [];
     const dateString = format(selectedDate, "yyyy-MM-dd");
-    return trades.filter((trade) => trade.date === dateString);
-  }, [trades, selectedDate]);
+    let filtered = trades.filter((trade) => trade.date === dateString);
+    
+    // Apply sorting
+    if (sortConfig.key) {
+      filtered.sort((a, b) => {
+        const aValue = a[sortConfig.key!];
+        const bValue = b[sortConfig.key!];
+        
+        // Handle different data types
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+        }
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          const comparison = aValue.localeCompare(bValue);
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        // Handle arrays (tags)
+        if (Array.isArray(aValue) && Array.isArray(bValue)) {
+          const aStr = aValue.join(', ');
+          const bStr = bValue.join(', ');
+          const comparison = aStr.localeCompare(bStr);
+          return sortConfig.direction === 'asc' ? comparison : -comparison;
+        }
+        
+        return 0;
+      });
+    }
+    
+    return filtered;
+  }, [trades, selectedDate, sortConfig]);
 
   const handleCellClick = (id: number, field: keyof Trade) => {
     setEditingCell({ id, field });
@@ -1017,6 +1054,33 @@ export default function TablePage() {
     setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)));
   };
 
+  const handleSort = (key: keyof Trade) => {
+    setSortConfig(prev => {
+      if (prev.key === key) {
+        // If clicking the same column, toggle direction
+        return {
+          key,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc'
+        };
+      } else {
+        // If clicking a different column, set it as the new sort key with ascending direction
+        return {
+          key,
+          direction: 'asc'
+        };
+      }
+    });
+  };
+
+  const getSortIcon = (columnId: string) => {
+    if (sortConfig.key !== columnId) {
+      return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
+    }
+    return sortConfig.direction === 'asc' 
+      ? <ArrowUp className="h-4 w-4 text-primary" />
+      : <ArrowDown className="h-4 w-4 text-primary" />;
+  };
+
   const handlePreviousDay = () => {
     if (selectedDate) {
       const previousDay = new Date(selectedDate);
@@ -1159,8 +1223,15 @@ export default function TablePage() {
                           {visibleColumns.map((colId) => {
                             const column = allColumns.find((c) => c.id === colId);
                             return column ? (
-                              <TableHead key={column.id} className={`${column.minWidth} text-left`}>
-                                {column.label}
+                              <TableHead 
+                                key={column.id} 
+                                className={`${column.minWidth} text-left cursor-pointer hover:bg-muted/50 transition-colors`}
+                                onClick={() => handleSort(column.id as keyof Trade)}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span>{column.label}</span>
+                                  {getSortIcon(column.id)}
+                                </div>
                               </TableHead>
                             ) : null;
                           })}
