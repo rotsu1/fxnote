@@ -112,8 +112,8 @@ const strategies = [
 
 // Column definitions for settings and table rendering
 const allColumns = [
-  { id: "entryTime", label: "エントリー時間", type: "datetime", defaultVisible: true, minWidth: "min-w-[180px]" },
-  { id: "exitTime", label: "エグジット時間", type: "datetime", defaultVisible: true, minWidth: "min-w-[180px]" },
+  { id: "entryTime", label: "エントリー時間", type: "datetime-local", defaultVisible: true, minWidth: "min-w-[180px]" },
+  { id: "exitTime", label: "エグジット時間", type: "datetime-local", defaultVisible: true, minWidth: "min-w-[180px]" },
   { id: "pair", label: "シンボル", type: "text", defaultVisible: true, minWidth: "min-w-[120px]" },
   {
     id: "type",
@@ -151,6 +151,8 @@ function TradeEditDialog({
   const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
       date: defaultDate || format(new Date(), "yyyy-MM-dd"),
+      entryTime: defaultDate ? `${defaultDate}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+      exitTime: defaultDate ? `${defaultDate}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
       pair: "",
       type: "買い",
       lot: undefined,
@@ -170,6 +172,8 @@ function TradeEditDialog({
     setFormData(
       trade || {
         date: defaultDate || format(new Date(), "yyyy-MM-dd"),
+        entryTime: defaultDate ? `${defaultDate}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
+        exitTime: defaultDate ? `${defaultDate}T00:00:00` : format(new Date(), "yyyy-MM-dd'T'HH:mm:ss"),
         pair: "",
         type: "買い",
         lot: undefined,
@@ -210,8 +214,14 @@ function TradeEditDialog({
     const parsedPips = formData.pips !== undefined ? Number.parseFloat(String(formData.pips)) : undefined
     const parsedProfit = formData.profit !== undefined ? Number.parseFloat(String(formData.profit)) : undefined
 
+    // Convert datetime-local format to ISO string for database
+    const entryDateTime = formData.entryTime ? new Date(formData.entryTime).toISOString() : undefined
+    const exitDateTime = formData.exitTime ? new Date(formData.exitTime).toISOString() : undefined
+
     onSave({
       ...formData,
+      entryTime: entryDateTime,
+      exitTime: exitDateTime,
       lot: parsedLot,
       entry: parsedEntry,
       exit: parsedExit,
@@ -231,21 +241,23 @@ function TradeEditDialog({
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="date">日付</Label>
+              <Label htmlFor="entryTime">エントリー日時</Label>
               <Input
-                id="date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+                id="entryTime"
+                type="datetime-local"
+                step="1"
+                value={formData.entryTime}
+                onChange={(e) => setFormData({ ...formData, entryTime: e.target.value })}
               />
             </div>
             <div>
-              <Label htmlFor="time">時間</Label>
+              <Label htmlFor="exitTime">エグジット日時</Label>
               <Input
-                id="time"
-                type="time"
-                value={formData.time}
-                onChange={(e) => setFormData({ ...formData, time: e.target.value })}
+                id="exitTime"
+                type="datetime-local"
+                step="1"
+                value={formData.exitTime}
+                onChange={(e) => setFormData({ ...formData, exitTime: e.target.value })}
               />
             </div>
           </div>
@@ -893,10 +905,15 @@ export default function TablePage() {
       [cellKey]: trade[field]
     }));
     
-    // Initialize editing value
+    // Initialize editing value - convert datetime fields to datetime-local format
+    let editingValue = trade[field];
+    if (field === 'entryTime' || field === 'exitTime') {
+      editingValue = convertToDateTimeLocal(trade[field] as string);
+    }
+    
     setEditingValues(prev => ({
       ...prev,
-      [cellKey]: trade[field]
+      [cellKey]: editingValue
     }));
     
     // Clear any previous errors for this cell
@@ -984,6 +1001,11 @@ export default function TablePage() {
       return { field: dbField, value: value === '買い' ? 0 : 1 };
     }
     
+    if (field === 'entryTime' || field === 'exitTime') {
+      // For datetime fields, value should already be in ISO format
+      return { field: dbField, value };
+    }
+    
     if (field === 'date' || field === 'time') {
       // Handle date/time updates - this is complex and might need special handling
       return { field: dbField, value, needsSpecialHandling: true };
@@ -994,9 +1016,14 @@ export default function TablePage() {
 
   const handleCellSave = useCallback(async (id: number, field: keyof Trade) => {
     const cellKey = `${id}-${field}`;
-    const value = editingValues[cellKey];
+    let value = editingValues[cellKey];
     
     if (value === undefined) return;
+    
+    // Convert datetime-local format back to ISO string for datetime fields
+    if (field === 'entryTime' || field === 'exitTime') {
+      value = convertFromDateTimeLocal(value as string);
+    }
     
     // Validate the value
     const validation = validateCellValue(field, value);
@@ -1036,10 +1063,23 @@ export default function TablePage() {
         if (error) throw error;
       }
       
-      // Update local state
+      // Update local state - convert back to display format for datetime fields
+      let displayValue = value;
+      if (field === 'entryTime' || field === 'exitTime') {
+        // Format the datetime for display
+        const date = new Date(value as string);
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const hours = String(date.getHours()).padStart(2, '0');
+        const minutes = String(date.getMinutes()).padStart(2, '0');
+        const seconds = String(date.getSeconds()).padStart(2, '0');
+        displayValue = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      }
+      
       setTrades(prevTrades => 
         prevTrades.map(trade => 
-          trade.id === id ? { ...trade, [field]: value } : trade
+          trade.id === id ? { ...trade, [field]: displayValue } : trade
         )
       );
       
@@ -1223,9 +1263,16 @@ export default function TablePage() {
       e.preventDefault();
       // Cancel editing and restore original value
       const cellKey = `${id}-${field}`;
+      let originalValue = originalValues[cellKey];
+      
+      // Convert datetime fields back to datetime-local format for display
+      if (field === 'entryTime' || field === 'exitTime') {
+        originalValue = convertToDateTimeLocal(originalValue as string);
+      }
+      
       setEditingValues(prev => ({
         ...prev,
-        [cellKey]: originalValues[cellKey]
+        [cellKey]: originalValue
       }));
       setCellErrors(prev => {
         const newErrors = { ...prev };
@@ -1294,6 +1341,8 @@ export default function TablePage() {
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
+            entry_time: tradeData.entryTime,
+            exit_time: tradeData.exitTime,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingTrade.id)
@@ -1397,9 +1446,8 @@ export default function TablePage() {
         
       } else {
         // Add new trade
-        const entryDateTime = tradeData.date && tradeData.time 
-          ? new Date(`${tradeData.date}T${tradeData.time}:00`).toISOString()
-          : new Date().toISOString();
+        const entryDateTime = tradeData.entryTime || new Date().toISOString();
+        const exitDateTime = tradeData.exitTime || new Date().toISOString();
         
         const { data, error } = await supabase
           .from("trades")
@@ -1414,7 +1462,7 @@ export default function TablePage() {
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
             entry_time: entryDateTime,
-            exit_time: entryDateTime,
+            exit_time: exitDateTime,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
@@ -1780,6 +1828,29 @@ export default function TablePage() {
     return String(value);
   };
 
+  // Helper function to convert datetime string to datetime-local format
+  const convertToDateTimeLocal = (dateTimeString: string): string => {
+    if (!dateTimeString) return "";
+    const date = new Date(dateTimeString);
+    if (isNaN(date.getTime())) return "";
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  };
+
+  // Helper function to convert datetime-local format to ISO string
+  const convertFromDateTimeLocal = (dateTimeLocalString: string): string => {
+    if (!dateTimeLocalString) return "";
+    const date = new Date(dateTimeLocalString);
+    if (isNaN(date.getTime())) return "";
+    return date.toISOString();
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -1931,7 +2002,7 @@ export default function TablePage() {
                                       isSaving && "opacity-50"
                                     )}
                                   >
-                                    {isEditing ? (
+                                                                        {isEditing ? (
                                       <div className="space-y-1">
                                         {column.type === "select" ? (
                                           <Select
@@ -1962,6 +2033,20 @@ export default function TablePage() {
                                             rows={2}
                                             className="min-w-[150px]"
                                           />
+                                        ) : column.id === "entryTime" || column.id === "exitTime" ? (
+                                          <Input
+                                            type="datetime-local"
+                                            step="1"
+                                            value={String(value)}
+                                            onChange={(e) =>
+                                              handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
+                                            }
+                                            onBlur={handleCellBlur}
+                                            onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                            autoFocus
+                                            className="h-8"
+                                            disabled={isSaving}
+                                          />
                                         ) : (
                                           <Input
                                             type={
@@ -1971,14 +2056,18 @@ export default function TablePage() {
                                                   ? "date"
                                                   : column.type === "time"
                                                     ? "time"
-                                                    : "text"
+                                                    : column.type === "datetime-local"
+                                                      ? "datetime-local"
+                                                      : "text"
                                             }
                                             step={
                                               column.type === "number"
                                                 ? column.id === "entry" || column.id === "exit"
                                                   ? "0.0001"
                                                   : "0.1"
-                                                : undefined
+                                                : column.type === "datetime-local"
+                                                  ? "1"
+                                                  : undefined
                                             }
                                             value={String(value)}
                                             onChange={(e) =>
@@ -2003,7 +2092,7 @@ export default function TablePage() {
                                           <div className="text-xs text-red-500 mt-1">{cellError}</div>
                                         )}
                                       </div>
-                                                                          ) : (
+                                    ) : (
                                         <div className="flex items-center gap-2">
                                           <span
                                             className={cn(
