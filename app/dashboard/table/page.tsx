@@ -753,11 +753,11 @@ export default function TablePage() {
             } else {
               emotionId = newEmotion.id;
             }
-          } else if (emotionError) {
-            console.error("Error finding emotion:", emotionError);
-          } else {
-            emotionId = emotionData.id;
-          }
+                      } else if (emotionError) {
+              console.error("Error finding emotion:", emotionError);
+            } else if (emotionData) {
+              emotionId = emotionData.id;
+            }
           
           if (emotionId) {
             // Create link
@@ -828,7 +828,7 @@ export default function TablePage() {
               } else if (tagError) {
                 console.error("Error finding tag:", tagError);
                 continue;
-              } else {
+              } else if (tagData) {
                 tagId = tagData.id;
               }
               
