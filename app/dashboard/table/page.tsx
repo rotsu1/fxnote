@@ -652,6 +652,11 @@ export default function TablePage() {
         
         // Handle different data types
         if (typeof aValue === 'number' && typeof bValue === 'number') {
+          // For profit and pips, reverse the logic so highest values appear at top when arrow is up
+          if (sortConfig.key === 'profit' || sortConfig.key === 'pips') {
+            return sortConfig.direction === 'asc' ? bValue - aValue : aValue - bValue;
+          }
+          // For other numeric fields (lot, entry, exit), use normal sorting
           return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
         }
         
@@ -1057,18 +1062,24 @@ export default function TablePage() {
   const handleSort = (key: keyof Trade) => {
     setSortConfig(prev => {
       if (prev.key === key) {
-        // If clicking the same column, toggle direction
-        return {
-          key,
-          direction: prev.direction === 'asc' ? 'desc' : 'asc'
-        };
-      } else {
-        // If clicking a different column, set it as the new sort key with ascending direction
-        return {
-          key,
-          direction: 'asc'
-        };
+        // If clicking the same column, cycle through: asc -> desc -> none
+        if (prev.direction === 'asc') {
+          return {
+            key,
+            direction: 'desc'
+          };
+        } else if (prev.direction === 'desc') {
+          return {
+            key: null,
+            direction: 'asc'
+          };
+        }
       }
+      // If clicking a different column, set it as the new sort key with ascending direction
+      return {
+        key,
+        direction: 'asc'
+      };
     });
   };
 
