@@ -55,6 +55,7 @@ interface Trade {
   exitTime: string
   pair: string
   type: "買い" | "売り"
+  lot: number
   entry: number
   exit: number
   pips: number
@@ -114,14 +115,15 @@ const allColumns = [
     defaultVisible: true,
     minWidth: "min-w-[80px]",
   },
+  { id: "lot", label: "ロット", type: "number", defaultVisible: true, minWidth: "min-w-[100px]" },
   { id: "entry", label: "エントリー", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
   { id: "exit", label: "エグジット", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
   { id: "pips", label: "pips", type: "number", defaultVisible: true, minWidth: "min-w-[100px]" },
   { id: "profit", label: "損益 (¥)", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
   { id: "emotion", label: "感情", type: "select", options: emotions, defaultVisible: true, minWidth: "min-w-[120px]" },
   { id: "holdingTime", label: "保有時間", type: "text", defaultVisible: true, minWidth: "min-w-[140px]" },
-  { id: "notes", label: "メモ", type: "textarea", defaultVisible: false, minWidth: "min-w-[250px]" },
-  { id: "tags", label: "タグ", type: "tags", defaultVisible: false, minWidth: "min-w-[200px]" },
+  { id: "notes", label: "メモ", type: "textarea", defaultVisible: true, minWidth: "min-w-[250px]" },
+  { id: "tags", label: "タグ", type: "tags", defaultVisible: true, minWidth: "min-w-[200px]" },
 ]
 
 // Reusing TradeEditDialog from calendar page, slightly modified for new fields
@@ -143,6 +145,7 @@ function TradeEditDialog({
       date: defaultDate || format(new Date(), "yyyy-MM-dd"),
       pair: "",
       type: "買い",
+      lot: undefined,
       entry: undefined,
       exit: undefined,
       pips: undefined,
@@ -161,6 +164,7 @@ function TradeEditDialog({
         date: defaultDate || format(new Date(), "yyyy-MM-dd"),
         pair: "",
         type: "買い",
+        lot: undefined,
         entry: undefined,
         exit: undefined,
         pips: undefined,
@@ -192,6 +196,7 @@ function TradeEditDialog({
 
   const handleSave = () => {
     // Basic validation for numbers
+    const parsedLot = formData.lot !== undefined ? Number.parseFloat(String(formData.lot)) : undefined
     const parsedEntry = formData.entry !== undefined ? Number.parseFloat(String(formData.entry)) : undefined
     const parsedExit = formData.exit !== undefined ? Number.parseFloat(String(formData.exit)) : undefined
     const parsedPips = formData.pips !== undefined ? Number.parseFloat(String(formData.pips)) : undefined
@@ -199,6 +204,7 @@ function TradeEditDialog({
 
     onSave({
       ...formData,
+      lot: parsedLot,
       entry: parsedEntry,
       exit: parsedExit,
       pips: parsedPips,
@@ -259,6 +265,19 @@ function TradeEditDialog({
                   <SelectItem value="売り">売り</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="lot">ロット</Label>
+              <Input
+                id="lot"
+                type="number"
+                step="0.01"
+                value={formData.lot}
+                onChange={(e) => setFormData({ ...formData, lot: Number.parseFloat(e.target.value) })}
+              />
             </div>
           </div>
 
@@ -575,6 +594,7 @@ export default function TablePage() {
             exitTime: formatDateTime(localExitTime),
             pair: trade.symbols?.symbol || "",
             type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
+            lot: trade.lot_size || 0,
             entry: trade.entry_price,
             exit: trade.exit_price,
             pips: trade.pips || 0,
@@ -696,6 +716,7 @@ export default function TablePage() {
           .update({
             symbol: symbolId,
             trade_type: tradeData.type === "買い" ? 0 : 1,
+            lot_size: tradeData.lot,
             entry_price: tradeData.entry,
             exit_price: tradeData.exit,
             pips: tradeData.pips,
@@ -814,6 +835,7 @@ export default function TablePage() {
             user_id: user.id,
             symbol: symbolId,
             trade_type: tradeData.type === "買い" ? 0 : 1,
+            lot_size: tradeData.lot,
             entry_price: tradeData.entry,
             exit_price: tradeData.exit,
             pips: tradeData.pips,
