@@ -112,7 +112,7 @@ const strategies = [
 const allColumns = [
   { id: "entryTime", label: "エントリー時間", type: "datetime", defaultVisible: true, minWidth: "min-w-[180px]" },
   { id: "exitTime", label: "エグジット時間", type: "datetime", defaultVisible: true, minWidth: "min-w-[180px]" },
-  { id: "pair", label: "通貨ペア", type: "text", defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "pair", label: "シンボル", type: "text", defaultVisible: true, minWidth: "min-w-[120px]" },
   {
     id: "type",
     label: "種別",
@@ -250,7 +250,7 @@ function TradeEditDialog({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="pair">通貨ペア</Label>
+              <Label htmlFor="pair">シンボル</Label>
               <Input
                 id="pair"
                 value={formData.pair}
@@ -469,12 +469,12 @@ function TableSettingsDialog({
                 className={`flex items-center gap-3 p-3 border rounded-lg ${
                   draggedColumn === column.id ? 'opacity-50 bg-muted' : 'bg-background'
                 }`}
-                draggable={!isRequired}
-                onDragStart={() => !isRequired && onDragStart(column.id)}
+                draggable={true}
+                onDragStart={() => onDragStart(column.id)}
                 onDragOver={(e) => onDragOver(e, column.id)}
                 onDrop={() => onDrop(column.id)}
               >
-                <GripVertical className={`h-4 w-4 text-muted-foreground ${!isRequired ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed'}`} />
+                <GripVertical className="h-4 w-4 text-muted-foreground cursor-grab active:cursor-grabbing" />
                 <Checkbox
                   id={`col-${column.id}`}
                   checked={true}
@@ -497,7 +497,7 @@ function TableSettingsDialog({
               
               return (
                 <div key={column.id} className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
-                  <GripVertical className={`h-4 w-4 text-muted-foreground/50 ${!isRequired ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed'}`} />
+                  <GripVertical className="h-4 w-4 text-muted-foreground/50 cursor-grab active:cursor-grabbing" />
                   <Checkbox
                     id={`col-${column.id}`}
                     checked={false}
@@ -569,19 +569,19 @@ export default function TablePage() {
         if (preferencesData) {
           const orderedColumns: string[] = [];
           const columnOrder = [
-            { key: 'symbol', dbField: 'symbol' },
-            { key: 'entry_time', dbField: 'entry_time' },
-            { key: 'exit_time', dbField: 'exit_time' },
-            { key: 'type', dbField: 'type' },
-            { key: 'lot', dbField: 'lot' },
+            { key: 'pair', dbField: 'symbol' },
             { key: 'entry', dbField: 'entry_price' },
             { key: 'exit', dbField: 'exit_price' },
+            { key: 'entryTime', dbField: 'entry_time' },
+            { key: 'exitTime', dbField: 'exit_time' },
+            { key: 'type', dbField: 'type' },
+            { key: 'emotion', dbField: 'emotion' },
+            { key: 'tags', dbField: 'tag' },
+            { key: 'lot', dbField: 'lot' },
             { key: 'pips', dbField: 'pips' },
             { key: 'profit', dbField: 'profit_loss' },
-            { key: 'emotion', dbField: 'emotion' },
-            { key: 'holdingTime', dbField: 'hold_time' },
             { key: 'notes', dbField: 'note' },
-            { key: 'tags', dbField: 'tag' },
+            { key: 'holdingTime', dbField: 'hold_time' },
           ];
 
           // Sort by order values and add visible columns
@@ -1259,11 +1259,11 @@ export default function TablePage() {
 
       const preferences: any = {};
       
-      // Set order for visible columns
+      // Set order for visible columns (1-based indexing to match database)
       visibleColumns.forEach((columnId, index) => {
         const dbField = columnMapping[columnId as keyof typeof columnMapping];
         if (dbField) {
-          preferences[dbField] = index;
+          preferences[dbField] = index + 1; // Convert 0-based to 1-based
         }
       });
 
