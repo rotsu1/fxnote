@@ -522,15 +522,14 @@ export default function TablePage() {
           const entryTime = new Date(trade.entry_time);
           const exitTime = new Date(trade.exit_time);
           
-          // Convert UTC to Japan timezone (UTC+9)
-          const convertToJapanTime = (date: Date) => {
-            // Add 9 hours to convert from UTC to Japan time
-            const japanTime = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-            return japanTime;
+          // Convert UTC to local timezone
+          const convertToLocalTime = (date: Date) => {
+            // The Date object automatically handles timezone conversion when created from UTC
+            return date;
           };
           
-          const japanEntryTime = convertToJapanTime(entryTime);
-          const japanExitTime = convertToJapanTime(exitTime);
+          const localEntryTime = convertToLocalTime(entryTime);
+          const localExitTime = convertToLocalTime(exitTime);
           
           // Convert hold_time from seconds to readable format
           const formatHoldTime = (seconds: number) => {
@@ -548,10 +547,17 @@ export default function TablePage() {
             }
           };
 
+          // Format local time properly
+          const formatLocalTime = (date: Date) => {
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            return `${hours}:${minutes}`;
+          };
+
           return {
             id: trade.id,
-            date: japanEntryTime.toISOString().split("T")[0],
-            time: japanEntryTime.toTimeString().slice(0, 5),
+            date: localEntryTime.toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
+            time: formatLocalTime(localEntryTime),
             pair: trade.symbols?.symbol || "",
             type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
             entry: trade.entry_price,
