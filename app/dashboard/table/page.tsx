@@ -661,6 +661,41 @@ export default function TablePage() {
         }
         
         if (typeof aValue === 'string' && typeof bValue === 'string') {
+          // Special handling for holding time (保有時間)
+          if (sortConfig.key === 'holdingTime') {
+            const parseTime = (timeStr: string) => {
+              if (!timeStr) return 0;
+              let totalMinutes = 0;
+              
+              // Parse hours
+              const hourMatch = timeStr.match(/(\d+)h/);
+              if (hourMatch) {
+                totalMinutes += parseInt(hourMatch[1]) * 60;
+              }
+              
+              // Parse minutes
+              const minuteMatch = timeStr.match(/(\d+)m/);
+              if (minuteMatch) {
+                totalMinutes += parseInt(minuteMatch[1]);
+              }
+              
+              // Parse seconds
+              const secondMatch = timeStr.match(/(\d+)s/);
+              if (secondMatch) {
+                totalMinutes += parseInt(secondMatch[1]) / 60;
+              }
+              
+              return totalMinutes;
+            };
+            
+            const aMinutes = parseTime(aValue);
+            const bMinutes = parseTime(bValue);
+            
+            // For holding time: arrow up = shortest time, arrow down = longest time
+            return sortConfig.direction === 'asc' ? aMinutes - bMinutes : bMinutes - aMinutes;
+          }
+          
+          // Regular string comparison for other string fields
           const comparison = aValue.localeCompare(bValue);
           return sortConfig.direction === 'asc' ? comparison : -comparison;
         }
