@@ -1982,7 +1982,10 @@ export default function TablePage() {
                                             onBlur={handleCellBlur}
                                             onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                             autoFocus
-                                            className="h-8"
+                                            className={cn(
+                                              "h-8",
+                                              column.id === "profit" && "no-spinner"
+                                            )}
                                             disabled={isSaving}
                                           />
                                         )}
