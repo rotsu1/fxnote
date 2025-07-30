@@ -51,6 +51,8 @@ interface Trade {
   id: number
   date: string
   time: string
+  entryTime: string
+  exitTime: string
   pair: string
   type: "買い" | "売り"
   entry: number
@@ -101,8 +103,8 @@ const strategies = [
 
 // Column definitions for settings and table rendering
 const allColumns = [
-  { id: "date", label: "日付", type: "date", defaultVisible: true, minWidth: "min-w-[120px]" },
-  { id: "time", label: "時間", type: "time", defaultVisible: true, minWidth: "min-w-[100px]" },
+  { id: "entryTime", label: "エントリー時間", type: "datetime", defaultVisible: true, minWidth: "min-w-[180px]" },
+  { id: "exitTime", label: "エグジット時間", type: "datetime", defaultVisible: true, minWidth: "min-w-[180px]" },
   { id: "pair", label: "通貨ペア", type: "text", defaultVisible: true, minWidth: "min-w-[120px]" },
   {
     id: "type",
@@ -554,10 +556,23 @@ export default function TablePage() {
             return `${hours}:${minutes}`;
           };
 
+          // Format datetime with seconds
+          const formatDateTime = (date: Date) => {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hours = String(date.getHours()).padStart(2, '0');
+            const minutes = String(date.getMinutes()).padStart(2, '0');
+            const seconds = String(date.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+          };
+
           return {
             id: trade.id,
             date: localEntryTime.toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
             time: formatLocalTime(localEntryTime),
+            entryTime: formatDateTime(localEntryTime),
+            exitTime: formatDateTime(localExitTime),
             pair: trade.symbols?.symbol || "",
             type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
             entry: trade.entry_price,
