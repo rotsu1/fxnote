@@ -346,6 +346,7 @@ function TradeEditDialog({
                 step="0.01"
                 value={formData.lot}
                 onChange={(e) => setFormData({ ...formData, lot: Number.parseFloat(e.target.value) })}
+                className="no-spinner"
               />
             </div>
           </div>
@@ -359,6 +360,7 @@ function TradeEditDialog({
                 step="0.0001"
                 value={formData.entry}
                 onChange={(e) => setFormData({ ...formData, entry: Number.parseFloat(e.target.value) })}
+                className="no-spinner"
               />
             </div>
             <div>
@@ -369,6 +371,7 @@ function TradeEditDialog({
                 step="0.0001"
                 value={formData.exit}
                 onChange={(e) => setFormData({ ...formData, exit: Number.parseFloat(e.target.value) })}
+                className="no-spinner"
               />
             </div>
           </div>
@@ -382,6 +385,7 @@ function TradeEditDialog({
                 step="0.1"
                 value={formData.pips}
                 onChange={(e) => setFormData({ ...formData, pips: Number.parseFloat(e.target.value) })}
+                className="no-spinner"
               />
             </div>
             <div>
@@ -391,6 +395,7 @@ function TradeEditDialog({
                 type="number"
                 value={formData.profit}
                 onChange={(e) => setFormData({ ...formData, profit: Number.parseFloat(e.target.value) })}
+                className="no-spinner"
               />
             </div>
           </div>
@@ -2178,7 +2183,7 @@ export default function TablePage() {
                                             autoFocus
                                             className={cn(
                                               "h-8",
-                                              column.id === "profit" && "no-spinner"
+                                              (column.id === "profit" || column.id === "lot" || column.id === "entry" || column.id === "exit" || column.id === "pips") && "no-spinner"
                                             )}
                                             disabled={isSaving}
                                           />
