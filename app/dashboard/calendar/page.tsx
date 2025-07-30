@@ -625,12 +625,26 @@ function TradeEditDialog({
 }) {
   const [showDiscardWarning, setShowDiscardWarning] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+    // Create datetime strings from defaultDate for entry and exit times
+    const createDateTimeString = (dateStr: string, timeStr: string = "00:00") => {
+      return dateStr ? `${dateStr}T${timeStr}` : "";
+    };
+    
+    const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
+    const currentTime = new Date().toTimeString().slice(0, 5); // Get current time in HH:MM format
+    
+    console.log("=== TradeEditDialog Initial State Debug ===");
+    console.log("Initial trade:", trade);
+    console.log("Initial defaultDate:", defaultDate);
+    console.log("defaultDateStr:", defaultDateStr);
+    console.log("currentTime:", currentTime);
+    
     const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
-      date: defaultDate || new Date().toISOString().split("T")[0],
+      date: defaultDateStr,
       time: "",
-      entryDateTime: "",
-      exitDateTime: "",
+      entryDateTime: createDateTimeString(defaultDateStr, currentTime),
+      exitDateTime: createDateTimeString(defaultDateStr, currentTime),
       pair: "",
       type: "買い",
       entry: 0,
@@ -662,28 +676,46 @@ function TradeEditDialog({
   const [validationError, setValidationError] = useState("")
 
     useEffect(() => {
-    setFormData(
-      trade || {
-        date: defaultDate || new Date().toISOString().split("T")[0],
-        time: "",
-        entryDateTime: "",
-        exitDateTime: "",
-        pair: "",
-        type: "買い",
-        entry: 0,
-        exit: 0,
-        lotSize: 0,
-        pips: 0,
-        profit: 0,
-        emotion: "",
-        holdingTime: 0,
-        holdingDays: 0,
-        holdingHours: 0,
-        holdingMinutes: 0,
-        notes: "",
-        tags: [],
-      },
-    )
+    console.log("=== TradeEditDialog useEffect Debug ===");
+    console.log("trade:", trade);
+    console.log("defaultDate:", defaultDate);
+    console.log("isOpen:", isOpen);
+    
+    // Create datetime strings from defaultDate for entry and exit times
+    const createDateTimeString = (dateStr: string, timeStr: string = "00:00") => {
+      return dateStr ? `${dateStr}T${timeStr}` : "";
+    };
+    
+    const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
+    const currentTime = new Date().toTimeString().slice(0, 5); // Get current time in HH:MM format
+    
+    const newFormData = trade || {
+      date: defaultDateStr,
+      time: "",
+      entryDateTime: createDateTimeString(defaultDateStr, currentTime),
+      exitDateTime: createDateTimeString(defaultDateStr, currentTime),
+      pair: "",
+      type: "買い",
+      entry: 0,
+      exit: 0,
+      lotSize: 0,
+      pips: 0,
+      profit: 0,
+      emotion: "",
+      holdingTime: 0,
+      holdingDays: 0,
+      holdingHours: 0,
+      holdingMinutes: 0,
+      notes: "",
+      tags: [],
+    };
+    
+    console.log("Setting formData with date:", newFormData.date);
+    console.log("Setting entryDateTime:", newFormData.entryDateTime);
+    console.log("Setting exitDateTime:", newFormData.exitDateTime);
+    console.log("Full newFormData:", newFormData);
+    
+    setFormData(newFormData);
     setHasUnsavedChanges(false);
   }, [trade, defaultDate, isOpen])
 
@@ -2511,6 +2543,11 @@ export default function CalendarPage() {
 
   const handleAddTrade = () => {
     setEditingTrade(null);
+    // If no date is selected, use today's date
+    if (!selectedDate) {
+      const today = new Date().toISOString().split("T")[0];
+      setSelectedDate(today);
+    }
     setIsTradeDialogOpen(true);
   };
 
