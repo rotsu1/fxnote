@@ -467,7 +467,7 @@ export default function TablePage() {
             symbols!inner(symbol)
           `)
           .eq("user_id", user.id)
-          .order("entry_time", { ascending: false });
+          .order("entry_time", { ascending: true });
 
         if (tradesError) {
           setError(tradesError.message);
