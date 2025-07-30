@@ -14,6 +14,7 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
+  GripVertical,
 } from "lucide-react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
@@ -424,36 +425,100 @@ function TableSettingsDialog({
   onClose,
   visibleColumns,
   onToggleColumn,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onSave,
+  draggedColumn,
 }: {
   isOpen: boolean
   onClose: () => void
   visibleColumns: string[]
   onToggleColumn: (columnId: string, isVisible: boolean) => void
+  onDragStart: (columnId: string) => void
+  onDragOver: (e: React.DragEvent, columnId: string) => void
+  onDrop: (targetColumnId: string) => void
+  onSave: () => void
+  draggedColumn: string | null
 }) {
+  // Define required columns that cannot be unchecked
+  const requiredColumns = ['pair', 'profit'];
+  
+  // Ensure required columns are always visible
+  const allRequiredColumns = requiredColumns.filter(col => !visibleColumns.includes(col));
+  const finalVisibleColumns = [...visibleColumns, ...allRequiredColumns];
+  
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>表示設定</DialogTitle>
-          <DialogDescription>テーブルに表示する列を選択してください。</DialogDescription>
+          <DialogDescription>テーブルに表示する列を選択し、ドラッグ＆ドロップで順序を変更してください。</DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-4">
-          {allColumns.map((column) => (
-            <div key={column.id} className="flex items-center space-x-2">
-              <Checkbox
-                id={`col-${column.id}`}
-                checked={visibleColumns.includes(column.id)}
-                onCheckedChange={(checked) => onToggleColumn(column.id, checked as boolean)}
-              />
-              <Label htmlFor={`col-${column.id}`}>{column.label}</Label>
-            </div>
-          ))}
+        <div className="space-y-2 max-h-96 overflow-y-auto">
+          {finalVisibleColumns.map((columnId) => {
+            const column = allColumns.find((c) => c.id === columnId);
+            if (!column) return null;
+            
+            const isRequired = requiredColumns.includes(columnId);
+            
+            return (
+              <div
+                key={column.id}
+                className={`flex items-center gap-3 p-3 border rounded-lg ${
+                  draggedColumn === column.id ? 'opacity-50 bg-muted' : 'bg-background'
+                }`}
+                draggable={!isRequired}
+                onDragStart={() => !isRequired && onDragStart(column.id)}
+                onDragOver={(e) => onDragOver(e, column.id)}
+                onDrop={() => onDrop(column.id)}
+              >
+                <GripVertical className={`h-4 w-4 text-muted-foreground ${!isRequired ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed'}`} />
+                <Checkbox
+                  id={`col-${column.id}`}
+                  checked={true}
+                  disabled={isRequired}
+                  onCheckedChange={(checked) => !isRequired && onToggleColumn(column.id, checked as boolean)}
+                />
+                <Label htmlFor={`col-${column.id}`} className="flex-1 cursor-pointer">
+                  {column.label}
+                  {isRequired && <span className="text-xs text-muted-foreground ml-2">(必須)</span>}
+                </Label>
+              </div>
+            );
+          })}
+          
+          {/* Hidden columns */}
+          {allColumns
+            .filter((column) => !finalVisibleColumns.includes(column.id))
+            .map((column) => {
+              const isRequired = requiredColumns.includes(column.id);
+              
+              return (
+                <div key={column.id} className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
+                  <GripVertical className={`h-4 w-4 text-muted-foreground/50 ${!isRequired ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed'}`} />
+                  <Checkbox
+                    id={`col-${column.id}`}
+                    checked={false}
+                    disabled={isRequired}
+                    onCheckedChange={(checked) => !isRequired && onToggleColumn(column.id, checked as boolean)}
+                  />
+                  <Label htmlFor={`col-${column.id}`} className="flex-1 cursor-pointer">
+                    {column.label}
+                    {isRequired && <span className="text-xs text-muted-foreground ml-2">(必須)</span>}
+                  </Label>
+                </div>
+              );
+            })}
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="outline" onClick={onClose}>
-            閉じる
+            キャンセル
+          </Button>
+          <Button onClick={() => { onSave(); onClose(); }}>
+            保存
           </Button>
         </div>
       </DialogContent>
@@ -480,6 +545,7 @@ export default function TablePage() {
     key: keyof Trade | null;
     direction: 'asc' | 'desc';
   }>({ key: null, direction: 'asc' });
+  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -488,6 +554,56 @@ export default function TablePage() {
       setLoading(true);
       setError("");
       try {
+        // Load user's column preferences first
+        const { data: preferencesData, error: preferencesError } = await supabase
+          .from("table_column_preferences")
+          .select("*")
+          .eq("user_id", user.id)
+          .single();
+
+        if (preferencesError && preferencesError.code !== 'PGRST116') {
+          console.error("Error loading preferences:", preferencesError);
+        }
+
+        // Set visible columns based on preferences or defaults
+        if (preferencesData) {
+          const orderedColumns: string[] = [];
+          const columnOrder = [
+            { key: 'symbol', dbField: 'symbol' },
+            { key: 'entry_time', dbField: 'entry_time' },
+            { key: 'exit_time', dbField: 'exit_time' },
+            { key: 'type', dbField: 'type' },
+            { key: 'lot', dbField: 'lot' },
+            { key: 'entry', dbField: 'entry_price' },
+            { key: 'exit', dbField: 'exit_price' },
+            { key: 'pips', dbField: 'pips' },
+            { key: 'profit', dbField: 'profit_loss' },
+            { key: 'emotion', dbField: 'emotion' },
+            { key: 'holdingTime', dbField: 'hold_time' },
+            { key: 'notes', dbField: 'note' },
+            { key: 'tags', dbField: 'tag' },
+          ];
+
+          // Sort by order values and add visible columns
+          columnOrder
+            .sort((a, b) => {
+              const aOrder = preferencesData[a.dbField as keyof typeof preferencesData] as number;
+              const bOrder = preferencesData[b.dbField as keyof typeof preferencesData] as number;
+              if (aOrder === null && bOrder === null) return 0;
+              if (aOrder === null) return 1;
+              if (bOrder === null) return -1;
+              return aOrder - bOrder;
+            })
+            .forEach(({ key }) => {
+              const order = preferencesData[columnOrder.find(c => c.key === key)?.dbField as keyof typeof preferencesData] as number;
+              if (order !== null) {
+                orderedColumns.push(key);
+              }
+            });
+
+          setVisibleColumns(orderedColumns);
+        }
+
         // Fetch trades with symbol information
         const { data: tradesData, error: tradesError } = await supabase
           .from("trades")
@@ -1094,6 +1210,101 @@ export default function TablePage() {
     setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)));
   };
 
+  const handleDragStart = (columnId: string) => {
+    setDraggedColumn(columnId);
+  };
+
+  const handleDragOver = (e: React.DragEvent, columnId: string) => {
+    e.preventDefault();
+  };
+
+  const handleDrop = (targetColumnId: string) => {
+    if (!draggedColumn || draggedColumn === targetColumnId) {
+      setDraggedColumn(null);
+      return;
+    }
+
+    const newOrder = [...visibleColumns];
+    const draggedIndex = newOrder.indexOf(draggedColumn);
+    const targetIndex = newOrder.indexOf(targetColumnId);
+
+    // Remove dragged item from its current position
+    newOrder.splice(draggedIndex, 1);
+    // Insert it at the target position
+    newOrder.splice(targetIndex, 0, draggedColumn);
+
+    setVisibleColumns(newOrder);
+    setDraggedColumn(null);
+  };
+
+  const saveColumnPreferences = async () => {
+    if (!user) return;
+
+    try {
+      const columnMapping = {
+        'pair': 'symbol',
+        'entryTime': 'entry_time',
+        'exitTime': 'exit_time',
+        'type': 'type',
+        'lot': 'lot',
+        'entry': 'entry_price',
+        'exit': 'exit_price',
+        'pips': 'pips',
+        'profit': 'profit_loss',
+        'emotion': 'emotion',
+        'holdingTime': 'hold_time',
+        'notes': 'note',
+        'tags': 'tag',
+      };
+
+      const preferences: any = {};
+      
+      // Set order for visible columns
+      visibleColumns.forEach((columnId, index) => {
+        const dbField = columnMapping[columnId as keyof typeof columnMapping];
+        if (dbField) {
+          preferences[dbField] = index;
+        }
+      });
+
+      // Set null for hidden columns
+      allColumns.forEach((column) => {
+        const dbField = columnMapping[column.id as keyof typeof columnMapping];
+        if (dbField && !visibleColumns.includes(column.id)) {
+          preferences[dbField] = null;
+        }
+      });
+
+      // Check if preferences exist
+      const { data: existingPrefs } = await supabase
+        .from("table_column_preferences")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (existingPrefs) {
+        // Update existing preferences
+        await supabase
+          .from("table_column_preferences")
+          .update({
+            ...preferences,
+            updated_at: new Date().toISOString(),
+          })
+          .eq("user_id", user.id);
+      } else {
+        // Create new preferences
+        await supabase
+          .from("table_column_preferences")
+          .insert([{
+            user_id: user.id,
+            ...preferences,
+          }]);
+      }
+    } catch (error) {
+      console.error("Error saving column preferences:", error);
+    }
+  };
+
   const handleSort = (key: keyof Trade) => {
     setSortConfig(prev => {
       if (prev.key === key) {
@@ -1421,6 +1632,11 @@ export default function TablePage() {
           onClose={() => setIsTableSettingsOpen(false)}
           visibleColumns={visibleColumns}
           onToggleColumn={handleToggleColumn}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+          onSave={saveColumnPreferences}
+          draggedColumn={draggedColumn}
         />
 
         <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
