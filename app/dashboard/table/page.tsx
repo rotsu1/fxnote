@@ -15,7 +15,9 @@ import {
   ArrowUp,
   ArrowDown,
   GripVertical,
+  Loader2,
 } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 
@@ -550,6 +552,12 @@ export default function TablePage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showDiscardWarning, setShowDiscardWarning] = useState(false);
 
+  // New state for improved cell editing
+  const [editingValues, setEditingValues] = useState<Record<string, any>>({});
+  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
+  const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
+  const [originalValues, setOriginalValues] = useState<Record<string, any>>({});
+
   useEffect(() => {
     if (!user) return;
     
@@ -759,6 +767,23 @@ export default function TablePage() {
     };
   }, [user]);
 
+  // Cleanup effect to handle unsaved changes when component unmounts
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (editingCell || Object.keys(editingValues).length > 0) {
+        e.preventDefault();
+        e.returnValue = '編集中のデータがあります。ページを離れますか？';
+        return e.returnValue;
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [editingCell, editingValues]);
+
   const filteredTrades = useMemo(() => {
     if (!selectedDate) return [];
     const dateString = format(selectedDate, "yyyy-MM-dd");
@@ -836,33 +861,375 @@ export default function TablePage() {
   }, [trades, selectedDate, sortConfig]);
 
   const handleCellClick = (id: number, field: keyof Trade) => {
+    const cellKey = `${id}-${field}`;
+    
+    // Don't allow editing if the cell is currently being saved
+    if (savingCells.has(cellKey)) {
+      return;
+    }
+    
+    // Don't allow editing of complex fields that need special handling
+    if (field === 'tags' || field === 'date' || field === 'time') {
+      // For these fields, open the edit dialog instead
+      const trade = trades.find(t => t.id === id);
+      if (trade) {
+        setEditingTrade(trade);
+        setIsTradeDialogOpen(true);
+      }
+      return;
+    }
+    
+    const trade = trades.find(t => t.id === id);
+    if (!trade) return;
+    
+    // Store original value for potential rollback
+    setOriginalValues(prev => ({
+      ...prev,
+      [cellKey]: trade[field]
+    }));
+    
+    // Initialize editing value
+    setEditingValues(prev => ({
+      ...prev,
+      [cellKey]: trade[field]
+    }));
+    
+    // Clear any previous errors for this cell
+    setCellErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[cellKey];
+      return newErrors;
+    });
+    
     setEditingCell({ id, field });
   };
 
-  const handleCellChange = useCallback(async (id: number, field: keyof Trade, value: any) => {
-    if (!user) return;
+  const isFieldEditable = (field: keyof Trade): boolean => {
+    // Fields that should not be directly edited in the table
+    const nonEditableFields: (keyof Trade)[] = ['tags', 'date', 'time', 'id'];
+    return !nonEditableFields.includes(field);
+  };
+
+  const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
+    const cellKey = `${id}-${field}`;
+    setEditingValues(prev => ({
+      ...prev,
+      [cellKey]: value
+    }));
+    
+    // Clear error when user starts typing
+    setCellErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors[cellKey];
+      return newErrors;
+    });
+  }, []);
+
+  const validateCellValue = (field: keyof Trade, value: any): { isValid: boolean; error?: string } => {
+    // Basic validation rules
+    if (field === 'lot' || field === 'entry' || field === 'exit' || field === 'pips' || field === 'profit') {
+      const numValue = Number(value);
+      if (isNaN(numValue)) {
+        return { isValid: false, error: '数値を入力してください' };
+      }
+      if (field === 'lot' && numValue <= 0) {
+        return { isValid: false, error: 'ロットは0より大きい値を入力してください' };
+      }
+      if ((field === 'entry' || field === 'exit') && numValue <= 0) {
+        return { isValid: false, error: '価格は0より大きい値を入力してください' };
+      }
+    }
+    
+    if (field === 'pair' && !value?.trim()) {
+      return { isValid: false, error: 'シンボルを入力してください' };
+    }
+    
+    if (field === 'type' && !['買い', '売り'].includes(value)) {
+      return { isValid: false, error: '有効な取引種別を選択してください' };
+    }
+    
+    return { isValid: true };
+  };
+
+  const mapFieldToDatabase = (field: keyof Trade, value: any) => {
+    // Map frontend field names to database column names
+    const fieldMapping: Record<keyof Trade, string> = {
+      id: 'id',
+      date: 'entry_time',
+      time: 'entry_time',
+      entryTime: 'entry_time',
+      exitTime: 'exit_time',
+      pair: 'symbol',
+      type: 'trade_type',
+      lot: 'lot_size',
+      entry: 'entry_price',
+      exit: 'exit_price',
+      pips: 'pips',
+      profit: 'profit_loss',
+      emotion: 'emotion',
+      holdingTime: 'hold_time',
+      notes: 'trade_memo',
+      tags: 'tags'
+    };
+    
+    const dbField = fieldMapping[field];
+    
+    // Transform values for database
+    if (field === 'type') {
+      return { field: dbField, value: value === '買い' ? 0 : 1 };
+    }
+    
+    if (field === 'date' || field === 'time') {
+      // Handle date/time updates - this is complex and might need special handling
+      return { field: dbField, value, needsSpecialHandling: true };
+    }
+    
+    return { field: dbField, value };
+  };
+
+  const handleCellSave = useCallback(async (id: number, field: keyof Trade) => {
+    const cellKey = `${id}-${field}`;
+    const value = editingValues[cellKey];
+    
+    if (value === undefined) return;
+    
+    // Validate the value
+    const validation = validateCellValue(field, value);
+    if (!validation.isValid) {
+      setCellErrors(prev => ({
+        ...prev,
+        [cellKey]: validation.error!
+      }));
+      return;
+    }
+    
+    // Check if value actually changed
+    const originalValue = originalValues[cellKey];
+    if (value === originalValue) {
+      setEditingCell(null);
+      return;
+    }
+    
+    setSavingCells(prev => new Set(prev).add(cellKey));
     
     try {
-      // Update in database
-      const { error } = await supabase
-        .from("trades")
-        .update({ [field]: value })
-        .eq("id", id)
-        .eq("user_id", user.id);
-      
-      if (error) throw error;
+      // Handle special cases that need complex updates
+      if (field === 'tags' || field === 'emotion') {
+        await handleSpecialFieldUpdate(id, field, value);
+      } else if (field === 'pair') {
+        await handleSymbolUpdate(id, value);
+      } else {
+        // Handle regular field updates
+        const { field: dbField, value: dbValue } = mapFieldToDatabase(field, value);
+        
+        const { error } = await supabase
+          .from("trades")
+          .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("user_id", user!.id);
+        
+        if (error) throw error;
+      }
       
       // Update local state
-      setTrades((prevTrades) => prevTrades.map((trade) => (trade.id === id ? { ...trade, [field]: value } : trade)));
+      setTrades(prevTrades => 
+        prevTrades.map(trade => 
+          trade.id === id ? { ...trade, [field]: value } : trade
+        )
+      );
+      
+      // Clear editing state
+      setEditingCell(null);
+      setEditingValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[cellKey];
+        return newValues;
+      });
+      setOriginalValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[cellKey];
+        return newValues;
+      });
+      
     } catch (error: any) {
-      console.error("Error updating trade:", error);
-      setError(error.message);
+      console.error("Error updating cell:", error);
+      setCellErrors(prev => ({
+        ...prev,
+        [cellKey]: error.message || '更新に失敗しました'
+      }));
+    } finally {
+      setSavingCells(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(cellKey);
+        return newSet;
+      });
     }
-  }, [user]);
+  }, [editingValues, originalValues, user]);
 
-  const handleCellBlur = () => {
-    setEditingCell(null);
+  const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: any) => {
+    if (field === 'tags') {
+      // Delete existing tags
+      await supabase
+        .from("trade_tag_links")
+        .delete()
+        .eq("trade_id", id);
+      
+      // Add new tags
+      if (Array.isArray(value) && value.length > 0) {
+        for (const tagName of value) {
+          // Get or create tag
+          let { data: tagData, error: tagError } = await supabase
+            .from("trade_tags")
+            .select("id")
+            .eq("tag_name", tagName)
+            .eq("user_id", user!.id)
+            .single();
+          
+          let tagId = null;
+          if (tagError && tagError.code === 'PGRST116') {
+            // Tag doesn't exist, create it
+            const { data: newTag, error: createTagError } = await supabase
+              .from("trade_tags")
+              .insert([{ tag_name: tagName, user_id: user!.id }])
+              .select()
+              .single();
+            
+            if (createTagError) {
+              console.error("Error creating tag:", createTagError);
+              continue;
+            }
+            tagId = newTag.id;
+          } else if (tagError) {
+            console.error("Error finding tag:", tagError);
+            continue;
+          } else if (tagData) {
+            tagId = tagData.id;
+          }
+          
+          // Create link
+          await supabase
+            .from("trade_tag_links")
+            .insert([{ trade_id: id, tag_id: tagId }]);
+        }
+      }
+    } else if (field === 'emotion') {
+      // Delete existing emotion
+      await supabase
+        .from("trade_emotion_links")
+        .delete()
+        .eq("trade_id", id);
+      
+      if (value) {
+        // Get or create emotion
+        let { data: emotionData, error: emotionError } = await supabase
+          .from("emotions")
+          .select("id")
+          .eq("emotion", value)
+          .eq("user_id", user!.id)
+          .single();
+        
+        let emotionId = null;
+        if (emotionError && emotionError.code === 'PGRST116') {
+          // Emotion doesn't exist, create it
+          const { data: newEmotion, error: createEmotionError } = await supabase
+            .from("emotions")
+            .insert([{ emotion: value, user_id: user!.id }])
+            .select()
+            .single();
+          
+          if (createEmotionError) {
+            console.error("Error creating emotion:", createEmotionError);
+            throw createEmotionError;
+          }
+          emotionId = newEmotion.id;
+        } else if (emotionError) {
+          console.error("Error finding emotion:", emotionError);
+          throw emotionError;
+        } else if (emotionData) {
+          emotionId = emotionData.id;
+        }
+        
+        if (emotionId) {
+          // Create link
+          await supabase
+            .from("trade_emotion_links")
+            .insert([{ trade_id: id, emotion_id: emotionId }]);
+        }
+      }
+    }
   };
+
+  const handleSymbolUpdate = async (id: number, symbolName: string) => {
+    // Get or create symbol ID
+    let symbolId = null;
+    if (symbolName) {
+      // First try to find existing symbol
+      let { data: symbolData, error: symbolError } = await supabase
+        .from("symbols")
+        .select("id")
+        .eq("symbol", symbolName)
+        .single();
+      
+      if (symbolError && symbolError.code === 'PGRST116') {
+        // Symbol doesn't exist, create it
+        const { data: newSymbol, error: createError } = await supabase
+          .from("symbols")
+          .insert([{ symbol: symbolName }])
+          .select()
+          .single();
+        
+        if (createError) {
+          console.error("Error creating symbol:", createError);
+          throw createError;
+        }
+        symbolId = newSymbol.id;
+      } else if (symbolError) {
+        console.error("Error finding symbol:", symbolError);
+        throw symbolError;
+      } else if (symbolData) {
+        symbolId = symbolData.id;
+      }
+    }
+
+    // Update trade with new symbol
+    const { error } = await supabase
+      .from("trades")
+      .update({ 
+        symbol: symbolId, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq("id", id)
+      .eq("user_id", user!.id);
+    
+    if (error) throw error;
+  };
+
+  const handleCellBlur = useCallback(() => {
+    if (editingCell) {
+      handleCellSave(editingCell.id, editingCell.field);
+    }
+  }, [editingCell, handleCellSave]);
+
+  const handleCellKeyDown = useCallback((e: React.KeyboardEvent, id: number, field: keyof Trade) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCellSave(id, field);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      // Cancel editing and restore original value
+      const cellKey = `${id}-${field}`;
+      setEditingValues(prev => ({
+        ...prev,
+        [cellKey]: originalValues[cellKey]
+      }));
+      setCellErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[cellKey];
+        return newErrors;
+      });
+      setEditingCell(null);
+    }
+  }, [handleCellSave, originalValues]);
 
   const handleAddTrade = () => {
     setEditingTrade(null);
@@ -1541,91 +1908,128 @@ export default function TablePage() {
                                 if (!column) return null;
 
                                 const isEditing = editingCell?.id === trade.id && editingCell.field === column.id;
-                                const value = trade[column.id as keyof Trade];
+                                const cellKey = `${trade.id}-${column.id}`;
+                                const editingValue = editingValues[cellKey];
+                                const isSaving = savingCells.has(cellKey);
+                                const cellError = cellErrors[cellKey];
+                                const value = isEditing && editingValue !== undefined ? editingValue : trade[column.id as keyof Trade];
 
                                 return (
                                   <TableCell
                                     key={column.id}
                                     onClick={() => handleCellClick(trade.id, column.id as keyof Trade)}
-                                    className={`py-2 px-4 border-b border-r last:border-r-0 ${column.minWidth} text-left`}
+                                    className={cn(
+                                      `py-2 px-4 border-b border-r last:border-r-0 ${column.minWidth} text-left relative`,
+                                      isFieldEditable(column.id as keyof Trade) && !isSaving
+                                        ? "cursor-pointer hover:bg-muted/50" 
+                                        : "cursor-default",
+                                      isSaving && "opacity-50"
+                                    )}
                                   >
                                     {isEditing ? (
-                                      column.type === "select" ? (
-                                        <Select
-                                          value={String(value)}
-                                          onValueChange={(val) => handleCellChange(trade.id, column.id as keyof Trade, val)}
-                                          onOpenChange={(open) => !open && handleCellBlur()}
-                                        >
-                                          <SelectTrigger className="h-8">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            {(column.options || []).map((option) => (
-                                              <SelectItem key={option} value={option}>
-                                                {option}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select>
-                                      ) : column.type === "textarea" ? (
-                                        <Textarea
-                                          value={String(value)}
-                                          onChange={(e) =>
-                                            handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                                          }
-                                          onBlur={handleCellBlur}
-                                          autoFocus
-                                          rows={2}
-                                          className="min-w-[150px]"
-                                        />
-                                      ) : (
-                                        <Input
-                                          type={
-                                            column.type === "number"
-                                              ? "number"
-                                              : column.type === "date"
-                                                ? "date"
-                                                : column.type === "time"
-                                                  ? "time"
-                                                  : "text"
-                                          }
-                                          step={
-                                            column.type === "number"
-                                              ? column.id === "entry" || column.id === "exit"
-                                                ? "0.0001"
-                                                : "0.1"
-                                              : undefined
-                                          }
-                                          value={String(value)}
-                                          onChange={(e) =>
-                                            handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                                          }
-                                          onBlur={handleCellBlur}
-                                          autoFocus
-                                          className="h-8"
-                                        />
-                                      )
-                                    ) : (
-                                      <span
-                                        className={cn(
-                                          column.id === "profit" &&
-                                            (trade.profit && trade.profit > 0
-                                              ? "text-green-600"
-                                              : trade.profit && trade.profit < 0
-                                                ? "text-red-600"
-                                                : ""),
-                                          column.id === "pips" &&
-                                            (trade.pips && trade.pips > 0
-                                              ? "text-green-600"
-                                              : trade.pips && trade.pips < 0
-                                                ? "text-red-600"
-                                                : ""),
-                                          "block min-h-[24px] py-1",
+                                      <div className="space-y-1">
+                                        {column.type === "select" ? (
+                                          <Select
+                                            value={String(value)}
+                                            onValueChange={(val) => handleCellChange(trade.id, column.id as keyof Trade, val)}
+                                            onOpenChange={(open) => !open && handleCellBlur()}
+                                          >
+                                            <SelectTrigger className="h-8">
+                                              <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                              {(column.options || []).map((option) => (
+                                                <SelectItem key={option} value={option}>
+                                                  {option}
+                                                </SelectItem>
+                                              ))}
+                                            </SelectContent>
+                                          </Select>
+                                        ) : column.type === "textarea" ? (
+                                          <Textarea
+                                            value={String(value)}
+                                            onChange={(e) =>
+                                              handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
+                                            }
+                                            onBlur={handleCellBlur}
+                                            onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                            autoFocus
+                                            rows={2}
+                                            className="min-w-[150px]"
+                                          />
+                                        ) : (
+                                          <Input
+                                            type={
+                                              column.type === "number"
+                                                ? "number"
+                                                : column.type === "date"
+                                                  ? "date"
+                                                  : column.type === "time"
+                                                    ? "time"
+                                                    : "text"
+                                            }
+                                            step={
+                                              column.type === "number"
+                                                ? column.id === "entry" || column.id === "exit"
+                                                  ? "0.0001"
+                                                  : "0.1"
+                                                : undefined
+                                            }
+                                            value={String(value)}
+                                            onChange={(e) =>
+                                              handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
+                                            }
+                                            onBlur={handleCellBlur}
+                                            onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                            autoFocus
+                                            className="h-8"
+                                            disabled={isSaving}
+                                          />
                                         )}
-                                      >
-                                        {getColumnValue(trade, column.id)}
-                                      </span>
-                                    )}
+                                        {isSaving && (
+                                          <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
+                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                          </div>
+                                        )}
+                                        {cellError && (
+                                          <div className="text-xs text-red-500 mt-1">{cellError}</div>
+                                        )}
+                                      </div>
+                                                                          ) : (
+                                        <div className="flex items-center gap-2">
+                                          <span
+                                            className={cn(
+                                              column.id === "profit" &&
+                                                (trade.profit && trade.profit > 0
+                                                  ? "text-green-600"
+                                                  : trade.profit && trade.profit < 0
+                                                    ? "text-red-600"
+                                                    : ""),
+                                              column.id === "pips" &&
+                                                (trade.pips && trade.pips > 0
+                                                  ? "text-green-600"
+                                                  : trade.pips && trade.pips < 0
+                                                    ? "text-red-600"
+                                                    : ""),
+                                              "block min-h-[24px] py-1 flex-1",
+                                            )}
+                                          >
+                                            {getColumnValue(trade, column.id)}
+                                          </span>
+                                          {!isFieldEditable(column.id as keyof Trade) && (
+                                            <TooltipProvider>
+                                              <Tooltip>
+                                                <TooltipTrigger asChild>
+                                                  <Edit className="h-3 w-3 text-muted-foreground opacity-50" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                  <p>編集するには取引編集ダイアログを使用してください</p>
+                                                </TooltipContent>
+                                              </Tooltip>
+                                            </TooltipProvider>
+                                          )}
+                                        </div>
+                                      )}
                                   </TableCell>
                                 );
                               })}
