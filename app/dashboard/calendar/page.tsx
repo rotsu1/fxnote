@@ -176,7 +176,7 @@ const getPLColor = (pnl: number) => {
   return "bg-gray-100 text-gray-600"
 }
 
-function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate: Date; onDateChange: (date: Date) => void; trades: any[] }) {
+function MonthlyNavigation({ currentDate, onDateChange, trades, onImportCSV }: { currentDate: Date; onDateChange: (date: Date) => void; trades: any[]; onImportCSV: () => void }) {
   const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
   const currentYear = currentDate.getFullYear()
   const currentMonth = currentDate.getMonth()
@@ -236,7 +236,12 @@ function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate:
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
-      <div
+      <div className="flex items-center gap-4">
+        <Button variant="outline" onClick={onImportCSV}>
+          <Upload className="mr-2 h-4 w-4" />
+          CSV
+        </Button>
+        <div
           className={`text-lg font-semibold ${
             monthlyPL > 0
               ? "text-green-600"
@@ -246,6 +251,7 @@ function MonthlyNavigation({ currentDate, onDateChange, trades }: { currentDate:
           }`}
         >
           月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
+        </div>
       </div>
     </div>
   )
@@ -522,7 +528,6 @@ function RightSidebar({
   onEditTrade,
   onDeleteTrade,
   onAddTrade,
-  onImportCSV,
   onDisplaySettings,
   displaySettings,
 }: {
@@ -533,7 +538,6 @@ function RightSidebar({
   onEditTrade: (trade: any) => void
   onDeleteTrade: (id: number) => void
   onAddTrade: () => void
-  onImportCSV: () => void
   onDisplaySettings: () => void
   displaySettings: Record<string, boolean>
 }) {
@@ -574,16 +578,10 @@ function RightSidebar({
 
         {/* Action Buttons */}
         <div className="p-4 border-b space-y-2">
-          <div className="flex gap-2">
-            <Button onClick={onAddTrade} className="flex-1">
-              <Plus className="mr-2 h-4 w-4" />
-              取引追加
-            </Button>
-            <Button variant="outline" onClick={onImportCSV}>
-              <Upload className="mr-2 h-4 w-4" />
-              CSV
-            </Button>
-          </div>
+          <Button onClick={onAddTrade} className="w-full">
+            <Plus className="mr-2 h-4 w-4" />
+            取引追加
+          </Button>
           <Button variant="outline" onClick={onDisplaySettings} className="w-full bg-transparent">
             <Filter className="mr-2 h-4 w-4" />
             表示設定
@@ -3070,7 +3068,7 @@ export default function CalendarPage() {
             <div className="text-center text-red-600 py-10">{error}</div>
           ) : (
             <>
-              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} trades={trades} />
+              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} trades={trades} onImportCSV={() => setIsCSVDialogOpen(true)} />
               <CalendarGrid currentDate={currentDate} onDateClick={handleDateClick} groupedTrades={groupedTrades} />
             </>
           )}
@@ -3083,7 +3081,6 @@ export default function CalendarPage() {
           onEditTrade={handleEditTrade}
           onDeleteTrade={handleDeleteTrade}
           onAddTrade={handleAddTrade}
-          onImportCSV={() => setIsCSVDialogOpen(true)}
           onDisplaySettings={() => setIsDisplaySettingsOpen(true)}
           displaySettings={displaySettings}
         />
