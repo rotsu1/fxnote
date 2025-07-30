@@ -517,7 +517,7 @@ function TableSettingsDialog({
           <Button variant="outline" onClick={onClose}>
             キャンセル
           </Button>
-          <Button onClick={() => { onSave(); onClose(); }}>
+          <Button onClick={onSave}>
             保存
           </Button>
         </div>
@@ -1308,6 +1308,7 @@ export default function TablePage() {
       }
       
       setHasUnsavedChanges(false);
+      setIsTableSettingsOpen(false);
     } catch (error) {
       console.error("Error saving column preferences:", error);
     }
