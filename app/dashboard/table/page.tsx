@@ -787,7 +787,12 @@ export default function TablePage() {
   const filteredTrades = useMemo(() => {
     if (!selectedDate) return [];
     const dateString = format(selectedDate, "yyyy-MM-dd");
-    let filtered = trades.filter((trade) => trade.date === dateString);
+    let filtered = trades.filter((trade) => {
+      // Use exit time for filtering instead of entry time
+      const exitDate = new Date(trade.exitTime);
+      const exitDateString = exitDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
+      return exitDateString === dateString;
+    });
     
     // Apply sorting
     if (sortConfig.key) {
