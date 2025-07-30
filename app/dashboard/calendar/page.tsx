@@ -1951,7 +1951,7 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
           const profitLoss = parseFloat(values[16]);           // 売買損益
           const entryPrice = parseFloat(values[12]);           // 新規約定値
           const exitPrice = parseFloat(values[13]);            // 決済約定値
-          const pips = parseFloat(values[14]) || 0;            // pip損益
+          const pips = (parseFloat(values[14]) || 0) / 10;     // pip損益 (divide by 10 for Hirose)
           const holdTime = calculateHoldTime(entryTime, exitTime);
           
           // Get or create symbol

@@ -43,6 +43,7 @@ interface DatabaseTrade {
   entry_time: string;
   exit_time: string;
   profit_loss: number;
+  pips: number;
   trade_memo: string;
   hold_time: number; // in seconds
 }
@@ -209,6 +210,7 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
         const profitLoss = parseFloat(trade.売買損益);
         const entryPrice = parseFloat(trade.新規約定値);
         const exitPrice = parseFloat(trade.決済約定値);
+        const pips = (parseFloat(trade.pip損益) || 0) / 10; // Divide by 10 for Hirose
         const holdTime = calculateHoldTime(entryTime, exitTime);
         
         // Get or create symbol
@@ -238,6 +240,7 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
           entry_time: entryTime,
           exit_time: exitTime,
           profit_loss: profitLoss,
+          pips: pips,
           trade_memo: tradeMemo,
           hold_time: holdTime,
         };
