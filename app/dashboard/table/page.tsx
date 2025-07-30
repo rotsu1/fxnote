@@ -9,6 +9,8 @@ import {
   Edit,
   Trash2,
   Tag,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
@@ -467,6 +469,7 @@ export default function TablePage() {
   const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
   const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [selectedTrades, setSelectedTrades] = useState<Set<number>>(new Set());
   const [visibleColumns, setVisibleColumns] = useState<string[]>(
     allColumns.filter((col) => col.defaultVisible).map((col) => col.id),
   );
@@ -943,6 +946,30 @@ export default function TablePage() {
     }
   };
 
+  const handleSelectTrade = (id: number, checked: boolean) => {
+    setSelectedTrades(prev => {
+      const newSet = new Set(prev);
+      if (checked) {
+        newSet.add(id);
+      } else {
+        newSet.delete(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleSelectAllTrades = (checked: boolean) => {
+    if (checked) {
+      setSelectedTrades(new Set(filteredTrades.map(trade => trade.id)));
+    } else {
+      setSelectedTrades(new Set());
+    }
+  };
+
+  const handleDeleteSelectedTrades = () => {
+    setDeleteConfirmId(-1); // Use -1 to indicate bulk delete
+  };
+
   const handleDeleteTrade = (id: number) => {
     setDeleteConfirmId(id);
   };
@@ -951,15 +978,34 @@ export default function TablePage() {
     if (!deleteConfirmId || !user) return;
     
     try {
-      const { error } = await supabase
-        .from("trades")
-        .delete()
-        .eq("id", deleteConfirmId)
-        .eq("user_id", user.id);
+      if (deleteConfirmId === -1) {
+        // Bulk delete selected trades
+        const selectedIds = Array.from(selectedTrades);
+        if (selectedIds.length === 0) return;
+        
+        const { error } = await supabase
+          .from("trades")
+          .delete()
+          .in("id", selectedIds)
+          .eq("user_id", user.id);
+        
+        if (error) throw error;
+        
+        setTrades((prevTrades) => prevTrades.filter((t) => !selectedIds.includes(t.id)));
+        setSelectedTrades(new Set());
+      } else {
+        // Single trade delete
+        const { error } = await supabase
+          .from("trades")
+          .delete()
+          .eq("id", deleteConfirmId)
+          .eq("user_id", user.id);
+        
+        if (error) throw error;
+        
+        setTrades((prevTrades) => prevTrades.filter((t) => t.id !== deleteConfirmId));
+      }
       
-      if (error) throw error;
-      
-      setTrades((prevTrades) => prevTrades.filter((t) => t.id !== deleteConfirmId));
       setDeleteConfirmId(null);
     } catch (error: any) {
       console.error("Error deleting trade:", error);
@@ -969,6 +1015,22 @@ export default function TablePage() {
 
   const handleToggleColumn = (columnId: string, isVisible: boolean) => {
     setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)));
+  };
+
+  const handlePreviousDay = () => {
+    if (selectedDate) {
+      const previousDay = new Date(selectedDate);
+      previousDay.setDate(previousDay.getDate() - 1);
+      setSelectedDate(previousDay);
+    }
+  };
+
+  const handleNextDay = () => {
+    if (selectedDate) {
+      const nextDay = new Date(selectedDate);
+      nextDay.setDate(nextDay.getDate() + 1);
+      setSelectedDate(nextDay);
+    }
   };
 
   const getColumnValue = (trade: Trade, columnId: string) => {
@@ -1017,24 +1079,44 @@ export default function TablePage() {
           ) : (
             <>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                {/* Date Picker */}
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant={"outline"}
-                      className={cn(
-                        "w-[280px] justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground",
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : <span>日付を選択</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ja} />
-                  </PopoverContent>
-                </Popover>
+                {/* Date Navigation */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handlePreviousDay}
+                    disabled={!selectedDate}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant={"outline"}
+                        className={cn(
+                          "w-[280px] justify-start text-left font-normal",
+                          !selectedDate && "text-muted-foreground",
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : <span>日付を選択</span>}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ja} />
+                    </PopoverContent>
+                  </Popover>
+                  
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={handleNextDay}
+                    disabled={!selectedDate}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
 
                 {/* Action Buttons */}
                 <div className="flex gap-2">
@@ -1042,6 +1124,12 @@ export default function TablePage() {
                     <Plus className="mr-2 h-4 w-4" />
                     取引を追加
                   </Button>
+                  {selectedTrades.size > 0 && (
+                    <Button variant="destructive" onClick={handleDeleteSelectedTrades}>
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      {selectedTrades.size}件削除
+                    </Button>
+                  )}
                   <Button variant="outline" onClick={() => setIsTableSettingsOpen(true)}>
                     <Settings className="h-4 w-4" />
                     <span className="sr-only">設定</span>
@@ -1062,6 +1150,12 @@ export default function TablePage() {
                     <Table className="w-full">
                       <TableHeader className="sticky top-0 bg-background z-10 shadow-sm">
                         <TableRow>
+                          <TableHead className="min-w-[50px] text-center">
+                            <Checkbox
+                              checked={filteredTrades.length > 0 && selectedTrades.size === filteredTrades.length}
+                              onCheckedChange={handleSelectAllTrades}
+                            />
+                          </TableHead>
                           {visibleColumns.map((colId) => {
                             const column = allColumns.find((c) => c.id === colId);
                             return column ? (
@@ -1070,13 +1164,18 @@ export default function TablePage() {
                               </TableHead>
                             ) : null;
                           })}
-                          <TableHead className="min-w-[100px] text-right">アクション</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {filteredTrades.length > 0 ? (
                           filteredTrades.map((trade) => (
                             <TableRow key={trade.id}>
+                              <TableCell className="py-2 px-4 border-b text-center min-w-[50px]">
+                                <Checkbox
+                                  checked={selectedTrades.has(trade.id)}
+                                  onCheckedChange={(checked) => handleSelectTrade(trade.id, checked as boolean)}
+                                />
+                              </TableCell>
                               {visibleColumns.map((colId) => {
                                 const column = allColumns.find((c) => c.id === colId);
                                 if (!column) return null;
@@ -1170,18 +1269,6 @@ export default function TablePage() {
                                   </TableCell>
                                 );
                               })}
-                              <TableCell className="py-2 px-4 border-b text-right min-w-[100px]">
-                                <div className="flex justify-end gap-1">
-                                  <Button variant="ghost" size="sm" onClick={() => handleEditTrade(trade)}>
-                                    <Edit className="h-4 w-4" />
-                                    <span className="sr-only">編集</span>
-                                  </Button>
-                                  <Button variant="ghost" size="sm" onClick={() => handleDeleteTrade(trade.id)}>
-                                    <Trash2 className="h-4 w-4 text-red-500" />
-                                    <span className="sr-only">削除</span>
-                                  </Button>
-                                </div>
-                              </TableCell>
                             </TableRow>
                           ))
                         ) : (
@@ -1222,9 +1309,14 @@ export default function TablePage() {
         <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>取引を削除しますか？</AlertDialogTitle>
+              <AlertDialogTitle>
+                {deleteConfirmId === -1 ? "選択された取引を削除しますか？" : "取引を削除しますか？"}
+              </AlertDialogTitle>
               <AlertDialogDescription>
-                この操作は取り消すことができません。取引データが完全に削除されます。
+                {deleteConfirmId === -1 
+                  ? `${selectedTrades.size}件の取引を削除します。この操作は取り消すことができません。`
+                  : "この操作は取り消すことができません。取引データが完全に削除されます。"
+                }
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
