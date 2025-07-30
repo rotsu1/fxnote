@@ -1811,7 +1811,9 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
       
       // Process data rows
       const dataRows = lines.slice(headerIndex + 1).filter(line => line.trim());
-      setImportProgress(`${dataRows.length}件の取引を処理中...`);
+      // Hirose CSV has 2 rows per transaction (entry and exit), so divide by 2
+      const transactionCount = Math.floor(dataRows.length / 2);
+      setImportProgress(`${transactionCount}件の取引を処理中...`);
       
       let successCount = 0;
       let errorCount = 0;
@@ -1985,7 +1987,7 @@ function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: 
           } else {
             successCount++;
             if (successCount % 10 === 0) {
-              setImportProgress(`${successCount}件の取引を処理完了...`);
+              setImportProgress(`${successCount}/${transactionCount}件の取引を処理完了...`);
             }
           }
           
