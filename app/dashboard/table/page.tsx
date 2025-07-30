@@ -546,6 +546,9 @@ export default function TablePage() {
     direction: 'asc' | 'desc';
   }>({ key: null, direction: 'asc' });
   const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
+  const [originalVisibleColumns, setOriginalVisibleColumns] = useState<string[]>([]);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [showDiscardWarning, setShowDiscardWarning] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -602,6 +605,7 @@ export default function TablePage() {
             });
 
           setVisibleColumns(orderedColumns);
+          setOriginalVisibleColumns(orderedColumns);
         }
 
         // Fetch trades with symbol information
@@ -1208,6 +1212,7 @@ export default function TablePage() {
 
   const handleToggleColumn = (columnId: string, isVisible: boolean) => {
     setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)));
+    setHasUnsavedChanges(true);
   };
 
   const handleDragStart = (columnId: string) => {
@@ -1235,6 +1240,7 @@ export default function TablePage() {
 
     setVisibleColumns(newOrder);
     setDraggedColumn(null);
+    setHasUnsavedChanges(true);
   };
 
   const saveColumnPreferences = async () => {
@@ -1300,9 +1306,30 @@ export default function TablePage() {
             ...preferences,
           }]);
       }
+      
+      setHasUnsavedChanges(false);
     } catch (error) {
       console.error("Error saving column preferences:", error);
     }
+  };
+
+  const handleCloseSettings = () => {
+    if (hasUnsavedChanges) {
+      setShowDiscardWarning(true);
+    } else {
+      setIsTableSettingsOpen(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setVisibleColumns(originalVisibleColumns);
+    setHasUnsavedChanges(false);
+    setShowDiscardWarning(false);
+    setIsTableSettingsOpen(false);
+  };
+
+  const handleCancelDiscard = () => {
+    setShowDiscardWarning(false);
   };
 
   const handleSort = (key: keyof Trade) => {
@@ -1451,7 +1478,11 @@ export default function TablePage() {
                       {selectedTrades.size}件削除
                     </Button>
                   )}
-                  <Button variant="outline" onClick={() => setIsTableSettingsOpen(true)}>
+                  <Button variant="outline" onClick={() => {
+                    setOriginalVisibleColumns(visibleColumns);
+                    setHasUnsavedChanges(false);
+                    setIsTableSettingsOpen(true);
+                  }}>
                     <Settings className="h-4 w-4" />
                     <span className="sr-only">設定</span>
                   </Button>
@@ -1629,7 +1660,7 @@ export default function TablePage() {
 
         <TableSettingsDialog
           isOpen={isTableSettingsOpen}
-          onClose={() => setIsTableSettingsOpen(false)}
+          onClose={handleCloseSettings}
           visibleColumns={visibleColumns}
           onToggleColumn={handleToggleColumn}
           onDragStart={handleDragStart}
@@ -1655,6 +1686,23 @@ export default function TablePage() {
             <AlertDialogFooter>
               <AlertDialogCancel>キャンセル</AlertDialogCancel>
               <AlertDialogAction onClick={confirmDelete}>削除</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
+              <AlertDialogDescription>
+                保存されていない変更があります。変更を破棄すると、元の設定に戻ります。
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleCancelDiscard}>キャンセル</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDiscardChanges} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                破棄
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
