@@ -69,7 +69,11 @@ interface Trade {
   pips: number
   profit: number
   emotion: string
-  holdingTime: string
+  holdingTime: number
+  holdingDays?: number
+  holdingHours?: number
+  holdingMinutes?: number
+  holdingSeconds?: number
   notes?: string
   tags: string[]
 }
@@ -129,7 +133,7 @@ const allColumns = [
   { id: "pips", label: "pips", type: "number", defaultVisible: true, minWidth: "min-w-[100px]" },
   { id: "profit", label: "損益 (¥)", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
   { id: "emotion", label: "感情", type: "select", options: emotions, defaultVisible: true, minWidth: "min-w-[120px]" },
-  { id: "holdingTime", label: "保有時間", type: "text", defaultVisible: true, minWidth: "min-w-[140px]" },
+  { id: "holdingTime", label: "保有時間", type: "holdingTime", defaultVisible: true, minWidth: "min-w-[200px]" },
   { id: "notes", label: "メモ", type: "textarea", defaultVisible: true, minWidth: "min-w-[250px]" },
   { id: "tags", label: "タグ", type: "tags", defaultVisible: true, minWidth: "min-w-[200px]" },
 ]
@@ -163,7 +167,7 @@ function TradeEditDialog({
       pips: undefined,
       profit: undefined,
       emotion: "",
-      holdingTime: "",
+      holdingTime: 0,
       notes: "",
       tags: [],
     },
@@ -215,7 +219,7 @@ function TradeEditDialog({
         pips: undefined,
         profit: undefined,
         emotion: "",
-        holdingTime: "",
+        holdingTime: 0,
         notes: "",
         tags: [],
       },
@@ -417,13 +421,105 @@ function TradeEditDialog({
           </div>
 
           <div>
-            <Label htmlFor="holdingTime">保有時間</Label>
-            <Input
-              id="holdingTime"
-              value={formData.holdingTime}
-              onChange={(e) => setFormData({ ...formData, holdingTime: e.target.value })}
-              placeholder="例: 1h 30m"
-            />
+            <Label>保有時間</Label>
+            <div className="grid grid-cols-4 gap-2">
+              <div>
+                <Label htmlFor="holdingDays" className="text-sm text-muted-foreground">日</Label>
+                <Input
+                  id="holdingDays"
+                  type="number"
+                  min="0"
+                  max="365"
+                  value={formData.holdingDays || ""}
+                  onChange={(e) => {
+                    const days = e.target.value ? parseInt(e.target.value) : 0;
+                    const hours = formData.holdingHours || 0;
+                    const minutes = formData.holdingMinutes || 0;
+                    const seconds = formData.holdingSeconds || 0;
+                    const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                    setFormData({ 
+                      ...formData, 
+                      holdingDays: days || undefined,
+                      holdingTime: totalSeconds
+                    });
+                  }}
+                  placeholder="0"
+                  className="no-spinner"
+                />
+              </div>
+              <div>
+                <Label htmlFor="holdingHours" className="text-sm text-muted-foreground">時間</Label>
+                <Input
+                  id="holdingHours"
+                  type="number"
+                  min="0"
+                  max="23"
+                  value={formData.holdingHours || ""}
+                  onChange={(e) => {
+                    const days = formData.holdingDays || 0;
+                    const hours = e.target.value ? parseInt(e.target.value) : 0;
+                    const minutes = formData.holdingMinutes || 0;
+                    const seconds = formData.holdingSeconds || 0;
+                    const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                    setFormData({ 
+                      ...formData, 
+                      holdingHours: hours || undefined,
+                      holdingTime: totalSeconds
+                    });
+                  }}
+                  placeholder="0"
+                  className="no-spinner"
+                />
+              </div>
+              <div>
+                <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">分</Label>
+                <Input
+                  id="holdingMinutes"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={formData.holdingMinutes || ""}
+                  onChange={(e) => {
+                    const days = formData.holdingDays || 0;
+                    const hours = formData.holdingHours || 0;
+                    const minutes = e.target.value ? parseInt(e.target.value) : 0;
+                    const seconds = formData.holdingSeconds || 0;
+                    const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                    setFormData({ 
+                      ...formData, 
+                      holdingMinutes: minutes || undefined,
+                      holdingTime: totalSeconds
+                    });
+                  }}
+                  placeholder="0"
+                  className="no-spinner"
+                />
+              </div>
+              <div>
+                <Label htmlFor="holdingSeconds" className="text-sm text-muted-foreground">秒</Label>
+                <Input
+                  id="holdingSeconds"
+                  type="number"
+                  min="0"
+                  max="59"
+                  value={formData.holdingSeconds || ""}
+                  onChange={(e) => {
+                    const days = formData.holdingDays || 0;
+                    const hours = formData.holdingHours || 0;
+                    const minutes = formData.holdingMinutes || 0;
+                    const seconds = e.target.value ? parseInt(e.target.value) : 0;
+                    const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                    setFormData({ 
+                      ...formData, 
+                      holdingSeconds: seconds || undefined,
+                      holdingTime: totalSeconds
+                    });
+                  }}
+                  placeholder="0"
+                  className="no-spinner"
+                />
+              </div>
+            </div>
           </div>
 
           <div>
@@ -841,7 +937,7 @@ export default function TablePage() {
             pips: trade.pips || 0,
             profit: trade.profit_loss,
             emotion: emotionsByTradeId[trade.id] || "",
-            holdingTime: formatHoldTime(trade.hold_time),
+            holdingTime: trade.hold_time || 0,
             notes: trade.trade_memo || "",
             tags: tagsByTradeId[trade.id] || [],
           };
@@ -1002,10 +1098,28 @@ export default function TablePage() {
       editingValue = convertToDateTimeLocal(trade[field] as string);
     }
     
-    setEditingValues(prev => ({
-      ...prev,
-      [cellKey]: editingValue
-    }));
+    // Initialize holding time fields
+    if (field === 'holdingTime') {
+      const totalSeconds = typeof trade[field] === 'number' ? trade[field] as number : 0;
+      const days = Math.floor(totalSeconds / (24 * 60 * 60));
+      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+      const seconds = totalSeconds % 60;
+      
+      setEditingValues(prev => ({
+        ...prev,
+        [`${id}-holdingDays`]: days || "",
+        [`${id}-holdingHours`]: hours || "",
+        [`${id}-holdingMinutes`]: minutes || "",
+        [`${id}-holdingSeconds`]: seconds || "",
+        [cellKey]: totalSeconds
+      }));
+    } else {
+      setEditingValues(prev => ({
+        ...prev,
+        [cellKey]: editingValue
+      }));
+    }
     
     // Clear any previous errors for this cell
     setCellErrors(prev => {
@@ -1081,6 +1195,10 @@ export default function TablePage() {
       profit: 'profit_loss',
       emotion: 'emotion',
       holdingTime: 'hold_time',
+      holdingDays: 'hold_time',
+      holdingHours: 'hold_time',
+      holdingMinutes: 'hold_time',
+      holdingSeconds: 'hold_time',
       notes: 'trade_memo',
       tags: 'tags'
     };
@@ -1905,6 +2023,21 @@ export default function TablePage() {
     if (column.id === "pips" && typeof value === "number") {
       return `${value} pips`;
     }
+    if (column.id === "holdingTime" && typeof value === "number") {
+      const totalSeconds = value;
+      const days = Math.floor(totalSeconds / (24 * 60 * 60));
+      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+      const seconds = totalSeconds % 60;
+      
+      let result = "";
+      if (days > 0) result += `${days}日`;
+      if (hours > 0) result += `${hours}時間`;
+      if (minutes > 0) result += `${minutes}分`;
+      if (seconds > 0) result += `${seconds}秒`;
+      
+      return result || "0秒";
+    }
     if (column.id === "tags" && Array.isArray(value)) {
       return (
         <div className="flex flex-wrap gap-1">
@@ -2152,6 +2285,85 @@ export default function TablePage() {
                                             className="h-8"
                                             disabled={isSaving}
                                           />
+                                        ) : column.id === "holdingTime" ? (
+                                          <div className="flex gap-1">
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              max="365"
+                                              placeholder="日"
+                                              value={editingValues[`${trade.id}-holdingDays`] || ""}
+                                              onChange={(e) => {
+                                                const days = e.target.value ? parseInt(e.target.value) : 0;
+                                                const hours = editingValues[`${trade.id}-holdingHours`] || 0;
+                                                const minutes = editingValues[`${trade.id}-holdingMinutes`] || 0;
+                                                const seconds = editingValues[`${trade.id}-holdingSeconds`] || 0;
+                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
+                                              }}
+                                              onBlur={handleCellBlur}
+                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                              className="w-12 h-8 text-xs no-spinner"
+                                              disabled={isSaving}
+                                            />
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              max="23"
+                                              placeholder="時"
+                                              value={editingValues[`${trade.id}-holdingHours`] || ""}
+                                              onChange={(e) => {
+                                                const days = editingValues[`${trade.id}-holdingDays`] || 0;
+                                                const hours = e.target.value ? parseInt(e.target.value) : 0;
+                                                const minutes = editingValues[`${trade.id}-holdingMinutes`] || 0;
+                                                const seconds = editingValues[`${trade.id}-holdingSeconds`] || 0;
+                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
+                                              }}
+                                              onBlur={handleCellBlur}
+                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                              className="w-12 h-8 text-xs no-spinner"
+                                              disabled={isSaving}
+                                            />
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              max="59"
+                                              placeholder="分"
+                                              value={editingValues[`${trade.id}-holdingMinutes`] || ""}
+                                              onChange={(e) => {
+                                                const days = editingValues[`${trade.id}-holdingDays`] || 0;
+                                                const hours = editingValues[`${trade.id}-holdingHours`] || 0;
+                                                const minutes = e.target.value ? parseInt(e.target.value) : 0;
+                                                const seconds = editingValues[`${trade.id}-holdingSeconds`] || 0;
+                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
+                                              }}
+                                              onBlur={handleCellBlur}
+                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                              className="w-12 h-8 text-xs no-spinner"
+                                              disabled={isSaving}
+                                            />
+                                            <Input
+                                              type="number"
+                                              min="0"
+                                              max="59"
+                                              placeholder="秒"
+                                              value={editingValues[`${trade.id}-holdingSeconds`] || ""}
+                                              onChange={(e) => {
+                                                const days = editingValues[`${trade.id}-holdingDays`] || 0;
+                                                const hours = editingValues[`${trade.id}-holdingHours`] || 0;
+                                                const minutes = editingValues[`${trade.id}-holdingMinutes`] || 0;
+                                                const seconds = e.target.value ? parseInt(e.target.value) : 0;
+                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
+                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
+                                              }}
+                                              onBlur={handleCellBlur}
+                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                              className="w-12 h-8 text-xs no-spinner"
+                                              disabled={isSaving}
+                                            />
+                                          </div>
                                         ) : (
                                           <Input
                                             type={
