@@ -522,6 +522,16 @@ export default function TablePage() {
           const entryTime = new Date(trade.entry_time);
           const exitTime = new Date(trade.exit_time);
           
+          // Convert UTC to Japan timezone (UTC+9)
+          const convertToJapanTime = (date: Date) => {
+            // Add 9 hours to convert from UTC to Japan time
+            const japanTime = new Date(date.getTime() + (9 * 60 * 60 * 1000));
+            return japanTime;
+          };
+          
+          const japanEntryTime = convertToJapanTime(entryTime);
+          const japanExitTime = convertToJapanTime(exitTime);
+          
           // Convert hold_time from seconds to readable format
           const formatHoldTime = (seconds: number) => {
             if (!seconds) return "";
@@ -540,8 +550,8 @@ export default function TablePage() {
 
           return {
             id: trade.id,
-            date: entryTime.toISOString().split("T")[0],
-            time: entryTime.toTimeString().slice(0, 5),
+            date: japanEntryTime.toISOString().split("T")[0],
+            time: japanEntryTime.toTimeString().slice(0, 5),
             pair: trade.symbols?.symbol || "",
             type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
             entry: trade.entry_price,
