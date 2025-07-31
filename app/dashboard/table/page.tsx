@@ -1418,6 +1418,9 @@ export default function TablePage() {
         const minutes = String(date.getMinutes()).padStart(2, '0');
         const seconds = String(date.getSeconds()).padStart(2, '0');
         displayValue = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      } else if (field === 'profit' || field === 'pips') {
+        // For profit and pips, store the numeric value so getColumnValue can format it
+        displayValue = Number(value);
       }
       
       setTrades(prevTrades => 
@@ -2545,7 +2548,7 @@ export default function TablePage() {
                                             value={String(value)}
                                             onChange={(e) => handleCellChange(trade.id, column.id as keyof Trade, e.target.value)}
                                             onBlur={(e) => {
-                                              if (!isComposing) handleCellBlur(e);
+                                              if (!isComposing) handleCellBlur();
                                             }}
                                             onKeyDown={(e) => {
                                               if (isComposing) return;
