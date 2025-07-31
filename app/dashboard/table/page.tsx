@@ -1144,6 +1144,24 @@ export default function TablePage() {
       [cellKey]: value
     }));
     
+    // For holding time, also update the individual field that was changed
+    if (field === 'holdingTime') {
+      const totalSeconds = value;
+      const days = Math.floor(totalSeconds / (24 * 60 * 60));
+      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+      const seconds = totalSeconds % 60;
+      
+      setEditingValues(prev => ({
+        ...prev,
+        [`${id}-holdingDays`]: days || "",
+        [`${id}-holdingHours`]: hours || "",
+        [`${id}-holdingMinutes`]: minutes || "",
+        [`${id}-holdingSeconds`]: seconds || "",
+        [cellKey]: value
+      }));
+    }
+    
     // Clear error when user starts typing
     setCellErrors(prev => {
       const newErrors = { ...prev };
@@ -1247,7 +1265,25 @@ export default function TablePage() {
     // Check if value actually changed
     const originalValue = originalValues[cellKey];
     if (value === originalValue) {
+      // No changes made, just exit editing mode
       setEditingCell(null);
+      setEditingValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[cellKey];
+        // Also clean up holding time individual fields
+        if (field === 'holdingTime') {
+          delete newValues[`${id}-holdingDays`];
+          delete newValues[`${id}-holdingHours`];
+          delete newValues[`${id}-holdingMinutes`];
+          delete newValues[`${id}-holdingSeconds`];
+        }
+        return newValues;
+      });
+      setOriginalValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[cellKey];
+        return newValues;
+      });
       return;
     }
     
@@ -1460,9 +1496,36 @@ export default function TablePage() {
 
   const handleCellBlur = useCallback(() => {
     if (editingCell) {
-      handleCellSave(editingCell.id, editingCell.field);
+      const cellKey = `${editingCell.id}-${editingCell.field}`;
+      const currentValue = editingValues[cellKey];
+      const originalValue = originalValues[cellKey];
+      
+      // If no changes were made, just exit editing mode
+      if (currentValue === originalValue) {
+        setEditingCell(null);
+        setEditingValues(prev => {
+          const newValues = { ...prev };
+          delete newValues[cellKey];
+          // Also clean up holding time individual fields
+          if (editingCell.field === 'holdingTime') {
+            delete newValues[`${editingCell.id}-holdingDays`];
+            delete newValues[`${editingCell.id}-holdingHours`];
+            delete newValues[`${editingCell.id}-holdingMinutes`];
+            delete newValues[`${editingCell.id}-holdingSeconds`];
+          }
+          return newValues;
+        });
+        setOriginalValues(prev => {
+          const newValues = { ...prev };
+          delete newValues[cellKey];
+          return newValues;
+        });
+      } else {
+        // Changes were made, save them
+        handleCellSave(editingCell.id, editingCell.field);
+      }
     }
-  }, [editingCell, handleCellSave]);
+  }, [editingCell, editingValues, originalValues, handleCellSave]);
 
   const handleCellKeyDown = useCallback((e: React.KeyboardEvent, id: number, field: keyof Trade) => {
     if (e.key === 'Enter') {
@@ -1479,10 +1542,29 @@ export default function TablePage() {
         originalValue = convertToDateTimeLocal(originalValue as string);
       }
       
-      setEditingValues(prev => ({
-        ...prev,
-        [cellKey]: originalValue
-      }));
+      // For holding time, restore individual fields
+      if (field === 'holdingTime') {
+        const totalSeconds = originalValue as number || 0;
+        const days = Math.floor(totalSeconds / (24 * 60 * 60));
+        const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+        const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+        const seconds = totalSeconds % 60;
+        
+        setEditingValues(prev => ({
+          ...prev,
+          [`${id}-holdingDays`]: days || "",
+          [`${id}-holdingHours`]: hours || "",
+          [`${id}-holdingMinutes`]: minutes || "",
+          [`${id}-holdingSeconds`]: seconds || "",
+          [cellKey]: originalValue
+        }));
+      } else {
+        setEditingValues(prev => ({
+          ...prev,
+          [cellKey]: originalValue
+        }));
+      }
+      
       setCellErrors(prev => {
         const newErrors = { ...prev };
         delete newErrors[cellKey];
@@ -2286,7 +2368,12 @@ export default function TablePage() {
                                             disabled={isSaving}
                                           />
                                         ) : column.id === "holdingTime" ? (
-                                          <div className="flex gap-1">
+                                          <div className="flex gap-1" onBlur={(e) => {
+                                            // Only blur if clicking outside the entire holding time container
+                                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                              handleCellBlur();
+                                            }
+                                          }}>
                                             <Input
                                               type="number"
                                               min="0"
@@ -2301,7 +2388,6 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
-                                              onBlur={handleCellBlur}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={isSaving}
@@ -2320,7 +2406,6 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
-                                              onBlur={handleCellBlur}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={isSaving}
@@ -2339,7 +2424,6 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
-                                              onBlur={handleCellBlur}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={isSaving}
@@ -2358,7 +2442,6 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
-                                              onBlur={handleCellBlur}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={isSaving}
@@ -2430,7 +2513,7 @@ export default function TablePage() {
                                           >
                                             {getColumnValue(trade, column.id)}
                                           </span>
-                                          {!isFieldEditable(column.id as keyof Trade) && (
+                                          {!isFieldEditable(column.id as keyof Trade) && column.id !== "tags" && (
                                             <TooltipProvider>
                                               <Tooltip>
                                                 <TooltipTrigger asChild>
