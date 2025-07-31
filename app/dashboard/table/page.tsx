@@ -78,32 +78,6 @@ interface Trade {
   tags: string[]
 }
 
-const availableTags = [
-  "USD/JPY",
-  "EUR/USD",
-  "GBP/JPY",
-  "AUD/USD",
-  "スキャルピング",
-  "デイトレード",
-  "スイング",
-  "ブレイクアウト",
-  "レンジブレイク",
-  "押し目買い",
-  "逆張り",
-  "トレンド",
-  "レンジ",
-  "興奮",
-  "焦り",
-  "冷静",
-  "満足",
-  "後悔",
-  "朝",
-  "昼",
-  "夜",
-  "失敗",
-  "成功",
-]
-
 const emotions = ["興奮", "焦り", "冷静", "満足", "後悔", "不安", "自信"]
 const strategies = [
   "ブレイクアウト",
@@ -146,6 +120,7 @@ function TradeEditDialog({
   onSave,
   defaultDate,
   user,
+  availableTags,
 }: {
   trade: Partial<Trade> | null
   isOpen: boolean
@@ -153,6 +128,7 @@ function TradeEditDialog({
   onSave: (trade: Partial<Trade>) => void
   defaultDate?: string
   user: any
+  availableTags: { id: number, tag_name: string }[]
 }) {
   const [formData, setFormData] = useState<Partial<Trade>>(
     trade || {
@@ -298,7 +274,7 @@ function TradeEditDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden-y">
         <DialogHeader>
           <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
           <DialogDescription>取引の詳細を入力または編集してください。</DialogDescription>
@@ -598,12 +574,12 @@ function TradeEditDialog({
               <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
                 {availableTags.map((tag, index) => (
                   <Badge
-                    key={index}
-                    variant={formData.tags?.includes(tag) ? "default" : "outline"}
+                    key={tag.id}
+                    variant={formData.tags?.includes(tag.tag_name) ? "default" : "outline"}
                     className="cursor-pointer text-xs"
-                    onClick={() => addExistingTag(tag)}
+                    onClick={() => addExistingTag(tag.tag_name)}
                   >
-                    {tag}
+                    {tag.tag_name}
                   </Badge>
                 ))}
               </div>
@@ -768,6 +744,28 @@ export default function TablePage() {
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Add state for availableTags (array of { id, tag_name })
+  const [availableTags, setAvailableTags] = useState<{ id: number, tag_name: string }[]>([]);
+
+  // Load tags from trade_tags for the current user
+  useEffect(() => {
+    if (!user) return;
+    const loadTags = async () => {
+      const { data, error } = await supabase
+        .from("trade_tags")
+        .select("id, tag_name")
+        .eq("user_id", user.id)
+        .order("tag_name");
+      if (error) {
+        console.error("Error loading tags for table:", error);
+        setAvailableTags([]);
+        return;
+      }
+      setAvailableTags(data || []);
+    };
+    loadTags();
+  }, [user]);
 
   // Load symbols from database for table editing
   const loadSymbolsForTable = async () => {
@@ -1150,7 +1148,7 @@ export default function TablePage() {
     }
     
     // Don't allow editing of complex fields that need special handling
-    if (field === 'tags' || field === 'date' || field === 'time') {
+    if (field === 'date' || field === 'time') {
       // For these fields, open the edit dialog instead
       const trade = trades.find(t => t.id === id);
       if (trade) {
@@ -1638,46 +1636,53 @@ export default function TablePage() {
         valuesEqual = currentValue === originalValue;
       }
       
-      // If no changes were made, just exit editing mode
-      if (valuesEqual) {
-        setEditingCell(null);
-        setEditingValues(prev => {
-          const newValues = { ...prev };
-          delete newValues[cellKey];
-          // Also clean up holding time individual fields
-          if (editingCell.field === 'holdingTime') {
-            delete newValues[`${editingCell.id}-holdingDays`];
-            delete newValues[`${editingCell.id}-holdingHours`];
-            delete newValues[`${editingCell.id}-holdingMinutes`];
-            delete newValues[`${editingCell.id}-holdingSeconds`];
-          }
-          return newValues;
-        });
-        setOriginalValues(prev => {
-          const newValues = { ...prev };
-          delete newValues[cellKey];
-          return newValues;
-        });
-      } else {
+      // Always exit editing mode first
+      setEditingCell(null);
+      setEditingValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[cellKey];
+        // Also clean up holding time individual fields
+        if (editingCell.field === 'holdingTime') {
+          delete newValues[`${editingCell.id}-holdingDays`];
+          delete newValues[`${editingCell.id}-holdingHours`];
+          delete newValues[`${editingCell.id}-holdingMinutes`];
+          delete newValues[`${editingCell.id}-holdingSeconds`];
+        }
+        return newValues;
+      });
+      setOriginalValues(prev => {
+        const newValues = { ...prev };
+        delete newValues[cellKey];
+        return newValues;
+      });
+      
+      // If changes were made, save them
+      if (!valuesEqual) {
         console.log('Changes detected, calling handleCellSave');
-        // Changes were made, save them
         setIsSaving(true);
         handleCellSave(editingCell.id, editingCell.field);
       }
     }
   }, [editingCell, editingValues, originalValues, handleCellSave, isSaving]);
 
-  // Global click handler for emotions container
+  // Global click handler for emotions and tags containers
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     
     const handleGlobalClick = (event: MouseEvent) => {
-      if (editingCell && editingCell.field === 'emotion' && !isSaving) {
+      if (
+        editingCell &&
+        (editingCell.field === 'emotion' || editingCell.field === 'tags') &&
+        !isSaving
+      ) {
         const target = event.target as Element;
-        const emotionsContainer = document.querySelector('[data-emotions-container="true"]');
+        const containerSelector = editingCell.field === 'emotion' 
+          ? '[data-emotions-container="true"]'
+          : '[data-tags-container="true"]';
+        const container = document.querySelector(containerSelector);
         
-        if (emotionsContainer && !emotionsContainer.contains(target)) {
-          console.log('Global click detected outside emotions container');
+        if (container && !container.contains(target)) {
+          console.log(`Global click detected outside ${editingCell.field} container`);
           // Clear any existing timeout
           if (timeoutId) {
             clearTimeout(timeoutId);
@@ -2647,7 +2652,6 @@ export default function TablePage() {
                                             onBlur={handleCellBlur}
                                           >
                                             <div className="mb-2">
-                                              <div className="text-sm text-muted-foreground mb-1">感情を選択:</div>
                                               <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
                                                 {availableEmotions.map((emotion, index) => (
                                                   <Badge
@@ -2673,6 +2677,44 @@ export default function TablePage() {
                                                 ))}
                                                 {availableEmotions.length === 0 && (
                                                   <div className="text-xs text-muted-foreground">感情がありません</div>
+                                                )}
+                                              </div>
+                                            </div>
+                                          </div>
+                                        ) : column.type === "tags" ? (
+                                          <div
+                                            className="space-y-2"
+                                            data-tags-container="true"
+                                            tabIndex={-1}
+                                            onClick={e => e.stopPropagation()}
+                                            onBlur={handleCellBlur}
+                                          >
+                                            <div className="mb-2">
+                                              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
+                                                {availableTags.map((tag, index) => (
+                                                  <Badge
+                                                    key={index}
+                                                    variant={Array.isArray(value) && value.includes(tag.tag_name) ? "default" : "outline"}
+                                                    className="cursor-pointer text-xs"
+                                                    onClick={e => {
+                                                      e.stopPropagation();
+                                                      const currentTags = Array.isArray(value) ? value : [];
+                                                      if (currentTags.includes(tag.tag_name)) {
+                                                        // Remove tag if already selected
+                                                        const newTags = currentTags.filter((t: string) => t !== tag.tag_name);
+                                                        handleCellChange(trade.id, column.id as keyof Trade, newTags);
+                                                      } else {
+                                                        // Add tag if not selected
+                                                        const newTags = [...currentTags, tag.tag_name];
+                                                        handleCellChange(trade.id, column.id as keyof Trade, newTags);
+                                                      }
+                                                    }}
+                                                  >
+                                                    {tag.tag_name}
+                                                  </Badge>
+                                                ))}
+                                                {availableTags.length === 0 && (
+                                                  <div className="text-xs text-muted-foreground">タグがありません</div>
                                                 )}
                                               </div>
                                             </div>
@@ -2789,6 +2831,7 @@ export default function TablePage() {
           onSave={handleSaveTrade}
           defaultDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
           user={user}
+          availableTags={availableTags}
         />
 
         <TableSettingsDialog
