@@ -1057,6 +1057,8 @@ export default function TablePage() {
     };
   }, [editingCell, editingValues]);
 
+
+
   const filteredTrades = useMemo(() => {
     if (!selectedDate) return [];
     const dateString = format(selectedDate, "yyyy-MM-dd");
@@ -1319,7 +1321,12 @@ export default function TablePage() {
     const cellKey = `${id}-${field}`;
     let value = editingValues[cellKey];
     
-    if (value === undefined) return;
+    console.log('handleCellSave called:', { id, field, value, cellKey });
+    
+    if (value === undefined) {
+      console.log('Value is undefined, returning early');
+      return;
+    }
     
     // Convert datetime-local format back to ISO string for datetime fields
     if (field === 'entryTime' || field === 'exitTime') {
@@ -1346,7 +1353,10 @@ export default function TablePage() {
       valuesEqual = value === originalValue;
     }
     
+    console.log('Value comparison:', { value, originalValue, valuesEqual });
+    
     if (valuesEqual) {
+      console.log('No changes detected, exiting editing mode');
       // No changes made, just exit editing mode
       setEditingCell(null);
       setEditingValues(prev => {
@@ -1371,9 +1381,12 @@ export default function TablePage() {
     
     setSavingCells(prev => new Set(prev).add(cellKey));
     
+    console.log('Starting database save for field:', field);
+    
     try {
       // Handle special cases that need complex updates
       if (field === 'tags' || field === 'emotion') {
+        console.log('Calling handleSpecialFieldUpdate for:', field, 'with value:', value);
         await handleSpecialFieldUpdate(id, field, value);
       } else if (field === 'pair') {
         await handleSymbolUpdate(id, value);
@@ -1439,6 +1452,8 @@ export default function TablePage() {
   }, [editingValues, originalValues, user]);
 
   const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: any) => {
+    console.log('handleSpecialFieldUpdate called:', { id, field, value });
+    
     if (field === 'tags') {
       // Delete existing tags
       await supabase
@@ -1485,51 +1500,73 @@ export default function TablePage() {
         }
       }
     } else if (field === 'emotion') {
+      console.log('Processing emotion field with value:', value);
+      
       // Delete existing emotions
-      await supabase
+      console.log('Deleting existing emotion links for trade_id:', id);
+      const { error: deleteError } = await supabase
         .from("trade_emotion_links")
         .delete()
         .eq("trade_id", id);
       
+      if (deleteError) {
+        console.error('Error deleting existing emotions:', deleteError);
+        throw deleteError;
+      }
+      console.log('Successfully deleted existing emotion links');
+      
       // Add new emotions
       if (Array.isArray(value) && value.length > 0) {
-        for (const emotionName of value) {
-          // Get or create emotion
-          let { data: emotionData, error: emotionError } = await supabase
-            .from("emotions")
-            .select("id")
-            .eq("emotion", emotionName)
-            .eq("user_id", user!.id)
-            .single();
-          
-          let emotionId = null;
-          if (emotionError && emotionError.code === 'PGRST116') {
-            // Emotion doesn't exist, create it
-            const { data: newEmotion, error: createEmotionError } = await supabase
+        console.log('Adding new emotions:', value);
+                  for (const emotionName of value) {
+            console.log('Processing emotion:', emotionName);
+            
+            // Get or create emotion
+            let { data: emotionData, error: emotionError } = await supabase
               .from("emotions")
-              .insert([{ emotion: emotionName, user_id: user!.id }])
-              .select()
+              .select("id")
+              .eq("emotion", emotionName)
+              .eq("user_id", user!.id)
               .single();
             
-            if (createEmotionError) {
-              console.error("Error creating emotion:", createEmotionError);
+            let emotionId = null;
+            if (emotionError && emotionError.code === 'PGRST116') {
+              console.log('Emotion not found, creating new emotion:', emotionName);
+              // Emotion doesn't exist, create it
+              const { data: newEmotion, error: createEmotionError } = await supabase
+                .from("emotions")
+                .insert([{ emotion: emotionName, user_id: user!.id }])
+                .select()
+                .single();
+              
+              if (createEmotionError) {
+                console.error("Error creating emotion:", createEmotionError);
+                continue;
+              }
+              emotionId = newEmotion.id;
+              console.log('Created new emotion with ID:', emotionId);
+            } else if (emotionError) {
+              console.error("Error finding emotion:", emotionError);
               continue;
+            } else if (emotionData) {
+              emotionId = emotionData.id;
+              console.log('Found existing emotion with ID:', emotionId);
             }
-            emotionId = newEmotion.id;
-          } else if (emotionError) {
-            console.error("Error finding emotion:", emotionError);
-            continue;
-          } else if (emotionData) {
-            emotionId = emotionData.id;
+            
+            if (emotionId) {
+              console.log('Creating emotion link for trade_id:', id, 'emotion_id:', emotionId);
+              // Create link
+              const { error: linkError } = await supabase
+                .from("trade_emotion_links")
+                .insert([{ trade_id: id, emotion_id: emotionId }]);
+              
+              if (linkError) {
+                console.error('Error creating emotion link:', linkError);
+                throw linkError;
+              }
+              console.log('Successfully created emotion link');
+            }
           }
-          
-          if (emotionId) {
-            // Create link
-            await supabase
-              .from("trade_emotion_links")
-              .insert([{ trade_id: id, emotion_id: emotionId }]);
-          }
-        }
       }
     }
   };
@@ -1580,10 +1617,13 @@ export default function TablePage() {
   };
 
   const handleCellBlur = useCallback(() => {
+    console.log('handleCellBlur called, editingCell:', editingCell);
     if (editingCell) {
       const cellKey = `${editingCell.id}-${editingCell.field}`;
       const currentValue = editingValues[cellKey];
       const originalValue = originalValues[cellKey];
+      
+      console.log('Blur values:', { cellKey, currentValue, originalValue });
       
       // Check if values are equal (handle arrays properly)
       let valuesEqual = false;
@@ -1615,11 +1655,33 @@ export default function TablePage() {
           return newValues;
         });
       } else {
+        console.log('Changes detected, calling handleCellSave');
         // Changes were made, save them
         handleCellSave(editingCell.id, editingCell.field);
       }
     }
   }, [editingCell, editingValues, originalValues, handleCellSave]);
+
+  // Global click handler for emotions container
+  useEffect(() => {
+    const handleGlobalClick = (event: MouseEvent) => {
+      if (editingCell && editingCell.field === 'emotion') {
+        const target = event.target as Element;
+        const emotionsContainer = document.querySelector('[data-emotions-container="true"]');
+        
+        if (emotionsContainer && !emotionsContainer.contains(target)) {
+          console.log('Global click detected outside emotions container');
+          handleCellBlur();
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleGlobalClick);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClick);
+    };
+  }, [editingCell, handleCellBlur]);
 
   const handleCellKeyDown = useCallback((e: React.KeyboardEvent, id: number, field: keyof Trade) => {
     if (e.key === 'Enter') {
@@ -2562,13 +2624,10 @@ export default function TablePage() {
                                         ) : column.type === "emotions" ? (
                                           <div 
                                             className="space-y-2" 
+                                            data-emotions-container="true"
+                                            tabIndex={-1}
                                             onClick={(e) => e.stopPropagation()}
-                                            onBlur={(e) => {
-                                              // Only blur if clicking outside the entire emotions container
-                                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                                handleCellBlur();
-                                              }
-                                            }}
+                                            onBlur={handleCellBlur}
                                           >
                                             <div className="mb-2">
                                               <div className="text-sm text-muted-foreground mb-1">感情を選択:</div>
