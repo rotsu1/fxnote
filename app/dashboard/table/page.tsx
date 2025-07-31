@@ -748,6 +748,9 @@ export default function TablePage() {
   // Add state for availableTags (array of { id, tag_name })
   const [availableTags, setAvailableTags] = useState<{ id: number, tag_name: string }[]>([]);
 
+  // Add isComposing state for IME handling in notes editing
+  const [isComposing, setIsComposing] = useState(false);
+
   // Load tags from trade_tags for the current user
   useEffect(() => {
     if (!user) return;
@@ -2540,11 +2543,16 @@ export default function TablePage() {
                                         ) : column.type === "textarea" ? (
                                           <Textarea
                                             value={String(value)}
-                                            onChange={(e) =>
-                                              handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                                            }
-                                            onBlur={handleCellBlur}
-                                            onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                            onChange={(e) => handleCellChange(trade.id, column.id as keyof Trade, e.target.value)}
+                                            onBlur={(e) => {
+                                              if (!isComposing) handleCellBlur(e);
+                                            }}
+                                            onKeyDown={(e) => {
+                                              if (isComposing) return;
+                                              handleCellKeyDown(e, trade.id, column.id as keyof Trade);
+                                            }}
+                                            onCompositionStart={() => setIsComposing(true)}
+                                            onCompositionEnd={() => setIsComposing(false)}
                                             autoFocus
                                             rows={2}
                                             className="min-w-[150px]"
