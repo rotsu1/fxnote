@@ -767,6 +767,7 @@ export default function TablePage() {
   const [originalValues, setOriginalValues] = useState<Record<string, any>>({});
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Load symbols from database for table editing
   const loadSymbolsForTable = async () => {
@@ -1376,6 +1377,7 @@ export default function TablePage() {
         delete newValues[cellKey];
         return newValues;
       });
+      setIsSaving(false);
       return;
     }
     
@@ -1435,6 +1437,7 @@ export default function TablePage() {
         delete newValues[cellKey];
         return newValues;
       });
+      setIsSaving(false);
       
     } catch (error: any) {
       console.error("Error updating cell:", error);
@@ -1448,6 +1451,7 @@ export default function TablePage() {
         newSet.delete(cellKey);
         return newSet;
       });
+      setIsSaving(false);
     }
   }, [editingValues, originalValues, user]);
 
@@ -1618,7 +1622,7 @@ export default function TablePage() {
 
   const handleCellBlur = useCallback(() => {
     console.log('handleCellBlur called, editingCell:', editingCell);
-    if (editingCell) {
+    if (editingCell && !isSaving) {
       const cellKey = `${editingCell.id}-${editingCell.field}`;
       const currentValue = editingValues[cellKey];
       const originalValue = originalValues[cellKey];
@@ -1657,21 +1661,31 @@ export default function TablePage() {
       } else {
         console.log('Changes detected, calling handleCellSave');
         // Changes were made, save them
+        setIsSaving(true);
         handleCellSave(editingCell.id, editingCell.field);
       }
     }
-  }, [editingCell, editingValues, originalValues, handleCellSave]);
+  }, [editingCell, editingValues, originalValues, handleCellSave, isSaving]);
 
   // Global click handler for emotions container
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     const handleGlobalClick = (event: MouseEvent) => {
-      if (editingCell && editingCell.field === 'emotion') {
+      if (editingCell && editingCell.field === 'emotion' && !isSaving) {
         const target = event.target as Element;
         const emotionsContainer = document.querySelector('[data-emotions-container="true"]');
         
         if (emotionsContainer && !emotionsContainer.contains(target)) {
           console.log('Global click detected outside emotions container');
-          handleCellBlur();
+          // Clear any existing timeout
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          // Add a small delay to prevent multiple rapid calls
+          timeoutId = setTimeout(() => {
+            handleCellBlur();
+          }, 10);
         }
       }
     };
@@ -1680,8 +1694,11 @@ export default function TablePage() {
     
     return () => {
       document.removeEventListener('mousedown', handleGlobalClick);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
     };
-  }, [editingCell, handleCellBlur]);
+  }, [editingCell, handleCellBlur, isSaving]);
 
   const handleCellKeyDown = useCallback((e: React.KeyboardEvent, id: number, field: keyof Trade) => {
     if (e.key === 'Enter') {
