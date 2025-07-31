@@ -68,7 +68,7 @@ interface Trade {
   exit: number
   pips: number
   profit: number
-  emotion: string
+  emotion: string[]
   holdingTime: number
   holdingDays?: number
   holdingHours?: number
@@ -132,7 +132,7 @@ const allColumns = [
   { id: "exit", label: "エグジット", type: "number", defaultVisible: true, minWidth: "min-w-[140px]" },
   { id: "pips", label: "pips", type: "number", defaultVisible: true, minWidth: "min-w-[100px]" },
   { id: "profit", label: "損益 (¥)", type: "number", defaultVisible: true, minWidth: "min-w-[120px]" },
-  { id: "emotion", label: "感情", type: "select", options: emotions, defaultVisible: true, minWidth: "min-w-[120px]" },
+  { id: "emotion", label: "感情", type: "emotions", defaultVisible: true, minWidth: "min-w-[200px]" },
   { id: "holdingTime", label: "保有時間", type: "holdingTime", defaultVisible: true, minWidth: "min-w-[200px]" },
   { id: "notes", label: "メモ", type: "textarea", defaultVisible: true, minWidth: "min-w-[250px]" },
   { id: "tags", label: "タグ", type: "tags", defaultVisible: true, minWidth: "min-w-[200px]" },
@@ -166,7 +166,7 @@ function TradeEditDialog({
       exit: undefined,
       pips: undefined,
       profit: undefined,
-      emotion: "",
+      emotion: [],
       holdingTime: 0,
       notes: "",
       tags: [],
@@ -175,6 +175,8 @@ function TradeEditDialog({
   const [newTag, setNewTag] = useState("")
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([])
   const [loadingSymbols, setLoadingSymbols] = useState(false)
+  const [availableEmotions, setAvailableEmotions] = useState<string[]>([])
+  const [loadingEmotions, setLoadingEmotions] = useState(false)
 
   // Load symbols from database
   const loadSymbolsFromDatabase = async () => {
@@ -201,8 +203,35 @@ function TradeEditDialog({
     }
   }
 
+  // Load emotions from database
+  const loadEmotionsFromDatabase = async () => {
+    if (!user) return
+    
+    setLoadingEmotions(true)
+    try {
+      const { data, error } = await supabase
+        .from("emotions")
+        .select("emotion")
+        .eq("user_id", user.id)
+        .order("emotion")
+      
+      if (error) {
+        console.error("Error loading emotions:", error)
+        return
+      }
+      
+      const emotions = data?.map(item => item.emotion) || []
+      setAvailableEmotions(emotions)
+    } catch (error) {
+      console.error("Error loading emotions:", error)
+    } finally {
+      setLoadingEmotions(false)
+    }
+  }
+
   useEffect(() => {
     loadSymbolsFromDatabase()
+    loadEmotionsFromDatabase()
   }, [user])
 
   useEffect(() => {
@@ -218,7 +247,7 @@ function TradeEditDialog({
         exit: undefined,
         pips: undefined,
         profit: undefined,
-        emotion: "",
+        emotion: [],
         holdingTime: 0,
         notes: "",
         tags: [],
@@ -405,19 +434,36 @@ function TradeEditDialog({
           </div>
 
           <div>
-            <Label htmlFor="emotion">感情</Label>
-            <Select value={formData.emotion} onValueChange={(value) => setFormData({ ...formData, emotion: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {emotions.map((e) => (
-                  <SelectItem key={e} value={e}>
-                    {e}
-                  </SelectItem>
+            <Label>感情</Label>
+            <div className="mb-3">
+              <div className="text-sm text-muted-foreground mb-2">既存の感情から選択:</div>
+              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
+                {availableEmotions.map((emotion, index) => (
+                  <Badge
+                    key={index}
+                    variant={formData.emotion?.includes(emotion) ? "default" : "outline"}
+                    className="cursor-pointer text-xs"
+                    onClick={() => {
+                      if (!formData.emotion?.includes(emotion)) {
+                        setFormData({ ...formData, emotion: [...(formData.emotion || []), emotion] })
+                      }
+                    }}
+                  >
+                    {emotion}
+                  </Badge>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-1">
+              {formData.emotion?.map((emotion: string, index: number) => (
+                <Badge key={index} variant="default" className="cursor-pointer" onClick={() => {
+                  setFormData({ ...formData, emotion: (formData.emotion || []).filter((e: string) => e !== emotion) })
+                }}>
+                  {emotion} ×
+                </Badge>
+              ))}
+            </div>
           </div>
 
           <div>
@@ -720,6 +766,7 @@ export default function TablePage() {
   const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
   const [originalValues, setOriginalValues] = useState<Record<string, any>>({});
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
+  const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
 
   // Load symbols from database for table editing
   const loadSymbolsForTable = async () => {
@@ -754,11 +801,37 @@ export default function TablePage() {
     }
   }
 
+  // Load emotions from database for table editing
+  const loadEmotionsForTable = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from("emotions")
+        .select("emotion")
+        .eq("user_id", user.id)
+        .order("emotion")
+      
+      if (error) {
+        console.error("Error loading emotions for table:", error)
+        return
+      }
+      
+      const emotions = data?.map(item => item.emotion) || []
+      setAvailableEmotions(emotions)
+    } catch (error) {
+      console.error("Error loading emotions for table:", error)
+    }
+  }
+
   useEffect(() => {
     if (!user) return;
     
     // Load symbols for table editing
     loadSymbolsForTable();
+    
+    // Load emotions for table editing
+    loadEmotionsForTable();
     
     const loadTrades = async () => {
       setLoading(true);
@@ -867,10 +940,11 @@ export default function TablePage() {
           return acc;
         }, {});
 
-        const emotionsByTradeId = (emotionLinksData || []).reduce((acc: Record<number, string>, link: any) => {
+        const emotionsByTradeId = (emotionLinksData || []).reduce((acc: Record<number, string[]>, link: any) => {
           // Only include emotions for trades that belong to the current user
           if (userTradeIds.has(link.trade_id)) {
-            acc[link.trade_id] = link.emotions.emotion;
+            if (!acc[link.trade_id]) acc[link.trade_id] = [];
+            acc[link.trade_id].push(link.emotions.emotion);
           }
           return acc;
         }, {});
@@ -936,7 +1010,7 @@ export default function TablePage() {
             exit: trade.exit_price,
             pips: trade.pips || 0,
             profit: trade.profit_loss,
-            emotion: emotionsByTradeId[trade.id] || "",
+            emotion: emotionsByTradeId[trade.id] || [],
             holdingTime: trade.hold_time || 0,
             notes: trade.trade_memo || "",
             tags: tagsByTradeId[trade.id] || [],
@@ -1264,7 +1338,15 @@ export default function TablePage() {
     
     // Check if value actually changed
     const originalValue = originalValues[cellKey];
-    if (value === originalValue) {
+    let valuesEqual = false;
+    if (Array.isArray(value) && Array.isArray(originalValue)) {
+      valuesEqual = value.length === originalValue.length && 
+                   value.every((item, index) => item === originalValue[index]);
+    } else {
+      valuesEqual = value === originalValue;
+    }
+    
+    if (valuesEqual) {
       // No changes made, just exit editing mode
       setEditingCell(null);
       setEditingValues(prev => {
@@ -1403,47 +1485,50 @@ export default function TablePage() {
         }
       }
     } else if (field === 'emotion') {
-      // Delete existing emotion
+      // Delete existing emotions
       await supabase
         .from("trade_emotion_links")
         .delete()
         .eq("trade_id", id);
       
-      if (value) {
-        // Get or create emotion
-        let { data: emotionData, error: emotionError } = await supabase
-          .from("emotions")
-          .select("id")
-          .eq("emotion", value)
-          .eq("user_id", user!.id)
-          .single();
-        
-        let emotionId = null;
-        if (emotionError && emotionError.code === 'PGRST116') {
-          // Emotion doesn't exist, create it
-          const { data: newEmotion, error: createEmotionError } = await supabase
+      // Add new emotions
+      if (Array.isArray(value) && value.length > 0) {
+        for (const emotionName of value) {
+          // Get or create emotion
+          let { data: emotionData, error: emotionError } = await supabase
             .from("emotions")
-            .insert([{ emotion: value, user_id: user!.id }])
-            .select()
+            .select("id")
+            .eq("emotion", emotionName)
+            .eq("user_id", user!.id)
             .single();
           
-          if (createEmotionError) {
-            console.error("Error creating emotion:", createEmotionError);
-            throw createEmotionError;
+          let emotionId = null;
+          if (emotionError && emotionError.code === 'PGRST116') {
+            // Emotion doesn't exist, create it
+            const { data: newEmotion, error: createEmotionError } = await supabase
+              .from("emotions")
+              .insert([{ emotion: emotionName, user_id: user!.id }])
+              .select()
+              .single();
+            
+            if (createEmotionError) {
+              console.error("Error creating emotion:", createEmotionError);
+              continue;
+            }
+            emotionId = newEmotion.id;
+          } else if (emotionError) {
+            console.error("Error finding emotion:", emotionError);
+            continue;
+          } else if (emotionData) {
+            emotionId = emotionData.id;
           }
-          emotionId = newEmotion.id;
-        } else if (emotionError) {
-          console.error("Error finding emotion:", emotionError);
-          throw emotionError;
-        } else if (emotionData) {
-          emotionId = emotionData.id;
-        }
-        
-        if (emotionId) {
-          // Create link
-          await supabase
-            .from("trade_emotion_links")
-            .insert([{ trade_id: id, emotion_id: emotionId }]);
+          
+          if (emotionId) {
+            // Create link
+            await supabase
+              .from("trade_emotion_links")
+              .insert([{ trade_id: id, emotion_id: emotionId }]);
+          }
         }
       }
     }
@@ -1500,8 +1585,17 @@ export default function TablePage() {
       const currentValue = editingValues[cellKey];
       const originalValue = originalValues[cellKey];
       
+      // Check if values are equal (handle arrays properly)
+      let valuesEqual = false;
+      if (Array.isArray(currentValue) && Array.isArray(originalValue)) {
+        valuesEqual = currentValue.length === originalValue.length && 
+                     currentValue.every((item, index) => item === originalValue[index]);
+      } else {
+        valuesEqual = currentValue === originalValue;
+      }
+      
       // If no changes were made, just exit editing mode
-      if (currentValue === originalValue) {
+      if (valuesEqual) {
         setEditingCell(null);
         setEditingValues(prev => {
           const newValues = { ...prev };
@@ -1687,47 +1781,51 @@ export default function TablePage() {
           }
         }
         
-        // Update emotion
+        // Update emotions
         if (tradeData.emotion) {
-          // Delete existing emotion
+          // Delete existing emotions
           await supabase
             .from("trade_emotion_links")
             .delete()
             .eq("trade_id", editingTrade.id);
           
-          // Get or create emotion
-          let { data: emotionData, error: emotionError } = await supabase
-            .from("emotions")
-            .select("id")
-            .eq("emotion", tradeData.emotion)
-            .eq("user_id", user.id)
-            .single();
-          
-          let emotionId = null;
-          if (emotionError && emotionError.code === 'PGRST116') {
-            // Emotion doesn't exist, create it
-            const { data: newEmotion, error: createEmotionError } = await supabase
+          // Add new emotions
+          for (const emotionName of tradeData.emotion) {
+            // Get or create emotion
+            let { data: emotionData, error: emotionError } = await supabase
               .from("emotions")
-              .insert([{ emotion: tradeData.emotion, user_id: user.id }])
-              .select()
+              .select("id")
+              .eq("emotion", emotionName)
+              .eq("user_id", user.id)
               .single();
             
-            if (createEmotionError) {
-              console.error("Error creating emotion:", createEmotionError);
-            } else {
+            let emotionId = null;
+            if (emotionError && emotionError.code === 'PGRST116') {
+              // Emotion doesn't exist, create it
+              const { data: newEmotion, error: createEmotionError } = await supabase
+                .from("emotions")
+                .insert([{ emotion: emotionName, user_id: user.id }])
+                .select()
+                .single();
+              
+              if (createEmotionError) {
+                console.error("Error creating emotion:", createEmotionError);
+                continue;
+              }
               emotionId = newEmotion.id;
-            }
-                      } else if (emotionError) {
+            } else if (emotionError) {
               console.error("Error finding emotion:", emotionError);
+              continue;
             } else if (emotionData) {
               emotionId = emotionData.id;
             }
-          
-          if (emotionId) {
-            // Create link
-            await supabase
-              .from("trade_emotion_links")
-              .insert([{ trade_id: editingTrade.id, emotion_id: emotionId }]);
+            
+            if (emotionId) {
+              // Create link
+              await supabase
+                .from("trade_emotion_links")
+                .insert([{ trade_id: editingTrade.id, emotion_id: emotionId }]);
+            }
           }
         }
         
@@ -1803,41 +1901,44 @@ export default function TablePage() {
             }
           }
           
-          // Add emotion
+          // Add emotions
           if (tradeData.emotion) {
-            // Get or create emotion
-            let { data: emotionData, error: emotionError } = await supabase
-              .from("emotions")
-              .select("id")
-              .eq("emotion", tradeData.emotion)
-              .eq("user_id", user.id)
-              .single();
-            
-            let emotionId = null;
-            if (emotionError && emotionError.code === 'PGRST116') {
-              // Emotion doesn't exist, create it
-              const { data: newEmotion, error: createEmotionError } = await supabase
+            for (const emotionName of tradeData.emotion) {
+              // Get or create emotion
+              let { data: emotionData, error: emotionError } = await supabase
                 .from("emotions")
-                .insert([{ emotion: tradeData.emotion, user_id: user.id }])
-                .select()
+                .select("id")
+                .eq("emotion", emotionName)
+                .eq("user_id", user.id)
                 .single();
               
-              if (createEmotionError) {
-                console.error("Error creating emotion:", createEmotionError);
-              } else {
+              let emotionId = null;
+              if (emotionError && emotionError.code === 'PGRST116') {
+                // Emotion doesn't exist, create it
+                const { data: newEmotion, error: createEmotionError } = await supabase
+                  .from("emotions")
+                  .insert([{ emotion: emotionName, user_id: user.id }])
+                  .select()
+                  .single();
+                
+                if (createEmotionError) {
+                  console.error("Error creating emotion:", createEmotionError);
+                  continue;
+                }
                 emotionId = newEmotion.id;
+              } else if (emotionError) {
+                console.error("Error finding emotion:", emotionError);
+                continue;
+              } else if (emotionData) {
+                emotionId = emotionData.id;
               }
-            } else if (emotionError) {
-              console.error("Error finding emotion:", emotionError);
-            } else if (emotionData) {
-              emotionId = emotionData.id;
-            }
-            
-            if (emotionId) {
-              // Create link
-              await supabase
-                .from("trade_emotion_links")
-                .insert([{ trade_id: newTradeId, emotion_id: emotionId }]);
+              
+              if (emotionId) {
+                // Create link
+                await supabase
+                  .from("trade_emotion_links")
+                  .insert([{ trade_id: newTradeId, emotion_id: emotionId }]);
+              }
             }
           }
           
@@ -2126,6 +2227,17 @@ export default function TablePage() {
           {value.map((tag, idx) => (
             <Badge key={idx} variant="outline" className="text-xs">
               {tag}
+            </Badge>
+          ))}
+        </div>
+      );
+    }
+    if (column.id === "emotion" && Array.isArray(value)) {
+      return (
+        <div className="flex flex-wrap gap-1">
+          {value.map((emotion, idx) => (
+            <Badge key={idx} variant="outline" className="text-xs">
+              {emotion}
             </Badge>
           ))}
         </div>
@@ -2446,6 +2558,48 @@ export default function TablePage() {
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={isSaving}
                                             />
+                                          </div>
+                                        ) : column.type === "emotions" ? (
+                                          <div 
+                                            className="space-y-2" 
+                                            onClick={(e) => e.stopPropagation()}
+                                            onBlur={(e) => {
+                                              // Only blur if clicking outside the entire emotions container
+                                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                                handleCellBlur();
+                                              }
+                                            }}
+                                          >
+                                            <div className="mb-2">
+                                              <div className="text-sm text-muted-foreground mb-1">感情を選択:</div>
+                                              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
+                                                {availableEmotions.map((emotion, index) => (
+                                                  <Badge
+                                                    key={index}
+                                                    variant={Array.isArray(value) && value.includes(emotion) ? "default" : "outline"}
+                                                    className="cursor-pointer text-xs"
+                                                    onClick={(e) => {
+                                                      e.stopPropagation();
+                                                      const currentEmotions = Array.isArray(value) ? value : [];
+                                                      if (currentEmotions.includes(emotion)) {
+                                                        // Remove emotion if already selected
+                                                        const newEmotions = currentEmotions.filter((e: string) => e !== emotion);
+                                                        handleCellChange(trade.id, column.id as keyof Trade, newEmotions);
+                                                      } else {
+                                                        // Add emotion if not selected
+                                                        const newEmotions = [...currentEmotions, emotion];
+                                                        handleCellChange(trade.id, column.id as keyof Trade, newEmotions);
+                                                      }
+                                                    }}
+                                                  >
+                                                    {emotion}
+                                                  </Badge>
+                                                ))}
+                                                {availableEmotions.length === 0 && (
+                                                  <div className="text-xs text-muted-foreground">感情がありません</div>
+                                                )}
+                                              </div>
+                                            </div>
                                           </div>
                                         ) : (
                                           <Input
