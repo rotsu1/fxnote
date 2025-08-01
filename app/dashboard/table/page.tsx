@@ -704,7 +704,7 @@ function TradeEditDialog({
                 id="entry"
                 type="number"
                   step="0.0001"
-                value={formData.entry}
+                value={formData.entry ?? ""}
                   onChange={(e) => handleFormChange({ entry: Number.parseFloat(e.target.value) })}
                   className="no-spinner"
               />
@@ -715,7 +715,7 @@ function TradeEditDialog({
                 id="exit"
                 type="number"
                   step="0.0001"
-                value={formData.exit}
+                value={formData.exit ?? ""}
                   onChange={(e) => handleFormChange({ exit: Number.parseFloat(e.target.value) })}
                   className="no-spinner"
               />
@@ -729,7 +729,7 @@ function TradeEditDialog({
                 id="lot"
                 type="number"
                 step="0.01"
-                value={formData.lot}
+                value={formData.lot ?? ""}
                 onChange={(e) => handleFormChange({ lot: Number.parseFloat(e.target.value) })}
                 placeholder="0.01"
                 className="no-spinner"
@@ -741,7 +741,7 @@ function TradeEditDialog({
                 id="pips"
                 type="number"
                 step="0.1"
-                value={formData.pips}
+                value={formData.pips ?? ""}
                 onChange={(e) => handleFormChange({ pips: Number.parseFloat(e.target.value) })}
                 className="no-spinner"
               />
@@ -754,7 +754,7 @@ function TradeEditDialog({
               <Input
                   id="profit"
                   type="number"
-                  value={formData.profit}
+                  value={formData.profit ?? ""}
                   onChange={(e) => handleFormChange({ profit: Number.parseFloat(e.target.value) })}
                   className="no-spinner"
               />
