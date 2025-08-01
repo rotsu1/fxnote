@@ -1159,7 +1159,7 @@ function TradeEditDialog({
                 </SelectTrigger>
                 <SelectContent>
                   {loadingSymbols ? (
-                    <SelectItem value="" disabled>読み込み中...</SelectItem>
+                    <SelectItem value="loading" disabled>読み込み中...</SelectItem>
                   ) : availableSymbols.length > 0 ? (
                     availableSymbols.map((symbol) => (
                       <SelectItem key={symbol} value={symbol}>
@@ -1167,7 +1167,7 @@ function TradeEditDialog({
                       </SelectItem>
                     ))
                   ) : (
-                    <SelectItem value="" disabled>シンボルがありません</SelectItem>
+                    <SelectItem value="no-symbols" disabled>シンボルがありません</SelectItem>
                   )}
                 </SelectContent>
               </Select>
