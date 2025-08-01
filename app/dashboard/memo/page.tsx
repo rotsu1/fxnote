@@ -5,10 +5,8 @@ import {
   FileText,
   Plus,
   Search,
-  Tag,
   Edit,
   Trash2,
-  Download,
   Grid3X3,
   MoreHorizontal,
   CalendarIcon,
@@ -19,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
@@ -33,7 +31,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -48,8 +45,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
 
-// Remove hardcoded availableTags
-
 function MemoCard({
   memo,
   onEdit,
@@ -62,9 +57,6 @@ function MemoCard({
   const truncateContent = (content: string, maxLength = 120) => {
     return content.length > maxLength ? content.substring(0, maxLength) + "..." : content
   }
-
-  // Ensure tags is always an array
-  const memoTags = Array.isArray(memo.tags) ? memo.tags : [];
 
   return (
     <Card className="h-full hover:shadow-md transition-shadow">
@@ -94,19 +86,7 @@ function MemoCard({
         </div>
       </CardHeader>
       <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground mb-3 line-clamp-4">{truncateContent(memo.content)}</p>
-        <div className="flex flex-wrap gap-1">
-          {memoTags.slice(0, 3).map((tag: string, index: number) => (
-            <Badge key={index} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-          {memoTags.length > 3 && (
-            <Badge variant="outline" className="text-xs">
-              +{memoTags.length - 3}
-            </Badge>
-          )}
-        </div>
+        <p className="text-sm text-muted-foreground line-clamp-4">{truncateContent(memo.content)}</p>
       </CardContent>
     </Card>
   )
@@ -117,33 +97,27 @@ function MemoEditDialog({
   isOpen,
   onClose,
   onSave,
-  availableTags,
 }: {
   memo: any
   isOpen: boolean
   onClose: () => void
   onSave: (memo: any) => void
-  availableTags: string[]
 }) {
   const [formData, setFormData] = useState<{
     title: string;
     content: string;
-    tags: string[];
     note_date: Date | undefined;
   }>(
     memo ? {
       title: memo.title || "",
       content: memo.content || "",
-      tags: memo.tags || [],
       note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
     } : {
       title: "",
       content: "",
-      tags: [],
       note_date: new Date(),
     },
   )
-  const [newTag, setNewTag] = useState("")
 
   // Sync formData when memo prop changes
   useEffect(() => {
@@ -151,33 +125,14 @@ function MemoEditDialog({
       memo ? {
         title: memo.title || "",
         content: memo.content || "",
-        tags: memo.tags || [],
         note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
       } : {
         title: "",
         content: "",
-        tags: [],
         note_date: new Date(),
       },
     )
   }, [memo])
-
-  const addTag = () => {
-    if (newTag && !formData.tags.includes(newTag)) {
-      setFormData({ ...formData, tags: [...formData.tags, newTag] })
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData({ ...formData, tags: formData.tags.filter((tag: string) => tag !== tagToRemove) })
-  }
-
-  const addExistingTag = (tag: string) => {
-    if (!formData.tags.includes(tag)) {
-      setFormData({ ...formData, tags: [...formData.tags, tag] })
-    }
-  }
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -233,45 +188,6 @@ function MemoEditDialog({
               placeholder="メモの内容を入力"
               rows={8}
             />
-          </div>
-
-          <div>
-            <Label>タグ</Label>
-            <div className="flex gap-2 mb-2">
-              <Input
-                placeholder="新しいタグ"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onKeyPress={(e) => e.key === "Enter" && addTag()}
-              />
-              <Button type="button" onClick={addTag}>
-                <Tag className="h-4 w-4" />
-              </Button>
-            </div>
-
-            <div className="mb-3">
-              <div className="text-sm text-muted-foreground mb-2">既存のタグから選択:</div>
-              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
-                {availableTags.map((tag: string, index: number) => (
-                  <Badge
-                    key={index}
-                    variant={(formData.tags || []).includes(tag) ? "default" : "outline"}
-                    className="cursor-pointer text-xs"
-                    onClick={() => addExistingTag(tag)}
-                  >
-                    {tag}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-1">
-              {(formData.tags || []).map((tag: string, index: number) => (
-                <Badge key={index} variant="default" className="cursor-pointer" onClick={() => removeTag(tag)}>
-                  {tag} ×
-                </Badge>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -336,12 +252,9 @@ function LayoutSettingsDialog({
 export default function MemoPage() {
   const user = useAuth();
   const [memos, setMemos] = useState<any[]>([]);
-  const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [selectedMemos, setSelectedMemos] = useState<number[]>([]);
   const [columns, setColumns] = useState(3);
   const [editingMemo, setEditingMemo] = useState<any>(null);
   const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false);
@@ -349,35 +262,14 @@ export default function MemoPage() {
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
-  useEffect(() => {
-    if (!user) return;
-    setLoading(true);
-    setError("");
-    
-    // Fetch tags from note_tags table
-    supabase
-      .from("note_tags")
-      .select("tag_name")
-      .eq("user_id", user.id)
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-          setAvailableTags([]);
-        } else {
-          const tags = (data || []).map((item: any) => item.tag_name).sort();
-          setAvailableTags(tags);
-        }
-        setLoading(false);
-      });
-  }, [user]);
+
 
   useEffect(() => {
     if (!user) return;
     
-    // Fetch notes with their tags from note_tag_links
-    const fetchNotesWithTags = async () => {
+    const fetchNotes = async () => {
       try {
-        // First fetch all notes
+        // Fetch all notes
         const { data: notesData, error: notesError } = await supabase
           .from("notes")
           .select("*")
@@ -386,61 +278,31 @@ export default function MemoPage() {
 
         if (notesError) throw notesError;
 
-        // Then fetch all tag links for these notes
-        const noteIds = notesData?.map(note => note.id) || [];
-        const { data: tagLinksData, error: tagLinksError } = await supabase
-          .from("note_tag_links")
-          .select(`
-            note_id,
-            note_tags!inner(tag_name)
-          `)
-          .in("note_id", noteIds);
-
-        if (tagLinksError) throw tagLinksError;
-
-        // Group tags by note_id
-        const tagsByNoteId: Record<number, string[]> = {};
-        tagLinksData?.forEach(link => {
-          const noteId = link.note_id;
-          const tagName = (link.note_tags as any)?.tag_name;
-          if (noteId && tagName) {
-            if (!tagsByNoteId[noteId]) {
-              tagsByNoteId[noteId] = [];
-            }
-            tagsByNoteId[noteId].push(tagName);
-          }
-        });
-
-        // Combine notes with their tags
-        const notesWithTags = notesData?.map(note => ({
+        // Process notes with dates
+        const processedNotes = notesData?.map(note => ({
           ...note,
-          tags: tagsByNoteId[note.id] || [],
           note_date: note.note_date ? new Date(note.note_date) : null
         })) || [];
 
-        console.log("Notes with tags:", notesWithTags);
-        setMemos(notesWithTags);
+        console.log("Notes:", processedNotes);
+        setMemos(processedNotes);
       } catch (error: any) {
-        console.error("Error fetching notes with tags:", error);
+        console.error("Error fetching notes:", error);
         setError(error.message);
         setMemos([]);
       }
     };
 
-    fetchNotesWithTags();
+    fetchNotes();
   }, [user]);
 
-  // Filter memos based on search and tags
+  // Filter memos based on search
   const filteredMemos = memos.filter((memo) => {
     const matchesSearch =
       memo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       memo.content.toLowerCase().includes(searchTerm.toLowerCase());
     
-    // Ensure tags is always an array
-    const memoTags = Array.isArray(memo.tags) ? memo.tags : (memo.tags ? JSON.parse(memo.tags) : []);
-    const matchesTags = selectedTags.length === 0 || selectedTags.some((tag) => memoTags.includes(tag));
-    
-    return matchesSearch && matchesTags;
+    return matchesSearch;
   });
 
   const handleEditMemo = (memo: any) => {
@@ -474,67 +336,6 @@ export default function MemoPage() {
           console.error("Error updating note:", updateError);
           throw updateError;
         }
-
-        // Delete existing tag links
-        const { error: deleteError } = await supabase
-          .from("note_tag_links")
-          .delete()
-          .eq("note_id", editingMemo.id);
-
-        if (deleteError) {
-          console.error("Error deleting existing tag links:", deleteError);
-          throw deleteError;
-        }
-
-        // Insert new tag links
-        if (memoData.tags && memoData.tags.length > 0) {
-          // First, get or create tags to get their IDs
-          const tagIds = [];
-          for (const tagName of memoData.tags) {
-            // Check if tag exists
-            let { data: existingTag } = await supabase
-              .from("note_tags")
-              .select("id")
-              .eq("user_id", user.id)
-              .eq("tag_name", tagName)
-              .single();
-
-            if (!existingTag) {
-              // Create new tag
-              const { data: newTag, error: tagError } = await supabase
-                .from("note_tags")
-                .insert([{
-                  user_id: user.id,
-                  tag_name: tagName
-                }])
-                .select("id")
-                .single();
-              
-              if (tagError) {
-                console.error("Error creating tag:", tagError);
-                throw tagError;
-              }
-              existingTag = newTag;
-            }
-            
-            tagIds.push(existingTag.id);
-          }
-
-          // Now insert the tag links with tag_ids
-          const tagLinks = tagIds.map((tagId: number) => ({
-            note_id: editingMemo.id,
-            tag_id: tagId
-          }));
-
-          const { error: insertError } = await supabase
-            .from("note_tag_links")
-            .insert(tagLinks);
-
-          if (insertError) {
-            console.error("Error inserting tag links:", insertError);
-            throw insertError;
-          }
-        }
         
         // Update local state
         setMemos(memos.map((m) => (m.id === editingMemo.id ? { ...m, ...memoData } : m)));
@@ -558,65 +359,13 @@ export default function MemoPage() {
         }
         
         if (newNote && newNote[0]) {
-          const noteId = newNote[0].id;
-          
-          // Insert tag links
-          if (memoData.tags && memoData.tags.length > 0) {
-            // First, get or create tags to get their IDs
-            const tagIds = [];
-            for (const tagName of memoData.tags) {
-              // Check if tag exists
-              let { data: existingTag } = await supabase
-                .from("note_tags")
-                .select("id")
-                .eq("user_id", user.id)
-                .eq("tag_name", tagName)
-                .single();
-
-              if (!existingTag) {
-                // Create new tag
-                const { data: newTag, error: tagError } = await supabase
-                  .from("note_tags")
-                  .insert([{
-                    user_id: user.id,
-                    tag_name: tagName
-                  }])
-                  .select("id")
-                  .single();
-                
-                if (tagError) {
-                  console.error("Error creating tag:", tagError);
-                  throw tagError;
-                }
-                existingTag = newTag;
-              }
-              
-              tagIds.push(existingTag.id);
-            }
-
-            // Now insert the tag links with tag_ids
-            const tagLinks = tagIds.map((tagId: number) => ({
-              note_id: noteId,
-              tag_id: tagId
-            }));
-
-            const { error: tagError } = await supabase
-              .from("note_tag_links")
-              .insert(tagLinks);
-
-            if (tagError) {
-              console.error("Error inserting tag links:", tagError);
-              throw tagError;
-            }
-          }
-
-          // Add tags to the note object for local state
-          const noteWithTags = {
+          // Add the new note to local state
+          const newNoteWithDate = {
             ...newNote[0],
-            tags: memoData.tags || []
+            note_date: newNote[0].note_date ? new Date(newNote[0].note_date) : null
           };
           
-          setMemos([noteWithTags, ...memos]);
+          setMemos([newNoteWithDate, ...memos]);
         }
       }
       setIsMemoDialogOpen(false);
@@ -641,15 +390,7 @@ export default function MemoPage() {
     if (!deleteConfirmId || !user) return;
     
     try {
-      // Delete tag links first
-      const { error: tagError } = await supabase
-        .from("note_tag_links")
-        .delete()
-        .eq("note_id", deleteConfirmId);
-      
-      if (tagError) throw tagError;
-
-      // Then delete the note
+      // Delete the note
       const { error } = await supabase
         .from("notes")
         .delete()
@@ -666,9 +407,7 @@ export default function MemoPage() {
     }
   };
 
-  const toggleTagFilter = (tag: string) => {
-    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
-  };
+
 
   const getGridColumns = () => {
     switch (columns) {
@@ -728,27 +467,7 @@ export default function MemoPage() {
                   </div>
                 </div>
 
-                {/* Tag Filter */}
-                <div>
-                  <div className="text-sm font-medium mb-2">タグでフィルター:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {availableTags.map((tag: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant={selectedTags.includes(tag) ? "default" : "outline"}
-                        className="cursor-pointer"
-                        onClick={() => toggleTagFilter(tag)}
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                    {selectedTags.length > 0 && (
-                      <Button variant="ghost" size="sm" onClick={() => setSelectedTags([])} className="h-6 px-2 text-xs">
-                        クリア
-                      </Button>
-                    )}
-                  </div>
-                </div>
+
               </div>
 
               {/* Results Info */}
@@ -782,7 +501,6 @@ export default function MemoPage() {
           isOpen={isMemoDialogOpen}
           onClose={() => setIsMemoDialogOpen(false)}
           onSave={handleSaveMemo}
-          availableTags={availableTags}
         />
 
         <LayoutSettingsDialog
