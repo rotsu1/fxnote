@@ -98,11 +98,19 @@ function MemoEditDialog({
   isOpen,
   onClose,
   onSave,
+  showExitWarning,
+  setShowExitWarning,
+  originalFormData,
+  onResetForm,
 }: {
   memo: any
   isOpen: boolean
   onClose: () => void
   onSave: (memo: any) => void
+  showExitWarning: boolean
+  setShowExitWarning: (show: boolean) => void
+  originalFormData: any
+  onResetForm: () => void
 }) {
   const [formData, setFormData] = useState<{
     title: string;
@@ -135,8 +143,43 @@ function MemoEditDialog({
     )
   }, [memo])
 
+  // Check if form has been modified
+  const hasFormChanged = () => {
+    if (!originalFormData) return false;
+    
+    return (
+      formData.title !== originalFormData.title ||
+      formData.content !== originalFormData.content ||
+      (formData.note_date && originalFormData.note_date && 
+       formData.note_date.getTime() !== originalFormData.note_date.getTime()) ||
+      (!formData.note_date && originalFormData.note_date) ||
+      (formData.note_date && !originalFormData.note_date)
+    );
+  };
+
+  // Handle close with warning if changes were made
+  const handleClose = () => {
+    if (hasFormChanged()) {
+      setShowExitWarning(true);
+    } else {
+      onClose();
+    }
+  };
+
+  // Reset form data to original state
+  const resetFormData = () => {
+    if (originalFormData) {
+      setFormData({
+        title: originalFormData.title,
+        content: originalFormData.content,
+        note_date: originalFormData.note_date,
+      });
+    }
+    onResetForm();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{memo ? "メモ編集" : "新規メモ"}</DialogTitle>
@@ -193,7 +236,7 @@ function MemoEditDialog({
         </div>
 
         <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
+          <Button variant="outline" onClick={handleClose}>
             キャンセル
           </Button>
           <Button onClick={() => onSave(formData)}>保存</Button>
@@ -263,6 +306,8 @@ export default function MemoPage() {
   const [isLayoutSettingsOpen, setIsLayoutSettingsOpen] = useState(false);
   const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [showExitWarning, setShowExitWarning] = useState(false);
+  const [originalFormData, setOriginalFormData] = useState<any>(null);
 
 
 
@@ -333,12 +378,27 @@ export default function MemoPage() {
 
   const handleEditMemo = (memo: any) => {
     setEditingMemo(memo);
+    setOriginalFormData({
+      title: memo.title || "",
+      content: memo.content || "",
+      note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
+    });
     setIsMemoDialogOpen(true);
   };
 
   const handleAddMemo = () => {
     setEditingMemo(null);
+    setOriginalFormData({
+      title: "",
+      content: "",
+      note_date: new Date(),
+    });
     setIsMemoDialogOpen(true);
+  };
+
+  const handleResetForm = () => {
+    // This function will be called when the form needs to be reset
+    // The actual reset is handled inside the MemoEditDialog component
   };
 
   const handleSaveMemo = async (memoData: any) => {
@@ -539,7 +599,43 @@ export default function MemoPage() {
           isOpen={isMemoDialogOpen}
           onClose={() => setIsMemoDialogOpen(false)}
           onSave={handleSaveMemo}
+          showExitWarning={showExitWarning}
+          setShowExitWarning={setShowExitWarning}
+          originalFormData={originalFormData}
+          onResetForm={handleResetForm}
         />
+
+        {/* Exit Warning Dialog */}
+        <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
+              <AlertDialogDescription>
+                保存されていない変更があります。この変更を破棄しますか？
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setShowExitWarning(false)}>
+                キャンセル
+              </AlertDialogCancel>
+              <AlertDialogAction onClick={() => {
+                setShowExitWarning(false);
+                // Reset form data to original state before closing
+                if (originalFormData) {
+                  setEditingMemo({
+                    ...editingMemo,
+                    title: originalFormData.title,
+                    content: originalFormData.content,
+                    note_date: originalFormData.note_date,
+                  });
+                }
+                setIsMemoDialogOpen(false);
+              }}>
+                破棄
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <LayoutSettingsDialog
           isOpen={isLayoutSettingsOpen}
