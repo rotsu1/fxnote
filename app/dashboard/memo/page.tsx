@@ -147,6 +147,15 @@ function MemoEditDialog({
   const hasFormChanged = () => {
     if (!originalFormData) return false;
     
+    // For new memos, check if user has entered any content
+    if (!memo) {
+      return (
+        formData.title.trim() !== "" ||
+        formData.content.trim() !== ""
+      );
+    }
+    
+    // For existing memos, check if values have changed
     return (
       formData.title !== originalFormData.title ||
       formData.content !== originalFormData.content ||
