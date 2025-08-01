@@ -342,32 +342,6 @@ function TradeEditDialog({
     }
   }, [formData.entryTime, formData.exitTime])
 
-  const addTag = () => {
-    if (newTag && !formData.tags?.includes(newTag)) {
-      setFormData({ ...formData, tags: [...(formData.tags || []), newTag] })
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData({ ...formData, tags: (formData.tags || []).filter((tag: string) => tag !== tagToRemove) })
-  }
-
-  const addExistingTag = (tag: string) => {
-    if (!formData.tags?.includes(tag)) {
-      setFormData({ ...formData, tags: [...(formData.tags || []), tag] })
-    }
-  }
-
-  const toggleTag = (tag: string) => {
-    const currentTags = formData.tags || []
-    if (currentTags.includes(tag)) {
-      setFormData({ ...formData, tags: currentTags.filter(t => t !== tag) })
-    } else {
-      setFormData({ ...formData, tags: [...currentTags, tag] })
-    }
-  }
-
   const addNewTagToDatabase = async (tagName: string) => {
     if (!tagName.trim() || !user) return
     
@@ -816,7 +790,7 @@ function TradeEditDialog({
             </div>
           </div>
 
-                      <div>
+          <div>
             <Label>保有時間</Label>
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -877,7 +851,7 @@ function TradeEditDialog({
 
             <div>
               <div className="flex items-center justify-between mb-2">
-            <Label>タグ</Label>
+                <Label>タグ</Label>
                 <Button 
                   type="button" 
                   variant="outline" 

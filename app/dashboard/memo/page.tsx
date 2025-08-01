@@ -35,12 +35,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Separator } from "@/components/ui/separator"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  AppSidebar,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
@@ -305,8 +300,6 @@ function LayoutSettingsDialog({
 export default function MemoPage() {
   const user = useAuth();
   const [memos, setMemos] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<string>("updated_at_desc");
   const [columns, setColumns] = useState(3);
@@ -343,7 +336,6 @@ export default function MemoPage() {
         setMemos(processedNotes);
       } catch (error: any) {
         console.error("Error fetching notes:", error);
-        setError(error.message);
         setMemos([]);
       }
     };
@@ -472,7 +464,6 @@ export default function MemoPage() {
         hint: error.hint,
         code: error.code
       });
-      setError(error.message || "メモの保存中にエラーが発生しました");
     }
   };
 
@@ -497,7 +488,6 @@ export default function MemoPage() {
       setDeleteConfirmId(null);
     } catch (error: any) {
       console.error("Error deleting memo:", error);
-      setError(error.message);
     }
   };
 
@@ -531,12 +521,6 @@ export default function MemoPage() {
         </header>
 
         <main className="flex-1 p-4 md:p-6">
-          {loading ? (
-            <div className="text-center py-10">読み込み中...</div>
-          ) : error ? (
-            <div className="text-center text-red-600 py-10">{error}</div>
-          ) : (
-            <>
               {/* Search and Filter Bar */}
               <div className="mb-6 space-y-4">
                 <div className="flex flex-col sm:flex-row gap-4">
@@ -592,8 +576,6 @@ export default function MemoPage() {
                   </Button>
                 </div>
               )}
-            </>
-          )}
         </main>
 
         {/* Dialogs */}

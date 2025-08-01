@@ -33,12 +33,7 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  AppSidebar,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -64,32 +59,6 @@ interface Trade {
   notes?: string
   tags: string[]
 }
-
-const availableTags = [
-  "USD/JPY",
-  "EUR/USD",
-  "GBP/JPY",
-  "AUD/USD",
-  "スキャルピング",
-  "デイトレード",
-  "スイング",
-  "ブレイクアウト",
-  "レンジブレイク",
-  "押し目買い",
-  "逆張り",
-  "トレンド",
-  "レンジ",
-  "興奮",
-  "焦り",
-  "冷静",
-  "満足",
-  "後悔",
-  "朝",
-  "昼",
-  "夜",
-  "失敗",
-  "成功",
-]
 
 // Remove the hardcoded emotions array since we'll load from database
 
@@ -261,7 +230,6 @@ function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1);
-  const lastDay = new Date(year, month + 1, 0);
   const startDate = new Date(firstDay);
   startDate.setDate(startDate.getDate() - firstDay.getDay());
 
@@ -324,12 +292,6 @@ function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate
       </div>
     </div>
   );
-}
-
-function getJapaneseTradeType(type: string | number) {
-  if (type === "buy" || type === 0) return "買い";
-  if (type === "sell" || type === 1) return "売り";
-  return type;
 }
 
 function TradeCard({
@@ -826,32 +788,6 @@ function TradeEditDialog({
       }));
     }
   }, [formData.entryDateTime, formData.exitDateTime])
-
-  const addTag = () => {
-    if (newTag && !formData.tags?.includes(newTag)) {
-      setFormData({ ...formData, tags: [...(formData.tags || []), newTag] })
-      setNewTag("")
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    setFormData({ ...formData, tags: (formData.tags || []).filter((tag: string) => tag !== tagToRemove) })
-  }
-
-  const addExistingTag = (tag: string) => {
-    if (!formData.tags?.includes(tag)) {
-      setFormData({ ...formData, tags: [...(formData.tags || []), tag] })
-    }
-  }
-
-  const toggleTag = (tag: string) => {
-    const currentTags = formData.tags || []
-    if (currentTags.includes(tag)) {
-      setFormData({ ...formData, tags: currentTags.filter(t => t !== tag) })
-    } else {
-      setFormData({ ...formData, tags: [...currentTags, tag] })
-    }
-  }
 
   const addNewTagToDatabase = async (tagName: string) => {
     if (!tagName.trim() || !user) return
@@ -2395,7 +2331,6 @@ export default function CalendarPage() {
   const [trades, setTrades] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
-  const [isEditingLoading, setIsEditingLoading] = useState<boolean>(false);
   const [displaySettings, setDisplaySettings] = useState<Record<string, boolean>>({
     show_symbol: true,
     show_direction: true,
@@ -2500,7 +2435,6 @@ export default function CalendarPage() {
   };
 
   const handleEditTrade = async (trade: any) => {
-    setIsEditingLoading(true);
     try {
       // Load trade tags
       let tradeTags: string[] = [];
@@ -2547,7 +2481,7 @@ export default function CalendarPage() {
         date: trade.entry_time?.split("T")[0] || "",
         time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
               entryDateTime: utcToLocalDateTime(trade.entry_time),
-      exitDateTime: utcToLocalDateTime(trade.exit_time),
+        exitDateTime: utcToLocalDateTime(trade.exit_time),
         pair: trade.symbol_name || "", // Use symbol name for display
         type: trade.trade_type === 0 ? "買い" : "売り",
         entry: trade.entry_price,
@@ -2571,7 +2505,7 @@ export default function CalendarPage() {
       console.error("Error preparing trade for editing:", error);
       setError("取引の編集準備中にエラーが発生しました");
     } finally {
-      setIsEditingLoading(false);
+
     }
   };
 
