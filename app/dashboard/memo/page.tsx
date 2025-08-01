@@ -63,18 +63,6 @@ function MemoCard({
     return content.length > maxLength ? content.substring(0, maxLength) + "..." : content
   }
 
-  const getTypeColor = (type: string) => {
-    const colors = {
-      "market-analysis": "bg-blue-100 text-blue-800",
-      "trade-journal": "bg-green-100 text-green-800",
-      "market-outlook": "bg-purple-100 text-purple-800",
-      strategy: "bg-orange-100 text-orange-800",
-      psychology: "bg-red-100 text-red-800",
-      learning: "bg-yellow-100 text-yellow-800",
-    }
-    return colors[type as keyof typeof colors] || "bg-gray-100 text-gray-800"
-  }
-
   // Ensure tags is always an array
   const memoTags = Array.isArray(memo.tags) ? memo.tags : [];
 
@@ -141,20 +129,17 @@ function MemoEditDialog({
     title: string;
     content: string;
     tags: string[];
-    type: string;
     note_date: Date | undefined;
   }>(
     memo ? {
       title: memo.title || "",
       content: memo.content || "",
       tags: memo.tags || [],
-      type: memo.type || "trade-journal",
       note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
     } : {
       title: "",
       content: "",
       tags: [],
-      type: "trade-journal",
       note_date: new Date(),
     },
   )
@@ -167,13 +152,11 @@ function MemoEditDialog({
         title: memo.title || "",
         content: memo.content || "",
         tags: memo.tags || [],
-        type: memo.type || "trade-journal",
         note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
       } : {
         title: "",
         content: "",
         tags: [],
-        type: "trade-journal",
         note_date: new Date(),
       },
     )
@@ -212,23 +195,6 @@ function MemoEditDialog({
               onChange={(e) => setFormData({ ...formData, title: e.target.value })}
               placeholder="メモのタイトルを入力"
             />
-          </div>
-
-          <div>
-            <Label htmlFor="type">種類</Label>
-            <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="trade-journal">取引日記</SelectItem>
-                <SelectItem value="market-analysis">市場分析</SelectItem>
-                <SelectItem value="market-outlook">市場展望</SelectItem>
-                <SelectItem value="strategy">戦略</SelectItem>
-                <SelectItem value="psychology">心理</SelectItem>
-                <SelectItem value="learning">学習</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           <div>
@@ -498,7 +464,6 @@ export default function MemoPage() {
           .update({
             title: memoData.title,
             content: memoData.content,
-            type: memoData.type,
             note_date: memoData.note_date ? new Date(memoData.note_date).toISOString() : null,
             updated_at: new Date().toISOString(),
           })
@@ -539,7 +504,6 @@ export default function MemoPage() {
             user_id: user.id,
             title: memoData.title,
             content: memoData.content,
-            type: memoData.type,
             note_date: memoData.note_date ? new Date(memoData.note_date).toISOString() : null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
