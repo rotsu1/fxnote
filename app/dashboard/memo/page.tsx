@@ -470,7 +470,10 @@ export default function MemoPage() {
           .eq("id", editingMemo.id)
           .eq("user_id", user.id);
         
-        if (updateError) throw updateError;
+        if (updateError) {
+          console.error("Error updating note:", updateError);
+          throw updateError;
+        }
 
         // Delete existing tag links
         const { error: deleteError } = await supabase
@@ -478,20 +481,59 @@ export default function MemoPage() {
           .delete()
           .eq("note_id", editingMemo.id);
 
-        if (deleteError) throw deleteError;
+        if (deleteError) {
+          console.error("Error deleting existing tag links:", deleteError);
+          throw deleteError;
+        }
 
         // Insert new tag links
         if (memoData.tags && memoData.tags.length > 0) {
-          const tagLinks = memoData.tags.map((tagName: string) => ({
+          // First, get or create tags to get their IDs
+          const tagIds = [];
+          for (const tagName of memoData.tags) {
+            // Check if tag exists
+            let { data: existingTag } = await supabase
+              .from("note_tags")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("tag_name", tagName)
+              .single();
+
+            if (!existingTag) {
+              // Create new tag
+              const { data: newTag, error: tagError } = await supabase
+                .from("note_tags")
+                .insert([{
+                  user_id: user.id,
+                  tag_name: tagName
+                }])
+                .select("id")
+                .single();
+              
+              if (tagError) {
+                console.error("Error creating tag:", tagError);
+                throw tagError;
+              }
+              existingTag = newTag;
+            }
+            
+            tagIds.push(existingTag.id);
+          }
+
+          // Now insert the tag links with tag_ids
+          const tagLinks = tagIds.map((tagId: number) => ({
             note_id: editingMemo.id,
-            tag_name: tagName
+            tag_id: tagId
           }));
 
           const { error: insertError } = await supabase
             .from("note_tag_links")
             .insert(tagLinks);
 
-          if (insertError) throw insertError;
+          if (insertError) {
+            console.error("Error inserting tag links:", insertError);
+            throw insertError;
+          }
         }
         
         // Update local state
@@ -510,23 +552,62 @@ export default function MemoPage() {
           }])
           .select();
         
-        if (insertError) throw insertError;
+        if (insertError) {
+          console.error("Error inserting note:", insertError);
+          throw insertError;
+        }
         
         if (newNote && newNote[0]) {
           const noteId = newNote[0].id;
           
           // Insert tag links
           if (memoData.tags && memoData.tags.length > 0) {
-            const tagLinks = memoData.tags.map((tagName: string) => ({
+            // First, get or create tags to get their IDs
+            const tagIds = [];
+            for (const tagName of memoData.tags) {
+              // Check if tag exists
+              let { data: existingTag } = await supabase
+                .from("note_tags")
+                .select("id")
+                .eq("user_id", user.id)
+                .eq("tag_name", tagName)
+                .single();
+
+              if (!existingTag) {
+                // Create new tag
+                const { data: newTag, error: tagError } = await supabase
+                  .from("note_tags")
+                  .insert([{
+                    user_id: user.id,
+                    tag_name: tagName
+                  }])
+                  .select("id")
+                  .single();
+                
+                if (tagError) {
+                  console.error("Error creating tag:", tagError);
+                  throw tagError;
+                }
+                existingTag = newTag;
+              }
+              
+              tagIds.push(existingTag.id);
+            }
+
+            // Now insert the tag links with tag_ids
+            const tagLinks = tagIds.map((tagId: number) => ({
               note_id: noteId,
-              tag_name: tagName
+              tag_id: tagId
             }));
 
             const { error: tagError } = await supabase
               .from("note_tag_links")
               .insert(tagLinks);
 
-            if (tagError) throw tagError;
+            if (tagError) {
+              console.error("Error inserting tag links:", tagError);
+              throw tagError;
+            }
           }
 
           // Add tags to the note object for local state
@@ -542,7 +623,13 @@ export default function MemoPage() {
       setEditingMemo(null);
     } catch (error: any) {
       console.error("Error saving memo:", error);
-      setError(error.message);
+      console.error("Error details:", {
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        code: error.code
+      });
+      setError(error.message || "メモの保存中にエラーが発生しました");
     }
   };
 
