@@ -313,7 +313,6 @@ export default function MemoPage() {
   const [editingMemo, setEditingMemo] = useState<any>(null);
   const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false);
   const [isLayoutSettingsOpen, setIsLayoutSettingsOpen] = useState(false);
-  const [isExportDialogOpen, setIsExportDialogOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [originalFormData, setOriginalFormData] = useState<any>(null);

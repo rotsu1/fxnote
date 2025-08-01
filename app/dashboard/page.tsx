@@ -1,27 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import {
-  FileText,
-  TrendingUp,
-  TrendingDown,
-  Plus,
-  AlertTriangle,
-} from "lucide-react"
+import { TrendingUp, TrendingDown } from "lucide-react"
 
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Progress } from "@/components/ui/progress"
-import { Badge } from "@/components/ui/badge"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  AppSidebar,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/hooks/useAuth"
 
@@ -486,89 +471,6 @@ function RecentActivity() {
   )
 }
 
-function MiniCalendar() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>ミニカレンダー</CardTitle>
-        <CardDescription>今月の損益カレンダー</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-7 gap-1 text-center text-sm">
-          {["日", "月", "火", "水", "木", "金", "土"].map((day) => (
-            <div key={day} className="p-2 font-medium text-muted-foreground">
-              {day}
-            </div>
-          ))}
-          {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-            <div
-              key={day}
-              className={`p-2 rounded cursor-pointer hover:bg-muted transition-colors ${
-                day === 15 ? "bg-green-100 text-green-800" : day === 12 ? "bg-red-100 text-red-800" : ""
-              }`}
-            >
-              {day}
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function PLTrendChart() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>損益トレンドチャート</CardTitle>
-        <CardDescription>過去30日間の累積損益</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="h-[200px] flex items-end justify-between gap-1">
-          {Array.from({ length: 30 }, (_, i) => (
-            <div
-              key={i}
-              className="bg-blue-500 rounded-t transition-all hover:bg-blue-600"
-              style={{
-                height: `${Math.random() * 100 + 20}px`,
-                width: "100%",
-              }}
-            />
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
-
-function AlertsNotifications() {
-  return (
-    <div className="space-y-4">
-      <Alert>
-        <AlertTriangle className="h-4 w-4" />
-        <AlertDescription>
-          <strong>注意:</strong> 今日の損失が¥5,000を超えました。リスク管理を確認してください。
-        </AlertDescription>
-      </Alert>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>月間目標の進捗</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span>目標: ¥200,000</span>
-              <span>現在: ¥128,750 (64%)</span>
-            </div>
-            <Progress value={64} className="w-full" />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
-
 export default function TradingDashboard() {
   return (
     <SidebarProvider>
@@ -600,17 +502,6 @@ export default function TradingDashboard() {
             <RecentActivity />
           </section>
 
-          {/* Mini Calendar and P/L Trend Chart */}
-          {/* <section className="grid gap-4 lg:grid-cols-2">
-            <MiniCalendar />
-            <PLTrendChart />
-          </section> */}
-
-          {/* Alerts & Notifications */}
-          {/* <section>
-            <h2 className="text-xl font-semibold mb-4">アラート・通知</h2>
-            <AlertsNotifications />
-          </section> */}
         </main>
       </SidebarInset>
     </SidebarProvider>

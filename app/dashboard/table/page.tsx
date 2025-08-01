@@ -15,7 +15,7 @@ import {
   ArrowUp,
   ArrowDown,
   GripVertical,
-  Loader2,
+  Loader2
 } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { format } from "date-fns"
@@ -44,12 +44,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-  AppSidebar,
-} from "@/components/ui/sidebar"
+import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -101,16 +96,6 @@ interface Trade {
   tags: string[]
 }
 
-const emotions = ["興奮", "焦り", "冷静", "満足", "後悔", "不安", "自信"]
-const strategies = [
-  "ブレイクアウト",
-  "レンジブレイク",
-  "押し目買い",
-  "逆張り",
-  "トレンドフォロー",
-  "カウンタートレード",
-]
-
 // Column definitions for settings and table rendering
 const allColumns = [
   { id: "entryTime", label: "エントリー時間", type: "datetime-local", defaultVisible: true, minWidth: "min-w-[180px]" },
@@ -143,7 +128,6 @@ function TradeEditDialog({
   onSave,
   defaultDate,
   user,
-  availableTags,
 }: {
   trade: Partial<Trade> | null
   isOpen: boolean

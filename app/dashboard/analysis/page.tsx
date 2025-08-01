@@ -2,12 +2,7 @@
 import { useState, useEffect } from "react"
 import {
   Calendar,
-  TrendingUp,
-  TrendingDown,
   Clock,
-  Target,
-  Activity,
-  PieChart,
 } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
