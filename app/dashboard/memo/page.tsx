@@ -573,12 +573,7 @@ export default function MemoPage() {
                     </Button>
                   </div>
                 </div>
-
-
               </div>
-
-              {/* Results Info */}
-              <div className="mb-4 text-sm text-muted-foreground">{sortedMemos.length}件のメモが見つかりました</div>
 
               {/* Memo Grid */}
               <div className={`grid gap-4 ${getGridColumns()}`}>
