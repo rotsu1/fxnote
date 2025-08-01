@@ -10,6 +10,7 @@ import {
   Grid3X3,
   MoreHorizontal,
   CalendarIcon,
+  Filter,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -255,6 +256,7 @@ export default function MemoPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
   const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState<string>("updated_at_desc");
   const [columns, setColumns] = useState(3);
   const [editingMemo, setEditingMemo] = useState<any>(null);
   const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false);
@@ -303,6 +305,30 @@ export default function MemoPage() {
       memo.content.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesSearch;
+  });
+
+  // Sort filtered memos
+  const sortedMemos = [...filteredMemos].sort((a, b) => {
+    switch (sortBy) {
+      case "note_date_asc":
+        const dateA = a.note_date ? new Date(a.note_date).getTime() : 0;
+        const dateB = b.note_date ? new Date(b.note_date).getTime() : 0;
+        return dateA - dateB;
+      case "note_date_desc":
+        const dateC = a.note_date ? new Date(a.note_date).getTime() : 0;
+        const dateD = b.note_date ? new Date(b.note_date).getTime() : 0;
+        return dateD - dateC;
+      case "updated_at_asc":
+        const updatedA = new Date(a.updated_at).getTime();
+        const updatedB = new Date(b.updated_at).getTime();
+        return updatedA - updatedB;
+      case "updated_at_desc":
+        const updatedC = new Date(a.updated_at).getTime();
+        const updatedD = new Date(b.updated_at).getTime();
+        return updatedD - updatedC;
+      default:
+        return 0;
+    }
   });
 
   const handleEditMemo = (memo: any) => {
@@ -456,6 +482,18 @@ export default function MemoPage() {
                     />
                   </div>
                   <div className="flex gap-2">
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-[180px]">
+                        <Filter className="mr-2 h-4 w-4" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="updated_at_desc">更新日時（新しい順）</SelectItem>
+                        <SelectItem value="updated_at_asc">更新日時（古い順）</SelectItem>
+                        <SelectItem value="note_date_desc">メモ日付（新しい順）</SelectItem>
+                        <SelectItem value="note_date_asc">メモ日付（古い順）</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <Button onClick={handleAddMemo}>
                       <Plus className="mr-2 h-4 w-4" />
                       新規メモ
@@ -471,16 +509,16 @@ export default function MemoPage() {
               </div>
 
               {/* Results Info */}
-              <div className="mb-4 text-sm text-muted-foreground">{filteredMemos.length}件のメモが見つかりました</div>
+              <div className="mb-4 text-sm text-muted-foreground">{sortedMemos.length}件のメモが見つかりました</div>
 
               {/* Memo Grid */}
               <div className={`grid gap-4 ${getGridColumns()}`}>
-                {filteredMemos.map((memo) => (
+                {sortedMemos.map((memo) => (
                   <MemoCard key={memo.id} memo={memo} onEdit={handleEditMemo} onDelete={handleDeleteMemo} />
                 ))}
               </div>
 
-              {filteredMemos.length === 0 && (
+              {sortedMemos.length === 0 && (
                 <div className="text-center py-12">
                   <FileText className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
                   <h3 className="text-lg font-medium mb-2">メモが見つかりません</h3>
