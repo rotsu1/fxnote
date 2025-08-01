@@ -11,6 +11,7 @@ import {
   Download,
   Grid3X3,
   MoreHorizontal,
+  CalendarIcon,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -34,6 +35,8 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Separator } from "@/components/ui/separator"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   SidebarInset,
   SidebarProvider,
@@ -42,6 +45,8 @@ import {
 } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
+import { format } from "date-fns";
+import { ja } from "date-fns/locale";
 
 // Remove hardcoded availableTags
 
@@ -96,7 +101,9 @@ function MemoCard({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
-        <div className="text-xs text-muted-foreground">{memo.date}</div>
+        <div className="text-xs text-muted-foreground">
+          {memo.note_date ? format(new Date(memo.note_date), "yyyy/MM/dd", { locale: ja }) : memo.date}
+        </div>
       </CardHeader>
       <CardContent className="pt-0">
         <p className="text-sm text-muted-foreground mb-3 line-clamp-4">{truncateContent(memo.content)}</p>
@@ -130,12 +137,25 @@ function MemoEditDialog({
   onSave: (memo: any) => void
   availableTags: string[]
 }) {
-  const [formData, setFormData] = useState(
-    memo || {
+  const [formData, setFormData] = useState<{
+    title: string;
+    content: string;
+    tags: string[];
+    type: string;
+    note_date: Date | undefined;
+  }>(
+    memo ? {
+      title: memo.title || "",
+      content: memo.content || "",
+      tags: memo.tags || [],
+      type: memo.type || "trade-journal",
+      note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
+    } : {
       title: "",
       content: "",
       tags: [],
       type: "trade-journal",
+      note_date: new Date(),
     },
   )
   const [newTag, setNewTag] = useState("")
@@ -143,11 +163,18 @@ function MemoEditDialog({
   // Sync formData when memo prop changes
   useEffect(() => {
     setFormData(
-      memo || {
+      memo ? {
+        title: memo.title || "",
+        content: memo.content || "",
+        tags: memo.tags || [],
+        type: memo.type || "trade-journal",
+        note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
+      } : {
         title: "",
         content: "",
         tags: [],
         type: "trade-journal",
+        note_date: new Date(),
       },
     )
   }, [memo])
@@ -202,6 +229,33 @@ function MemoEditDialog({
                 <SelectItem value="learning">学習</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div>
+            <Label htmlFor="date">日付</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-left font-normal"
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.note_date instanceof Date ? (
+                    format(formData.note_date, "PPP", { locale: ja })
+                  ) : (
+                    <span>日付を選択</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={formData.note_date instanceof Date ? formData.note_date : undefined}
+                  onSelect={(date) => setFormData({ ...formData, note_date: date })}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div>
@@ -394,7 +448,8 @@ export default function MemoPage() {
         // Combine notes with their tags
         const notesWithTags = notesData?.map(note => ({
           ...note,
-          tags: tagsByNoteId[note.id] || []
+          tags: tagsByNoteId[note.id] || [],
+          note_date: note.note_date ? new Date(note.note_date) : null
         })) || [];
 
         console.log("Notes with tags:", notesWithTags);
@@ -444,6 +499,7 @@ export default function MemoPage() {
             title: memoData.title,
             content: memoData.content,
             type: memoData.type,
+            note_date: memoData.note_date ? new Date(memoData.note_date).toISOString() : null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingMemo.id)
@@ -484,6 +540,7 @@ export default function MemoPage() {
             title: memoData.title,
             content: memoData.content,
             type: memoData.type,
+            note_date: memoData.note_date ? new Date(memoData.note_date).toISOString() : null,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
