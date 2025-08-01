@@ -54,6 +54,29 @@ import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
+// Helper to convert local datetime string to UTC ISO string
+function localDateTimeToUTC(localDateTimeString: string): string {
+  if (!localDateTimeString || localDateTimeString.trim() === "") {
+    console.log("localDateTimeToUTC: Empty input, using current time");
+    return new Date().toISOString();
+  }
+  
+  console.log("localDateTimeToUTC: Input:", localDateTimeString);
+  
+  // Create a date object from the local datetime string
+  const date = new Date(localDateTimeString);
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    console.error("localDateTimeToUTC: Invalid date string:", localDateTimeString);
+    return new Date().toISOString();
+  }
+  
+  const result = date.toISOString();
+  console.log("localDateTimeToUTC: Output:", result);
+  return result;
+}
+
 // Sample trade data (expanded for table view)
 interface Trade {
   id: number
@@ -2360,8 +2383,16 @@ export default function TablePage() {
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
-            entry_time: tradeData.entryTime,
-            exit_time: tradeData.exitTime,
+            entry_time: (() => {
+              const result = localDateTimeToUTC(tradeData.entryTime || "");
+              console.log("Update - Entry time conversion:", { input: tradeData.entryTime, output: result });
+              return result;
+            })(),
+            exit_time: (() => {
+              const result = localDateTimeToUTC(tradeData.exitTime || "");
+              console.log("Update - Exit time conversion:", { input: tradeData.exitTime, output: result });
+              return result;
+            })(),
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingTrade.id)
@@ -2469,9 +2500,6 @@ export default function TablePage() {
         
       } else {
         // Add new trade
-        const entryDateTime = tradeData.entryTime || new Date().toISOString();
-        const exitDateTime = tradeData.exitTime || new Date().toISOString();
-        
         const { data, error } = await supabase
           .from("trades")
           .insert([{
@@ -2484,8 +2512,16 @@ export default function TablePage() {
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
-            entry_time: entryDateTime,
-            exit_time: exitDateTime,
+            entry_time: (() => {
+              const result = localDateTimeToUTC(tradeData.entryTime || "");
+              console.log("Insert - Entry time conversion:", { input: tradeData.entryTime, output: result });
+              return result;
+            })(),
+            exit_time: (() => {
+              const result = localDateTimeToUTC(tradeData.exitTime || "");
+              console.log("Insert - Exit time conversion:", { input: tradeData.exitTime, output: result });
+              return result;
+            })(),
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
