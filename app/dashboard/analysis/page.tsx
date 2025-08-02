@@ -139,37 +139,40 @@ function KeyStatsGrid() {
   ];
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {metrics.map((metric, index) => {
-        const value = keyStats[metric.key];
-        if (value === null || value === undefined) return null;
-        
-        // Handle different value types for color function
-        let colorClass = "text-gray-900 dark:text-gray-100";
-        if (metric.key === 'avg_holding_time') {
-          colorClass = metric.color(value as string);
-        } else {
-          colorClass = metric.color(value as number);
-        }
-        
-        return (
-          <Card key={index}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {metric.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${colorClass}`}>
-                {metric.key === 'avg_holding_time' 
-                  ? metric.format(value as string)
-                  : metric.format(value as number)
-                }
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
+    <div className="space-y-4">
+      {/* Key Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {metrics.map((metric, index) => {
+          const value = keyStats[metric.key];
+          if (value === null || value === undefined) return null;
+          
+          // Handle different value types for color function
+          let colorClass = "text-gray-900 dark:text-gray-100";
+          if (metric.key === 'avg_holding_time') {
+            colorClass = metric.color(value as string);
+          } else {
+            colorClass = metric.color(value as number);
+          }
+          
+          return (
+            <Card key={index}>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  {metric.title}
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${colorClass}`}>
+                  {metric.key === 'avg_holding_time' 
+                    ? metric.format(value as string)
+                    : metric.format(value as number)
+                  }
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
     </div>
   )
 }
@@ -577,6 +580,32 @@ function MonthlyBreakdown() {
 }
 
 export default function AnalysisPage() {
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
+
+  // Generate year options (current year and 5 years back)
+  const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
+  
+  // Generate month options
+  const monthOptions = [
+    { value: 1, label: "1月" },
+    { value: 2, label: "2月" },
+    { value: 3, label: "3月" },
+    { value: 4, label: "4月" },
+    { value: 5, label: "5月" },
+    { value: 6, label: "6月" },
+    { value: 7, label: "7月" },
+    { value: 8, label: "8月" },
+    { value: 9, label: "9月" },
+    { value: 10, label: "10月" },
+    { value: 11, label: "11月" },
+    { value: 12, label: "12月" },
+  ];
+
+  // Generate day options (1-31)
+  const dayOptions = Array.from({ length: 31 }, (_, i) => i + 1);
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -592,7 +621,51 @@ export default function AnalysisPage() {
         <main className="flex-1 p-4 md:p-6 space-y-6">
           {/* Key Statistics */}
           <section>
-            <h2 className="text-xl font-semibold mb-4">主要統計</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold">主要統計</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-muted-foreground">期間:</span>
+                <Select value={selectedYear === 0 ? "0" : selectedYear.toString()} onValueChange={(value) => setSelectedYear(Number(value))}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue placeholder="年を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">指定しない</SelectItem>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}年
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedMonth === 0 ? "0" : selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(Number(value))}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue placeholder="月を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">指定しない</SelectItem>
+                    {monthOptions.map((month) => (
+                      <SelectItem key={month.value} value={month.value.toString()}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedDay === 0 ? "0" : selectedDay.toString()} onValueChange={(value) => setSelectedDay(Number(value))}>
+                  <SelectTrigger className="w-24">
+                    <SelectValue placeholder="日を選択" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">指定しない</SelectItem>
+                    {dayOptions.map((day) => (
+                      <SelectItem key={day} value={day.toString()}>
+                        {day}日
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
             <div className="space-y-4">
               <KeyStatsGrid />
             </div>
