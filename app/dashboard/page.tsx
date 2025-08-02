@@ -22,26 +22,94 @@ function PLSummaryCards() {
   const [error, setError] = useState<string>("");
   const user = useAuth();
 
+  // Helper function to get current period values
+  const getCurrentPeriods = () => {
+    const now = new Date();
+    
+    // Daily: today's date
+    const daily = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    
+    // Weekly: current ISO week
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+    const weekNumber = Math.ceil((weekStart.getTime() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const weekly = `${weekStart.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+    
+    // Monthly: current month
+    const monthly = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
+    
+    // Yearly: current year
+    const yearly = now.getFullYear().toString();
+    
+    return { daily, weekly, monthly, yearly };
+  };
+
   useEffect(() => {
     if (!user) return;
     
-    setLoading(true);
-    setError("");
-    
-    supabase
-      .from("user_pl_summary")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-          setPlSummary(null);
-        } else {
-          setPlSummary(data);
-        }
+    const fetchPLSummary = async () => {
+      setLoading(true);
+      setError("");
+      
+      try {
+        const periods = getCurrentPeriods();
+        
+        // Fetch data for all periods
+        const { data: dailyData, error: dailyError } = await supabase
+          .from("user_performance_metrics")
+          .select("win_profit, loss_loss")
+          .eq("user_id", user.id)
+          .eq("period_type", "daily")
+          .eq("period_value", periods.daily)
+          .single();
+
+        const { data: weeklyData, error: weeklyError } = await supabase
+          .from("user_performance_metrics")
+          .select("win_profit, loss_loss")
+          .eq("user_id", user.id)
+          .eq("period_type", "weekly")
+          .eq("period_value", periods.weekly)
+          .single();
+
+        const { data: monthlyData, error: monthlyError } = await supabase
+          .from("user_performance_metrics")
+          .select("win_profit, loss_loss")
+          .eq("user_id", user.id)
+          .eq("period_type", "monthly")
+          .eq("period_value", periods.monthly)
+          .single();
+
+        const { data: totalData, error: totalError } = await supabase
+          .from("user_performance_metrics")
+          .select("win_profit, loss_loss")
+          .eq("user_id", user.id)
+          .eq("period_type", "total")
+          .eq("period_value", "total")
+          .single();
+
+        // Calculate profits (handle null/undefined values)
+        const dailyProfit = (dailyData?.win_profit || 0) + (dailyData?.loss_loss || 0);
+        const weeklyProfit = (weeklyData?.win_profit || 0) + (weeklyData?.loss_loss || 0);
+        const monthlyProfit = (monthlyData?.win_profit || 0) + (monthlyData?.loss_loss || 0);
+        const totalProfit = (totalData?.win_profit || 0) + (totalData?.loss_loss || 0);
+
+        setPlSummary({
+          daily_profit: dailyProfit,
+          weekly_profit: weeklyProfit,
+          monthly_profit: monthlyProfit,
+          total_profit: totalProfit
+        });
+
+      } catch (error: any) {
+        console.error("Error fetching PL summary:", error);
+        setError(error.message || "データの取得に失敗しました");
+        setPlSummary(null);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchPLSummary();
   }, [user]);
 
   if (loading) {
@@ -81,27 +149,27 @@ function PLSummaryCards() {
   const summaryData = [
     { 
       title: "今日の損益", 
-      value: `¥${plSummary.daily_profit.toLocaleString()}`, 
-      trend: plSummary.daily_profit >= 0 ? "up" : "down", 
-      color: plSummary.daily_profit >= 0 ? "text-green-600" : "text-red-600" 
+      value: plSummary.daily_profit !== 0 ? `¥${plSummary.daily_profit.toLocaleString()}` : "N/A", 
+      trend: plSummary.daily_profit > 0 ? "up" : plSummary.daily_profit < 0 ? "down" : "neutral", 
+      color: plSummary.daily_profit > 0 ? "text-green-600" : plSummary.daily_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
     { 
       title: "今週の損益", 
-      value: `¥${plSummary.weekly_profit.toLocaleString()}`, 
-      trend: plSummary.weekly_profit >= 0 ? "up" : "down", 
-      color: plSummary.weekly_profit >= 0 ? "text-green-600" : "text-red-600" 
+      value: plSummary.weekly_profit !== 0 ? `¥${plSummary.weekly_profit.toLocaleString()}` : "N/A", 
+      trend: plSummary.weekly_profit > 0 ? "up" : plSummary.weekly_profit < 0 ? "down" : "neutral", 
+      color: plSummary.weekly_profit > 0 ? "text-green-600" : plSummary.weekly_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
     { 
       title: "今月の損益", 
-      value: `¥${plSummary.monthly_profit.toLocaleString()}`, 
-      trend: plSummary.monthly_profit >= 0 ? "up" : "down", 
-      color: plSummary.monthly_profit >= 0 ? "text-green-600" : "text-red-600" 
+      value: plSummary.monthly_profit !== 0 ? `¥${plSummary.monthly_profit.toLocaleString()}` : "N/A", 
+      trend: plSummary.monthly_profit > 0 ? "up" : plSummary.monthly_profit < 0 ? "down" : "neutral", 
+      color: plSummary.monthly_profit > 0 ? "text-green-600" : plSummary.monthly_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
     { 
       title: "総損益", 
-      value: `¥${plSummary.total_profit.toLocaleString()}`, 
-      trend: plSummary.total_profit >= 0 ? "up" : "down", 
-      color: plSummary.total_profit >= 0 ? "text-green-600" : "text-red-600" 
+      value: plSummary.total_profit !== 0 ? `¥${plSummary.total_profit.toLocaleString()}` : "N/A", 
+      trend: plSummary.total_profit > 0 ? "up" : plSummary.total_profit < 0 ? "down" : "neutral", 
+      color: plSummary.total_profit > 0 ? "text-green-600" : plSummary.total_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
   ];
 
@@ -113,8 +181,10 @@ function PLSummaryCards() {
               <CardTitle className="text-sm font-medium">{item.title}</CardTitle>
               {item.trend === "up" ? (
                 <TrendingUp className="h-4 w-4 text-green-600" />
-              ) : (
+              ) : item.trend === "down" ? (
                 <TrendingDown className="h-4 w-4 text-red-600" />
+              ) : (
+                <div className="h-4 w-4" /> // Neutral state - no icon
               )}
             </CardHeader>
             <CardContent>
