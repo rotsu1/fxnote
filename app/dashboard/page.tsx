@@ -132,26 +132,94 @@ function PerformanceMetrics() {
   const [error, setError] = useState<string>("");
   const user = useAuth();
 
+  // Helper function to get current period based on metrics_period
+  const getCurrentPeriod = (metricsPeriod: number) => {
+    const now = new Date();
+    
+    switch (metricsPeriod) {
+      case 0: // daily
+        return {
+          period_type: 'daily',
+          period_value: now.toISOString().split('T')[0] // YYYY-MM-DD
+        };
+      case 1: // weekly
+        const weekStart = new Date(now);
+        weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
+        const weekNumber = Math.ceil((weekStart.getTime() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
+        return {
+          period_type: 'weekly',
+          period_value: `${weekStart.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`
+        };
+      case 2: // monthly
+        return {
+          period_type: 'monthly',
+          period_value: `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`
+        };
+      case 3: // yearly
+        return {
+          period_type: 'yearly',
+          period_value: now.getFullYear().toString()
+        };
+      case 4: // total
+        return {
+          period_type: 'total',
+          period_value: 'total'
+        };
+      default:
+        return {
+          period_type: 'monthly',
+          period_value: `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`
+        };
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
     
-    setLoading(true);
-    setError("");
-    
-    supabase
-      .from("user_performance_metrics")
-      .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-          setPerformanceData(null);
-        } else {
-          setPerformanceData(data);
+    const fetchPerformanceData = async () => {
+      setLoading(true);
+      setError("");
+      
+      try {
+        // First, fetch the user's metrics_period setting
+        const { data: settingsData, error: settingsError } = await supabase
+          .from("dashboard_settings")
+          .select("metrics_period")
+          .eq("user_id", user.id)
+          .single();
+
+        if (settingsError && settingsError.code !== 'PGRST116') { // PGRST116 is "not found"
+          throw settingsError;
         }
+
+        // Default to monthly (2) if no settings found
+        const metricsPeriod = settingsData?.metrics_period ?? 2;
+        const period = getCurrentPeriod(metricsPeriod);
+
+        // Fetch performance data with the computed period
+        const { data, error } = await supabase
+          .from("user_performance_metrics")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("period_type", period.period_type)
+          .eq("period_value", period.period_value)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+
+        setPerformanceData(data || null);
+      } catch (error: any) {
+        console.error("Error fetching performance data:", error);
+        setError(error.message || "データの取得に失敗しました");
+        setPerformanceData(null);
+      } finally {
         setLoading(false);
-      });
+      }
+    };
+
+    fetchPerformanceData();
   }, [user]);
 
   if (loading) {
@@ -205,33 +273,56 @@ function PerformanceMetrics() {
     );
   }
 
-  // Handle old table structure (key-value format)
+  // Compute derived values
+  const winCount = performanceData.win_count || 0;
+  const lossCount = performanceData.loss_count || 0;
+  const tradeCount = winCount + lossCount;
+  const winProfit = performanceData.win_profit || 0;
+  const lossLoss = performanceData.loss_loss || 0;
+
+  const winRate = tradeCount > 0 
+    ? `${Math.round((winCount / tradeCount) * 100)}%` 
+    : 'N/A';
+
+  const averageProfitLoss = tradeCount > 0 
+    ? new Intl.NumberFormat('ja-JP', { 
+        style: 'currency', 
+        currency: 'JPY' 
+      }).format((winProfit + lossLoss) / tradeCount)
+    : 'N/A';
+
+  const maxWinStreak = performanceData.max_win_streak || 0;
+  const maxLossStreak = performanceData.max_loss_streak || 0;
+  const maxStreakDisplay = (maxWinStreak > 0 || maxLossStreak > 0) 
+    ? `${maxWinStreak}勝 / ${maxLossStreak}敗` 
+    : 'N/A';
+
+  const tradeCountDisplay = tradeCount > 0 
+    ? `${tradeCount}回` 
+    : 'N/A';
+
   const performanceMetrics = [
     { 
-      title: "今月の勝率", 
-      value: performanceData.monthly_win_rate ? `${performanceData.monthly_win_rate}%` : "N/A", 
-      description: performanceData.monthly_win_count && performanceData.monthly_trade_count 
-        ? `${performanceData.monthly_win_count}勝 / ${performanceData.monthly_trade_count}取引` 
+      title: "勝率", 
+      value: winRate, 
+      description: tradeCount > 0 
+        ? `${winCount}勝 / ${tradeCount}取引` 
         : "データなし" 
     },
     { 
       title: "平均利益/損失", 
-      value: performanceData.average_profit_loss ? `¥${performanceData.average_profit_loss.toLocaleString()}` : "N/A", 
-      description: "利益時平均" 
+      value: averageProfitLoss, 
+      description: "取引平均" 
     },
     { 
       title: "最大連勝・連敗", 
-      value: performanceData.max_win_streak && performanceData.max_loss_streak 
-        ? `${performanceData.max_win_streak}勝 / ${performanceData.max_loss_streak}敗` 
-        : "N/A", 
+      value: maxStreakDisplay, 
       description: "現在の記録" 
     },
     { 
-      title: "今月の取引回数", 
-      value: performanceData.monthly_trade_count ? `${performanceData.monthly_trade_count}回` : "N/A", 
-      description: performanceData.previous_month_trade_count 
-        ? `前月比 ${performanceData.monthly_trade_count > performanceData.previous_month_trade_count ? '+' : ''}${((performanceData.monthly_trade_count - performanceData.previous_month_trade_count) / performanceData.previous_month_trade_count * 100).toFixed(0)}%` 
-        : "データなし" 
+      title: "取引回数", 
+      value: tradeCountDisplay, 
+      description: "データなし" 
     },
   ];
 
