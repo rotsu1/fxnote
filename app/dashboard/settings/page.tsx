@@ -5,11 +5,9 @@ import type React from "react"
 import {
   Mail,
   Lock,
-  User,
   Shield,
   Eye,
   EyeOff,
-  Upload,
   Check,
   X,
   AlertCircle,
@@ -22,12 +20,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
@@ -287,86 +283,6 @@ function PasswordManagement() {
   )
 }
 
-function ProfileSettings() {
-  const [displayName, setDisplayName] = useState(initialUserData.displayName)
-  const [bio, setBio] = useState(initialUserData.bio)
-  const [avatar, setAvatar] = useState(initialUserData.avatar)
-
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setAvatar(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
-
-  const handleSaveProfile = () => {
-    // Save profile logic here
-    console.log("Profile saved:", { displayName, bio, avatar })
-  }
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <User className="h-5 w-5 text-purple-600" />
-          プロフィール設定
-        </CardTitle>
-        <CardDescription>プロフィール情報を編集します</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex items-center gap-4">
-          <Avatar className="h-20 w-20">
-            <AvatarImage src={avatar || "/placeholder.svg"} alt="Profile" />
-            <AvatarFallback>{displayName.charAt(0)}</AvatarFallback>
-          </Avatar>
-          <div>
-            <Label htmlFor="avatar" className="cursor-pointer">
-              <Button variant="outline" size="sm" asChild>
-                <span>
-                  <Upload className="mr-2 h-4 w-4" />
-                  写真を変更
-                </span>
-              </Button>
-            </Label>
-            <Input id="avatar" type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
-            <div className="text-xs text-muted-foreground mt-1">JPG、PNG形式のファイルをアップロードできます</div>
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="displayName">表示名</Label>
-          <Input
-            id="displayName"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="表示名を入力"
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="bio">自己紹介</Label>
-          <Textarea
-            id="bio"
-            value={bio}
-            onChange={(e) => setBio(e.target.value)}
-            placeholder="自己紹介を入力"
-            rows={4}
-          />
-          <div className="text-xs text-muted-foreground">{bio.length}/500文字</div>
-        </div>
-
-        <Button onClick={handleSaveProfile} className="w-full">
-          プロフィールを保存
-        </Button>
-      </CardContent>
-    </Card>
-  )
-}
-
 function AuthenticationManagement() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(initialUserData.twoFactorEnabled)
   const [showBackupCodes, setShowBackupCodes] = useState(false)
@@ -551,7 +467,6 @@ export default function SettingsPage() {
           <div className="max-w-2xl space-y-6">
             <EmailManagement />
             <PasswordManagement />
-            <ProfileSettings />
             <AuthenticationManagement />
           </div>
           <div className="max-w-2xl mx-auto pt-8">
