@@ -1,14 +1,19 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import { TrendingUp, TrendingDown, Settings } from "lucide-react"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
 import { supabase } from "@/lib/supabaseClient"
 import { useAuth } from "@/hooks/useAuth"
+import { useToast } from "@/hooks/use-toast"
 
 
 function PLSummaryCards() {
@@ -471,6 +476,157 @@ function RecentActivity() {
   )
 }
 
+function DashboardSettings() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [metricsPeriod, setMetricsPeriod] = useState<string>("2"); // Default to monthly (2)
+  const [loading, setLoading] = useState(false);
+  const user = useAuth();
+  const { toast } = useToast();
+
+  // Period options mapping
+  const periodOptions = [
+    { value: "0", label: "日次" },
+    { value: "1", label: "週次" },
+    { value: "2", label: "月次" },
+    { value: "3", label: "年次" },
+    { value: "4", label: "総計" },
+  ];
+
+  // Load current settings
+  useEffect(() => {
+    if (!user || !isOpen) return;
+
+    const loadSettings = async () => {
+      try {
+        const { data, error } = await supabase
+          .from("dashboard_settings")
+          .select("metrics_period")
+          .eq("user_id", user.id)
+          .single();
+
+        if (error && error.code !== 'PGRST116') { // PGRST116 is "not found"
+          console.error("Error loading settings:", error);
+          return;
+        }
+
+        if (data) {
+          setMetricsPeriod(data.metrics_period?.toString() || "2");
+        }
+      } catch (error) {
+        console.error("Error loading settings:", error);
+      }
+    };
+
+    loadSettings();
+  }, [user, isOpen]);
+
+  // Save settings
+  const handleSaveSettings = async () => {
+    if (!user) return;
+
+    setLoading(true);
+    try {
+      // First check if a row exists for this user
+      const { data: existingSettings, error: checkError } = await supabase
+        .from("dashboard_settings")
+        .select("user_id")
+        .eq("user_id", user.id)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "not found"
+        throw checkError;
+      }
+
+      let error;
+      if (existingSettings) {
+        // Update existing row
+        const { error: updateError } = await supabase
+          .from("dashboard_settings")
+          .update({ metrics_period: parseInt(metricsPeriod) })
+          .eq("user_id", user.id);
+        error = updateError;
+      } else {
+        // Insert new row if none exists
+        const { error: insertError } = await supabase
+          .from("dashboard_settings")
+          .insert({
+            user_id: user.id,
+            metrics_period: parseInt(metricsPeriod),
+          });
+        error = insertError;
+      }
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "設定を保存しました",
+        description: "パフォーマンス指標の期間設定が更新されました。",
+      });
+
+      setIsOpen(false);
+    } catch (error: any) {
+      console.error("Error saving settings:", error);
+      toast({
+        title: "エラーが発生しました",
+        description: "設定の保存に失敗しました。",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" className="h-8 w-8 p-0">
+          <span className="sr-only">設定</span>
+          <Settings className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>ダッシュボード設定</DialogTitle>
+          <DialogDescription>
+            ダッシュボードの表示設定を変更できます。
+          </DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="performance-period" className="text-right">
+              パフォーマンス指標期間:
+            </Label>
+            <div className="col-span-3">
+              <Select value={metricsPeriod} onValueChange={setMetricsPeriod}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="期間を選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {periodOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={() => setIsOpen(false)}>
+            キャンセル
+          </Button>
+          <Button onClick={handleSaveSettings} disabled={loading}>
+            {loading ? "保存中..." : "保存"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function TradingDashboard() {
   return (
     <SidebarProvider>
@@ -481,6 +637,7 @@ export default function TradingDashboard() {
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">ダッシュボード</h1>
+            <DashboardSettings />
           </div>
         </header>
 
