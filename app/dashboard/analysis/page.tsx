@@ -223,7 +223,7 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       title: '平均利益保有時間', 
       format: (value: number | string) => {
         if (typeof value === "string") return value;
-        if (typeof value === "number") {
+        if (typeof value === "number" && !isNaN(value) && value > 0) {
           // Convert seconds to hours and minutes
           const hours = Math.floor(value / 3600);
           const minutes = Math.floor((value % 3600) / 60);
@@ -231,14 +231,19 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
         }
         return "データなし";
       },
-      color: (_value: number | string) => "text-blue-600"
+      color: (value: number | string) => {
+        if (typeof value === "string" || (typeof value === "number" && (isNaN(value) || value <= 0))) {
+          return "text-gray-400";
+        }
+        return "text-blue-600";
+      }
     },
     { 
       key: 'avg_loss_holding_time', 
       title: '平均損失保有時間', 
       format: (value: number | string) => {
         if (typeof value === "string") return value;
-        if (typeof value === "number") {
+        if (typeof value === "number" && !isNaN(value) && value > 0) {
           // Convert seconds to hours and minutes
           const hours = Math.floor(value / 3600);
           const minutes = Math.floor((value % 3600) / 60);
@@ -246,15 +251,31 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
         }
         return "データなし";
       },
-      color: (_value: number | string) => "text-blue-600"
+      color: (value: number | string) => {
+        if (typeof value === "string" || (typeof value === "number" && (isNaN(value) || value <= 0))) {
+          return "text-gray-400";
+        }
+        return "text-blue-600";
+      }
     },
     { 
       key: 'payoff_ratio', 
       title: 'ペイオフ比率', 
-      format: (value: number | string) => typeof value === "number" ? value.toFixed(2) : value,
-      color: (value: number | string) => typeof value === "number"
-        ? value >= 1.5 ? "text-green-600" : value >= 1.0 ? "text-yellow-600" : "text-red-600"
-        : "text-gray-400"
+      format: (value: number | string) => {
+        if (typeof value === "string") return value;
+        if (typeof value === "number" && !isNaN(value) && value > 0) {
+          return value.toFixed(2);
+        }
+        return "データなし";
+      },
+      color: (value: number | string) => {
+        if (typeof value === "string" || (typeof value === "number" && (isNaN(value) || value <= 0))) {
+          return "text-gray-400";
+        }
+        return typeof value === "number"
+          ? value >= 1.5 ? "text-green-600" : value >= 1.0 ? "text-yellow-600" : "text-red-600"
+          : "text-gray-400";
+      }
     },
   ];
 
