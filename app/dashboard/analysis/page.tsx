@@ -19,7 +19,13 @@ interface Metric {
   color: (value: any) => string;
 }
 
-function KeyStatsGrid() {
+interface KeyStatsGridProps {
+  selectedYear: number | "指定しない";
+  selectedMonth: number | "指定しない";
+  selectedDay: number | "指定しない";
+}
+
+function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGridProps) {
   const user = useAuth();
   const [keyStats, setKeyStats] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -31,21 +37,119 @@ function KeyStatsGrid() {
     setLoading(true);
     setError("");
     
-    supabase
-      .from("user_key_status")
+    // Build query based on selected date filters
+    let query = supabase
+      .from("user_performance_metrics")
       .select("*")
-      .eq("user_id", user.id)
-      .single()
-      .then(({ data, error }) => {
-        if (error) {
-          setError(error.message);
-          setKeyStats(null);
+      .eq("user_id", user.id);
+    
+    // Determine period type and value based on selected filters
+    let periodType = "yearly";
+    let periodValue = "";
+    
+    if (selectedYear !== "指定しない") {
+      if (selectedMonth !== "指定しない" && selectedDay !== "指定しない") {
+        // All three specified - daily
+        periodType = "daily";
+        periodValue = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-${selectedDay.toString().padStart(2, '0')}`;
+      } else if (selectedMonth !== "指定しない") {
+        // Year and month specified - monthly
+        periodType = "monthly";
+        periodValue = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
+      } else {
+        // Only year specified - yearly
+        periodType = "yearly";
+        periodValue = selectedYear.toString();
+      }
+      
+      query = query.eq("period_type", periodType).eq("period_value", periodValue);
+    } else {
+      // Handle partial matches when some fields are "指定しない"
+      if (selectedMonth !== "指定しない") {
+        query = query.like("period_value", `%-${selectedMonth.toString().padStart(2, '0')}-%`);
+      }
+      if (selectedDay !== "指定しない") {
+        query = query.like("period_value", `%-${selectedDay.toString().padStart(2, '0')}`);
+      }
+    }
+    
+    query.then(({ data, error }) => {
+      if (error) {
+        setError(error.message);
+        setKeyStats(null);
+      } else {
+        // Aggregate data if multiple rows returned
+        if (data && data.length > 0) {
+          const aggregatedStats = aggregateMetrics(data);
+          setKeyStats(aggregatedStats);
         } else {
-          setKeyStats(data);
+          setKeyStats(null);
         }
-        setLoading(false);
-      });
-  }, [user]);
+      }
+      setLoading(false);
+    });
+  }, [user, selectedYear, selectedMonth, selectedDay]);
+
+  const aggregateMetrics = (data: any[]) => {
+    const total = data.reduce((acc, row) => {
+      return {
+        win_count: (acc.win_count || 0) + (row.win_count || 0),
+        loss_count: (acc.loss_count || 0) + (row.loss_count || 0),
+        win_profit: (acc.win_profit || 0) + (row.win_profit || 0),
+        loss_loss: (acc.loss_loss || 0) + (row.loss_loss || 0),
+        win_pips: (acc.win_pips || 0) + (row.win_pips || 0),
+        loss_pips: (acc.loss_pips || 0) + (row.loss_pips || 0),
+        avg_win_holding_time: (acc.avg_win_holding_time || 0) + (row.avg_win_holding_time || 0),
+        avg_loss_holding_time: (acc.avg_loss_holding_time || 0) + (row.avg_loss_holding_time || 0),
+      };
+    }, {});
+
+    const count = data.length;
+    
+    // Calculate aggregated metrics
+    const win_rate = total.win_count + total.loss_count > 0 
+      ? (total.win_count / (total.win_count + total.loss_count)) * 100 
+      : 0;
+    
+    const avg_win_trade_profit = total.win_count > 0 
+      ? total.win_profit / total.win_count 
+      : 0;
+    
+    const avg_loss_trade_loss = total.loss_count > 0 
+      ? total.loss_loss / total.loss_count 
+      : 0;
+    
+    const avg_win_trade_pips = total.win_count > 0 
+      ? total.win_pips / total.win_count 
+      : 0;
+    
+    const avg_loss_trade_pips = total.loss_count > 0 
+      ? total.loss_pips / total.loss_count 
+      : 0;
+    
+    const avg_win_holding_time = count > 0 
+      ? total.avg_win_holding_time / count 
+      : 0;
+    
+    const avg_loss_holding_time = count > 0 
+      ? total.avg_loss_holding_time / count 
+      : 0;
+    
+    const payoff_ratio = avg_loss_trade_loss > 0 
+      ? avg_win_trade_profit / avg_loss_trade_loss 
+      : 0;
+
+    return {
+      win_rate,
+      avg_win_trade_profit,
+      avg_loss_trade_loss,
+      avg_win_trade_pips,
+      avg_loss_trade_pips,
+      avg_win_holding_time,
+      avg_loss_holding_time,
+      payoff_ratio
+    };
+  };
 
   if (loading) {
     return (
@@ -85,56 +189,72 @@ function KeyStatsGrid() {
     { 
       key: 'win_rate', 
       title: '勝率', 
-      format: (value: number) => `${value}%`,
-      color: (value: number) => value >= 60 ? "text-green-600" : value >= 40 ? "text-yellow-600" : "text-red-600"
+      format: (value: number | string) => typeof value === "number" ? `${value.toFixed(1)}%` : value,
+      color: (value: number | string) => typeof value === "number"
+        ? value >= 60 ? "text-green-600" : value >= 40 ? "text-yellow-600" : "text-red-600"
+        : "text-gray-400"
     },
     { 
       key: 'avg_win_trade_profit', 
       title: '平均利益', 
-      format: (value: number) => `¥${value.toLocaleString()}`,
-      color: (_value: number) => "text-green-600"
+      format: (value: number | string) => typeof value === "number" ? `¥${value.toLocaleString()}` : value,
+      color: (_value: number | string) => "text-green-600"
     },
     { 
-      key: 'avg_loss_trade_pips', 
-      title: '平均損失pips', 
-      format: (value: number) => `${value.toFixed(1)} pips`,
-      color: (_value: number) => "text-red-600"
+      key: 'avg_loss_trade_loss', 
+      title: '平均損失', 
+      format: (value: number | string) => typeof value === "number" ? `¥${value.toLocaleString()}` : value,
+      color: (_value: number | string) => "text-red-600"
     },
     { 
       key: 'avg_win_trade_pips', 
       title: '平均利益pips', 
-      format: (value: number) => `${value.toFixed(1)} pips`,
-      color: (_value: number) => "text-green-600"
+      format: (value: number | string) => typeof value === "number" ? `${value.toFixed(1)} pips` : value,
+      color: (_value: number | string) => "text-green-600"
     },
     { 
-      key: 'avg_daily_win_trades', 
-      title: '日平均利益取引', 
-      format: (value: number) => `${value.toFixed(1)}回`,
-      color: (_value: number) => "text-blue-600"
+      key: 'avg_loss_trade_pips', 
+      title: '平均損失pips', 
+      format: (value: number | string) => typeof value === "number" ? `${value.toFixed(1)} pips` : value,
+      color: (_value: number | string) => "text-red-600"
     },
     { 
-      key: 'avg_holding_time', 
-      title: '平均保有時間', 
-      format: (value: string) => {
-        // Convert "02:30:00" format to "2h 30m"
-        const parts = value.split(':');
-        const hours = parseInt(parts[0]);
-        const minutes = parseInt(parts[1]);
-        return `${hours}h ${minutes}m`;
+      key: 'avg_win_holding_time', 
+      title: '平均利益保有時間', 
+      format: (value: number | string) => {
+        if (typeof value === "string") return value;
+        if (typeof value === "number") {
+          // Convert seconds to hours and minutes
+          const hours = Math.floor(value / 3600);
+          const minutes = Math.floor((value % 3600) / 60);
+          return `${hours}h ${minutes}m`;
+        }
+        return "データなし";
       },
-      color: (_value: string) => "text-blue-600"
+      color: (_value: number | string) => "text-blue-600"
     },
     { 
-      key: 'avg_daily_loss_trades', 
-      title: '日平均損失取引', 
-      format: (value: number) => `${value.toFixed(1)}回`,
-      color: (_value: number) => "text-blue-600"
+      key: 'avg_loss_holding_time', 
+      title: '平均損失保有時間', 
+      format: (value: number | string) => {
+        if (typeof value === "string") return value;
+        if (typeof value === "number") {
+          // Convert seconds to hours and minutes
+          const hours = Math.floor(value / 3600);
+          const minutes = Math.floor((value % 3600) / 60);
+          return `${hours}h ${minutes}m`;
+        }
+        return "データなし";
+      },
+      color: (_value: number | string) => "text-blue-600"
     },
     { 
       key: 'payoff_ratio', 
       title: 'ペイオフ比率', 
-      format: (value: number) => value.toFixed(2),
-      color: (value: number) => value >= 1.5 ? "text-green-600" : value >= 1.0 ? "text-yellow-600" : "text-red-600"
+      format: (value: number | string) => typeof value === "number" ? value.toFixed(2) : value,
+      color: (value: number | string) => typeof value === "number"
+        ? value >= 1.5 ? "text-green-600" : value >= 1.0 ? "text-yellow-600" : "text-red-600"
+        : "text-gray-400"
     },
   ];
 
@@ -142,36 +262,37 @@ function KeyStatsGrid() {
     <div className="space-y-4">
       {/* Key Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {metrics.map((metric, index) => {
-          const value = keyStats[metric.key];
-          if (value === null || value === undefined) return null;
-          
-          // Handle different value types for color function
-          let colorClass = "text-gray-900 dark:text-gray-100";
-          if (metric.key === 'avg_holding_time') {
-            colorClass = metric.color(value as string);
-          } else {
-            colorClass = metric.color(value as number);
-          }
-          
-          return (
-            <Card key={index}>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  {metric.title}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${colorClass}`}>
-                  {metric.key === 'avg_holding_time' 
-                    ? metric.format(value as string)
-                    : metric.format(value as number)
-                  }
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+              {metrics.map((metric, index) => {
+        const value = keyStats?.[metric.key];
+        
+        // Show "データなし" if no data or value is 0/null/undefined
+        const displayValue = (value === null || value === undefined || value === 0) 
+          ? "データなし" 
+          : value;
+        
+        // Determine color class
+        let colorClass = "text-gray-900 dark:text-gray-100";
+        if (displayValue === "データなし") {
+          colorClass = "text-gray-400";
+        } else {
+          colorClass = metric.color(displayValue);
+        }
+        
+        return (
+          <Card key={index}>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                {metric.title}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${colorClass}`}>
+                {metric.format(displayValue)}
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })}
       </div>
     </div>
   )
@@ -580,9 +701,9 @@ function MonthlyBreakdown() {
 }
 
 export default function AnalysisPage() {
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
-  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
-  const [selectedDay, setSelectedDay] = useState<number>(new Date().getDate());
+  const [selectedYear, setSelectedYear] = useState<number | "指定しない">(new Date().getFullYear());
+  const [selectedMonth, setSelectedMonth] = useState<number | "指定しない">(new Date().getMonth() + 1);
+  const [selectedDay, setSelectedDay] = useState<number | "指定しない">(new Date().getDate());
 
   // Generate year options (current year and 5 years back)
   const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
@@ -625,12 +746,12 @@ export default function AnalysisPage() {
               <h2 className="text-xl font-semibold">主要統計</h2>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-muted-foreground">期間:</span>
-                <Select value={selectedYear === 0 ? "0" : selectedYear.toString()} onValueChange={(value) => setSelectedYear(Number(value))}>
+                <Select value={selectedYear === "指定しない" ? "指定しない" : selectedYear.toString()} onValueChange={(value) => setSelectedYear(value === "指定しない" ? "指定しない" : Number(value))}>
                   <SelectTrigger className="w-32">
                     <SelectValue placeholder="年を選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">指定しない</SelectItem>
+                    <SelectItem value="指定しない">指定しない</SelectItem>
                     {yearOptions.map((year) => (
                       <SelectItem key={year} value={year.toString()}>
                         {year}年
@@ -638,12 +759,12 @@ export default function AnalysisPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={selectedMonth === 0 ? "0" : selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(Number(value))}>
+                <Select value={selectedMonth === "指定しない" ? "指定しない" : selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(value === "指定しない" ? "指定しない" : Number(value))}>
                   <SelectTrigger className="w-24">
                     <SelectValue placeholder="月を選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">指定しない</SelectItem>
+                    <SelectItem value="指定しない">指定しない</SelectItem>
                     {monthOptions.map((month) => (
                       <SelectItem key={month.value} value={month.value.toString()}>
                         {month.label}
@@ -651,12 +772,12 @@ export default function AnalysisPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={selectedDay === 0 ? "0" : selectedDay.toString()} onValueChange={(value) => setSelectedDay(Number(value))}>
+                <Select value={selectedDay === "指定しない" ? "指定しない" : selectedDay.toString()} onValueChange={(value) => setSelectedDay(value === "指定しない" ? "指定しない" : Number(value))}>
                   <SelectTrigger className="w-24">
                     <SelectValue placeholder="日を選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0">指定しない</SelectItem>
+                    <SelectItem value="指定しない">指定しない</SelectItem>
                     {dayOptions.map((day) => (
                       <SelectItem key={day} value={day.toString()}>
                         {day}日
@@ -667,7 +788,11 @@ export default function AnalysisPage() {
               </div>
             </div>
             <div className="space-y-4">
-              <KeyStatsGrid />
+              <KeyStatsGrid 
+                selectedYear={selectedYear}
+                selectedMonth={selectedMonth}
+                selectedDay={selectedDay}
+              />
             </div>
           </section>
 
