@@ -135,8 +135,8 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       ? total.avg_loss_holding_time / count 
       : 0;
     
-    const payoff_ratio = avg_loss_trade_loss > 0 
-      ? avg_win_trade_profit / avg_loss_trade_loss 
+    const payoff_ratio = total.loss_count > 0 && Math.abs(avg_loss_trade_loss) > 0
+      ? avg_win_trade_profit / Math.abs(avg_loss_trade_loss)
       : 0;
 
     return {
@@ -197,13 +197,13 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
     { 
       key: 'avg_win_trade_profit', 
       title: '平均利益', 
-      format: (value: number | string) => typeof value === "number" ? `¥${value.toLocaleString()}` : value,
+      format: (value: number | string) => typeof value === "number" ? `${value.toLocaleString()}` : value,
       color: (_value: number | string) => "text-green-600"
     },
     { 
       key: 'avg_loss_trade_loss', 
       title: '平均損失', 
-      format: (value: number | string) => typeof value === "number" ? `¥${value.toLocaleString()}` : value,
+      format: (value: number | string) => typeof value === "number" ? `-${(Math.abs(value)).toLocaleString()}` : value,
       color: (_value: number | string) => "text-red-600"
     },
     { 
