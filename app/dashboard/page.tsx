@@ -126,7 +126,7 @@ function PLSummaryCards() {
   )
 }
 
-function PerformanceMetrics() {
+function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
   const [performanceData, setPerformanceData] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>("");
@@ -220,7 +220,7 @@ function PerformanceMetrics() {
     };
 
     fetchPerformanceData();
-  }, [user]);
+  }, [user, settingsVersion]); // Add settingsVersion to dependencies
 
   if (loading) {
     return (
@@ -567,7 +567,7 @@ function RecentActivity() {
   )
 }
 
-function DashboardSettings() {
+function DashboardSettings({ onSettingsChange }: { onSettingsChange?: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
   const [metricsPeriod, setMetricsPeriod] = useState<string>("2"); // Default to monthly (2)
   const [loading, setLoading] = useState(false);
@@ -656,6 +656,11 @@ function DashboardSettings() {
         description: "パフォーマンス指標の期間設定が更新されました。",
       });
 
+      // Trigger refresh of performance metrics
+      if (onSettingsChange) {
+        onSettingsChange();
+      }
+
       setIsOpen(false);
     } catch (error: any) {
       console.error("Error saving settings:", error);
@@ -719,6 +724,13 @@ function DashboardSettings() {
 }
 
 export default function TradingDashboard() {
+  const [settingsVersion, setSettingsVersion] = useState<number>(0);
+
+  const handleSettingsChange = () => {
+    // Force immediate refresh of performance metrics
+    setSettingsVersion(prev => prev + 1);
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -728,7 +740,7 @@ export default function TradingDashboard() {
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold">ダッシュボード</h1>
-            <DashboardSettings />
+            <DashboardSettings onSettingsChange={handleSettingsChange} />
           </div>
         </header>
 
@@ -741,7 +753,7 @@ export default function TradingDashboard() {
 
           {/* Performance Metrics */}
           <section>
-            <PerformanceMetrics />
+            <PerformanceMetrics settingsVersion={settingsVersion} />
           </section>
 
           {/* Recent Activity */}
