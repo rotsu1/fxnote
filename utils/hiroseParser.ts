@@ -1,11 +1,7 @@
-import { createClient } from '@supabase/supabase-js';
 import * as fs from 'fs';
 import * as path from 'path';
-
-// Database configuration
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { supabase } from '../lib/supabaseClient';
+import { updateUserPerformanceMetricsBatch, TradeInput } from './metrics/updateUserPerformanceMetrics';
 
 // Interface for parsed trade data
 interface HiroseTrade {
@@ -159,12 +155,14 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
     const headers = lines[headerIndex].split(',').map(h => h.trim());
     console.log(`Found headers at line ${headerIndex + 1}:`, headers);
     
-    // Process data rows
+    // Skip header row and empty lines
     const dataRows = lines.slice(headerIndex + 1).filter(line => line.trim());
+    
     console.log(`Processing ${dataRows.length} trade records...`);
     
     let successCount = 0;
     let errorCount = 0;
+    const tradesForMetrics: TradeInput[] = [];
     
     for (let i = 0; i < dataRows.length; i++) {
       try {
@@ -255,6 +253,18 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
           errorCount++;
         } else {
           successCount++;
+          
+          // Add to metrics batch
+          tradesForMetrics.push({
+            user_id: userId,
+            exit_time: exitTime,
+            profit_loss: profitLoss,
+            pips: pips,
+            hold_time: holdTime,
+            trade_type: tradeType,
+            entry_time: entryTime,
+          });
+          
           if (successCount % 10 === 0) {
             console.log(`Processed ${successCount} trades successfully...`);
           }
@@ -263,6 +273,17 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
       } catch (rowError) {
         console.error(`Error processing row ${i + 1}:`, rowError);
         errorCount++;
+      }
+    }
+    
+    // Update performance metrics for all imported trades
+    if (tradesForMetrics.length > 0) {
+      try {
+        await updateUserPerformanceMetricsBatch(tradesForMetrics);
+        console.log(`Updated performance metrics for ${tradesForMetrics.length} trades`);
+      } catch (metricsError) {
+        console.error("Error updating performance metrics for batch import:", metricsError);
+        // Don't fail the import if metrics update fails
       }
     }
     

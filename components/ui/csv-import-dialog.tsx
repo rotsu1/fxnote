@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { updateUserPerformanceMetricsBatch, TradeInput } from '@/utils/metrics/updateUserPerformanceMetrics';
 
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
     const [isCustomBrokerOpen, setIsCustomBrokerOpen] = useState(false);
@@ -178,218 +179,142 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
       }
     };
   
+    // Helper function to parse Japanese date format
+    const parseJapaneseDateTime = (dateTimeStr: string): string => {
+      // Split by multiple spaces and filter out empty parts
+      const parts = dateTimeStr.split(/\s+/).filter(part => part.trim() !== '');
+      
+      if (parts.length < 2) {
+        return new Date().toISOString();
+      }
+      
+      const datePart = parts[0];
+      const timePart = parts[1];
+      
+      const [year, month, day] = datePart.split('/').map(Number);
+      let [hours, minutes, seconds = '00'] = timePart.split(':');
+      
+      // Handle AM/PM if present
+      if (parts.length > 2) {
+        const ampm = parts[2];
+        const hour = parseInt(hours);
+        if (ampm === '午後' && hour !== 12) {
+          hours = (hour + 12).toString();
+        } else if (ampm === '午前' && hour === 12) {
+          hours = '00';
+        }
+      }
+      
+      // Create a Date object in local timezone and convert to UTC ISO string
+      const localDate = new Date(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds));
+      return localDate.toISOString();
+    };
+
+    // Helper function to calculate holding time
+    const calculateHoldTime = (entryTime: string, exitTime: string): number => {
+      const entry = new Date(entryTime);
+      const exit = new Date(exitTime);
+      
+      // Calculate time difference in seconds
+      const timeDiffMs = exit.getTime() - entry.getTime();
+      const timeDiffSeconds = Math.floor(timeDiffMs / 1000);
+      
+      // Ensure positive value (exit time should be after entry time)
+      return Math.max(0, timeDiffSeconds);
+    };
+
+    // Helper function to get or create symbol
+    const getOrCreateSymbol = async (symbolName: string): Promise<string> => {
+      const { data: existingSymbol, error: findError } = await supabase
+        .from('symbols')
+        .select('id')
+        .eq('symbol', symbolName)
+        .single();
+      
+      if (findError && findError.code !== 'PGRST116') {
+        throw new Error(`Error finding symbol: ${findError.message}`);
+      }
+      
+      if (existingSymbol) {
+        return existingSymbol.id;
+      }
+      
+      const { data: newSymbol, error: insertError } = await supabase
+        .from('symbols')
+        .insert({ symbol: symbolName })
+        .select('id')
+        .single();
+      
+      if (insertError) {
+        throw new Error(`Error creating symbol: ${insertError.message}`);
+      }
+      
+      return newSymbol.id;
+    };
+
     // Import Hirose CSV
     const importHiroseCSV = async (file: File) => {
+      setIsImporting(true);
+      setImportError("");
+      setImportSuccess("");
+      
       try {
-        setIsImporting(true);
-        setImportProgress("CSVファイルを検証中...");
+        const text = await file.text();
+        const lines = text.split('\n');
         
-        // Validate CSV format
-        const isValid = await validateHiroseCSV(file);
-        if (!isValid) {
-          setImportError("CSVファイルの形式が正しくありません。ヒロセ通商のCSVファイルをアップロードしてください。ブラウザのコンソールで詳細を確認できます。");
-          setIsImporting(false);
-          return;
-        }
-  
-        setImportProgress("CSVファイルを解析中...");
+        // Skip header row and empty lines
+        const dataRows = lines.slice(1).filter(line => line.trim());
+        const transactionCount = dataRows.length;
         
-        // Read CSV content with proper encoding
-        let csvContent = await file.text();
-        
-        // Check if we have encoding issues and fix them
-        if (csvContent.includes('')) {
-          console.log('Fixing encoding for import...');
-          const arrayBuffer = await file.arrayBuffer();
-          
-          try {
-            const decoder = new TextDecoder('shift-jis');
-            csvContent = decoder.decode(arrayBuffer);
-            console.log('Successfully decoded import with Shift_JIS');
-          } catch (shiftJisError) {
-            console.log('Shift_JIS failed for import, trying other encodings...');
-            
-            const encodings = ['cp932', 'euc-jp', 'iso-2022-jp'];
-            for (const encoding of encodings) {
-              try {
-                const decoder = new TextDecoder(encoding);
-                csvContent = decoder.decode(arrayBuffer);
-                console.log(`Successfully decoded import with ${encoding}`);
-                break;
-              } catch (e) {
-                console.log(`${encoding} failed for import`);
-              }
-            }
-          }
-        }
-        
-        const lines = csvContent.split('\n');
-        
-        // Find the header row
-        let headerIndex = -1;
-        for (let i = 0; i < lines.length; i++) {
-          if (lines[i].includes('決済約定日時') && lines[i].includes('通貨ペア')) {
-            headerIndex = i;
-            break;
-          }
-        }
-        
-        if (headerIndex === -1) {
-          setImportError("ヘッダー行が見つかりません。");
-          setIsImporting(false);
+        if (transactionCount === 0) {
+          setImportError("CSVファイルに有効なデータが含まれていません。");
           return;
         }
         
-        // Process data rows
-        const dataRows = lines.slice(headerIndex + 1).filter(line => line.trim());
-        // Hirose CSV has 2 rows per transaction (entry and exit), so divide by 2
-        const transactionCount = Math.floor(dataRows.length / 2);
-        setImportProgress(`${transactionCount}件の取引を処理中...`);
+        setImportProgress(`0/${transactionCount}件の取引を処理中...`);
         
         let successCount = 0;
         let errorCount = 0;
+        const tradesForMetrics: TradeInput[] = [];
         
         for (let i = 0; i < dataRows.length; i++) {
           try {
-            const row = dataRows[i];
-            const values = row.split(',').map(v => v.trim().replace(/"/g, ''));
+            const values = dataRows[i].split(',');
             
-            // Skip rows with empty essential data
-            if (!values[3] || !values[16] || !values[11] || !values[0]) {
+            if (values.length < 8) {
+              console.error(`Row ${i + 1} has insufficient columns: ${values.length}`);
+              errorCount++;
               continue;
             }
             
-            // Parse Japanese date format and convert to local datetime string for localDateTimeToUTC
-            const parseJapaneseDateTime = (dateTimeStr: string): string => {
-              console.log("=== parseJapaneseDateTime Debug ===");
-              console.log("Input dateTimeStr:", dateTimeStr);
-              console.log("Input length:", dateTimeStr.length);
-              
-              // Split by multiple spaces and filter out empty parts
-              const parts = dateTimeStr.split(/\s+/).filter(part => part.trim() !== '');
-              console.log("Parts after split:", parts);
-              console.log("Parts length:", parts.length);
-              
-              if (parts.length < 2) {
-                console.log("Not enough parts, returning current time");
-                return new Date().toISOString();
-              }
-              
-              const datePart = parts[0];
-              const timePart = parts[1];
-              console.log("Date part:", datePart);
-              console.log("Time part:", timePart);
-              
-              const [year, month, day] = datePart.split('/').map(Number);
-              console.log("Parsed date:", { day, month, year });
-              
-              let [hours, minutes, seconds = '00'] = timePart.split(':');
-              console.log("Parsed time components:", { hours, minutes, seconds });
-              
-              // Handle AM/PM if present
-              if (parts.length > 2) {
-                const ampm = parts[2];
-                console.log("AM/PM part:", ampm);
-                const hour = parseInt(hours);
-                if (ampm === '午後' && hour !== 12) {
-                  hours = (hour + 12).toString();
-                  console.log("Converted to 24-hour format:", hours);
-                } else if (ampm === '午前' && hour === 12) {
-                  hours = '00';
-                  console.log("Converted 12 AM to 00:", hours);
-                }
-              }
-              
-              // Create a Date object in local timezone and convert to UTC ISO string
-              const localDate = new Date(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds));
-              const utcResult = localDate.toISOString();
-              console.log("Local date object:", localDate);
-              console.log("Final UTC result:", utcResult);
-              console.log("=== End parseJapaneseDateTime Debug ===");
-              
-              return utcResult;
-            };
+            // Parse values
+            const exitDateTime = values[0].trim(); // 決済約定日時
+            const symbolName = values[3].trim(); // 通貨ペア
+            const buySell = values[4].trim(); // 売買
+            const lotSizeStr = values[5].trim(); // Lot数
+            const entryDateTime = values[6].trim(); // 新規約定日時
+            const entryPriceStr = values[7].trim(); // 新規約定値
+            const exitPriceStr = values[8].trim(); // 決済約定値
+            const pipsStr = values[9].trim(); // pip損益
+            const profitLossStr = values[10].trim(); // 売買損益
             
-            // Convert lot size (10000 currency per lot to 1000 currency per lot)
-            const convertLotSize = (lotSizeStr: string): number => {
-              const lotSize = parseFloat(lotSizeStr);
-              return lotSize / 10;
-            };
+            // Convert values
+            const entryPrice = parseFloat(entryPriceStr);
+            const exitPrice = parseFloat(exitPriceStr);
+            const lotSize = parseFloat(lotSizeStr);
+            const pips = parseFloat(pipsStr);
+            const profitLoss = parseFloat(profitLossStr);
+            const tradeType = buySell === '買' ? 0 : 1;
             
-            // Convert trade type (inverted because 決済約定日時 means exit, so 売買 is opposite)
-            const convertTradeType = (buySellStr: string): number => {
-              return buySellStr === '売' ? 0 : 1; // 売 (sell) = 0 (buy), 買 (buy) = 1 (sell)
-            };
+            // Parse dates
+            const entryTime = parseJapaneseDateTime(entryDateTime);
+            const exitTime = parseJapaneseDateTime(exitDateTime);
             
-            // Calculate holding time (difference between settlement and new contract times)
-            const calculateHoldTime = (entryTime: string, exitTime: string): number => {
-              const entry = new Date(entryTime);
-              const exit = new Date(exitTime);
-              
-              // Calculate time difference in seconds
-              const timeDiffMs = exit.getTime() - entry.getTime();
-              const timeDiffSeconds = Math.floor(timeDiffMs / 1000);
-              
-              // Ensure positive value (exit time should be after entry time)
-              return Math.max(0, timeDiffSeconds);
-            };
-            
-            // Get or create symbol
-            const getOrCreateSymbol = async (symbolName: string): Promise<string> => {
-              const { data: existingSymbol, error: findError } = await supabase
-                .from('symbols')
-                .select('id')
-                .eq('symbol', symbolName)
-                .single();
-              
-              if (findError && findError.code !== 'PGRST116') {
-                throw new Error(`Error finding symbol: ${findError.message}`);
-              }
-              
-              if (existingSymbol) {
-                return existingSymbol.id;
-              }
-              
-              const { data: newSymbol, error: insertError } = await supabase
-                .from('symbols')
-                .insert({ symbol: symbolName })
-                .select('id')
-                .single();
-              
-              if (insertError) {
-                throw new Error(`Error creating symbol: ${insertError.message}`);
-              }
-              
-              return newSymbol.id;
-            };
-            
-            // Parse trade data
-            console.log("=== CSV Trade Data Parsing Debug ===");
-            console.log("Raw entry time from CSV:", values[11]); // 新規約定日時
-            console.log("Raw exit time from CSV:", values[0]);   // 決済約定日時
-            
-            const entryDateTime = parseJapaneseDateTime(values[11]); // 新規約定日時
-            const exitDateTime = parseJapaneseDateTime(values[0]);   // 決済約定日時
-            
-            console.log("Parsed entry datetime:", entryDateTime);
-            console.log("Parsed exit datetime:", exitDateTime);
-            
-            const entryTime = localDateTimeToUTC(entryDateTime);
-            const exitTime = localDateTimeToUTC(exitDateTime);
-            
-            console.log("Final entry time (UTC):", entryTime);
-            console.log("Final exit time (UTC):", exitTime);
-            console.log("=== End CSV Trade Data Parsing Debug ===");
-            const lotSize = convertLotSize(values[10]);          // Lot数
-            const tradeType = convertTradeType(values[9]);       // 売買
-            const profitLoss = parseFloat(values[16]);           // 売買損益
-            const entryPrice = parseFloat(values[12]);           // 新規約定値
-            const exitPrice = parseFloat(values[13]);            // 決済約定値
-            const pips = (parseFloat(values[14]) || 0) / 10;     // pip損益 (divide by 10 for Hirose)
+            // Calculate hold time
             const holdTime = calculateHoldTime(entryTime, exitTime);
             
             // Get or create symbol
-            const symbolId = await getOrCreateSymbol(values[3]); // 通貨ペア
+            const symbolId = await getOrCreateSymbol(symbolName); // 通貨ペア
             
             // Trade memo should be empty
             const tradeMemo = "";
@@ -417,6 +342,18 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
               errorCount++;
             } else {
               successCount++;
+              
+              // Add to metrics batch
+              tradesForMetrics.push({
+                user_id: user.id,
+                exit_time: exitTime,
+                profit_loss: profitLoss,
+                pips: pips,
+                hold_time: holdTime,
+                trade_type: tradeType,
+                entry_time: entryTime,
+              });
+              
               if (successCount % 10 === 0) {
                 setImportProgress(`${successCount}/${transactionCount}件の取引を処理完了...`);
               }
@@ -425,6 +362,17 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
           } catch (rowError) {
             console.error(`Error processing row ${i + 1}:`, rowError);
             errorCount++;
+          }
+        }
+        
+        // Update performance metrics for all imported trades
+        if (tradesForMetrics.length > 0) {
+          try {
+            await updateUserPerformanceMetricsBatch(tradesForMetrics);
+            console.log(`Updated performance metrics for ${tradesForMetrics.length} trades`);
+          } catch (metricsError) {
+            console.error("Error updating performance metrics for batch import:", metricsError);
+            // Don't fail the import if metrics update fails
           }
         }
         

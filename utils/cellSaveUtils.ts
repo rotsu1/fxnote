@@ -2,6 +2,7 @@ import { Trade } from "./types"
 import { localDateTimeToUTC } from "./timeUtils"
 import { validateCellValue, mapFieldToDatabase } from "./tableUtils"
 import { supabase } from "@/lib/supabaseClient"
+import { updateUserPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 export interface CellSaveResult {
   success: boolean
@@ -65,8 +66,10 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     if (field === 'tags' || field === 'emotion') {
       console.log('Calling handleSpecialFieldUpdate for:', field, 'with value:', processedValue)
       await handleSpecialFieldUpdate(id, field, processedValue, user)
+      return { success: true, displayValue: value }
     } else if (field === 'pair') {
       await handleSymbolUpdate(id, processedValue, user)
+      return { success: true, displayValue: value }
     } else {
       // Handle regular field updates
       const { field: dbField, value: dbValue } = mapFieldToDatabase(field, processedValue)
@@ -78,6 +81,36 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
         .eq("user_id", user.id)
       
       if (error) throw error
+      
+      // Update performance metrics if the field affects metrics
+      if (field === 'profit' || field === 'pips' || field === 'exitTime' || field === 'entryTime') {
+        try {
+          // Get the updated trade data to calculate performance metrics
+          const { data: tradeData, error: fetchError } = await supabase
+            .from("trades")
+            .select("*")
+            .eq("id", id)
+            .eq("user_id", user.id)
+            .single();
+          
+          if (!fetchError && tradeData) {
+            const tradeInput: TradeInput = {
+              user_id: tradeData.user_id,
+              exit_time: tradeData.exit_time,
+              profit_loss: tradeData.profit_loss,
+              pips: tradeData.pips,
+              hold_time: tradeData.hold_time || 0,
+              trade_type: tradeData.trade_type,
+              entry_time: tradeData.entry_time,
+            };
+            
+            await updateUserPerformanceMetrics(tradeInput);
+          }
+        } catch (metricsError) {
+          console.error("Error updating performance metrics after cell update:", metricsError);
+          // Don't fail the cell update if metrics update fails
+        }
+      }
     }
     
     // Convert back to display format for datetime fields

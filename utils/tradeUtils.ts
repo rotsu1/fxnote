@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { localDateTimeToUTC } from "./timeUtils";
+import { updateUserPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 interface Trade {
     id: number
@@ -182,6 +183,24 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
           }
         }
         
+        // Update performance metrics for the updated trade
+        const tradeInput: TradeInput = {
+          user_id: user.id,
+          exit_time: localDateTimeToUTC(tradeData.exitTime || ""),
+          profit_loss: tradeData.profit || 0,
+          pips: tradeData.pips || 0,
+          hold_time: tradeData.holdingTime || 0,
+          trade_type: tradeData.type === "買い" ? 0 : 1,
+          entry_time: localDateTimeToUTC(tradeData.entryTime || ""),
+        };
+
+        try {
+          await updateUserPerformanceMetrics(tradeInput);
+        } catch (metricsError) {
+          console.error("Error updating performance metrics after trade update:", metricsError);
+          // Don't fail the update if metrics update fails
+        }
+        
         // Refresh the data
         const event = new Event('tradeUpdated');
         window.dispatchEvent(event);
@@ -298,6 +317,24 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
                   .insert([{ trade_id: newTradeId, emotion_id: emotionId }]);
               }
             }
+          }
+
+          // Update performance metrics for the new trade
+          const tradeInput: TradeInput = {
+            user_id: user.id,
+            exit_time: localDateTimeToUTC(tradeData.exitTime || ""),
+            profit_loss: tradeData.profit || 0,
+            pips: tradeData.pips || 0,
+            hold_time: tradeData.holdingTime || 0,
+            trade_type: tradeData.type === "買い" ? 0 : 1,
+            entry_time: localDateTimeToUTC(tradeData.entryTime || ""),
+          };
+
+          try {
+            await updateUserPerformanceMetrics(tradeInput);
+          } catch (metricsError) {
+            console.error("Error updating performance metrics after trade insertion:", metricsError);
+            // Don't fail the insertion if metrics update fails
           }
           
           // Refresh the data

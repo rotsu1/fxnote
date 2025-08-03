@@ -1,6 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import { utcToLocalDateTime } from "./timeUtils";
 import { Trade } from "./types";
+import { removeTradeFromPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 export interface TransformedTrade {
   id: number;
@@ -57,6 +58,19 @@ export const deleteTrade = async (tradeId: number, userId: string): Promise<{ su
   }
 
   try {
+    // First, get the trade data before deletion for performance metrics update
+    const { data: tradeData, error: fetchError } = await supabase
+      .from("trades")
+      .select("*")
+      .eq("id", tradeId)
+      .eq("user_id", userId)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching trade data:", fetchError);
+      return { success: false, error: "取引データの取得中にエラーが発生しました" };
+    }
+
     // Delete trade emotion links
     const { error: emotionError } = await supabase
       .from("trade_emotion_links")
@@ -87,6 +101,26 @@ export const deleteTrade = async (tradeId: number, userId: string): Promise<{ su
     if (tradeError) {
       console.error("Error deleting trade:", tradeError);
       return { success: false, error: "取引の削除中にエラーが発生しました" };
+    }
+
+    // Update performance metrics by removing the trade
+    if (tradeData) {
+      const tradeInput: TradeInput = {
+        user_id: tradeData.user_id,
+        exit_time: tradeData.exit_time,
+        profit_loss: tradeData.profit_loss,
+        pips: tradeData.pips,
+        hold_time: tradeData.hold_time || 0,
+        trade_type: tradeData.trade_type,
+        entry_time: tradeData.entry_time,
+      };
+
+      try {
+        await removeTradeFromPerformanceMetrics(tradeInput);
+      } catch (metricsError) {
+        console.error("Error updating performance metrics after trade deletion:", metricsError);
+        // Don't fail the deletion if metrics update fails
+      }
     }
 
     console.log("Trade deleted successfully");
