@@ -352,36 +352,93 @@ function TimeAnalysis() {
     setLoading(true);
     setError("");
     
-    // Fetch time analysis data for the selected year and month
+    // Fetch hourly data from user_performance_metrics for the selected year and month
+    const monthString = selectedMonth.toString().padStart(2, '0');
+    const yearMonth = `${selectedYear}-${monthString}`;
+    
     supabase
-      .from("time_analysis")
+      .from("user_performance_metrics")
       .select("*")
       .eq("user_id", user.id)
-      .eq("year", selectedYear)
-      .eq("month", selectedMonth)
-      .order("time_range", { ascending: true })
+      .eq("period_type", "hourly")
+      .like("period_value", `${yearMonth}-%`)
+      .order("period_value", { ascending: true })
       .then(({ data, error }) => {
         if (error) {
           setError(error.message);
           setTimeData([]);
         } else {
-          // If no data, use default structure with zeros
-          const defaultTimeSlots = [
-            "00:00-02:00", "02:00-04:00", "04:00-06:00", "06:00-08:00",
-            "08:00-10:00", "10:00-12:00", "12:00-14:00", "14:00-16:00",
-            "16:00-18:00", "18:00-20:00", "20:00-22:00", "22:00-00:00"
+          // Define time slots (1-hour intervals)
+          // Each hour record (e.g., "2025-01-15T14") represents trades from that hour only
+          // We display each hour individually for detailed analysis
+          const timeSlots = [
+            { hour: 0, label: "00:00-01:00" },
+            { hour: 1, label: "01:00-02:00" },
+            { hour: 2, label: "02:00-03:00" },
+            { hour: 3, label: "03:00-04:00" },
+            { hour: 4, label: "04:00-05:00" },
+            { hour: 5, label: "05:00-06:00" },
+            { hour: 6, label: "06:00-07:00" },
+            { hour: 7, label: "07:00-08:00" },
+            { hour: 8, label: "08:00-09:00" },
+            { hour: 9, label: "09:00-10:00" },
+            { hour: 10, label: "10:00-11:00" },
+            { hour: 11, label: "11:00-12:00" },
+            { hour: 12, label: "12:00-13:00" },
+            { hour: 13, label: "13:00-14:00" },
+            { hour: 14, label: "14:00-15:00" },
+            { hour: 15, label: "15:00-16:00" },
+            { hour: 16, label: "16:00-17:00" },
+            { hour: 17, label: "17:00-18:00" },
+            { hour: 18, label: "18:00-19:00" },
+            { hour: 19, label: "19:00-20:00" },
+            { hour: 20, label: "20:00-21:00" },
+            { hour: 21, label: "21:00-22:00" },
+            { hour: 22, label: "22:00-23:00" },
+            { hour: 23, label: "23:00-00:00" }
           ];
           
-          const processedData = defaultTimeSlots.map(timeSlot => {
-            const timeData = data?.find(item => item.time_range === timeSlot);
+          // Process hourly data
+          const processedData = timeSlots.map(timeSlot => {
+            // Find data for this specific hour
+            const hourData = data?.find(item => {
+              const periodValue = item.period_value;
+              if (!periodValue) return false;
+              
+              // Extract hour from period_value format "YYYY-MM-DDTHH"
+              const hourMatch = periodValue.match(/T(\d{2})$/);
+              if (!hourMatch) return false;
+              
+              const hour = parseInt(hourMatch[1], 10);
+              
+              // Check if this matches our specific hour
+              return hour === timeSlot.hour;
+            });
+            
+            if (!hourData) {
+              return {
+                time: timeSlot.label,
+                wins: 0,
+                losses: 0,
+                avgPips: 0,
+                performance: "neutral"
+              };
+            }
+            
+            // Calculate metrics for this hour
+            const totalTrades = (hourData.win_count || 0) + (hourData.loss_count || 0);
+            const totalPips = (hourData.win_pips || 0) + (hourData.loss_pips || 0);
+            const avgPips = totalTrades > 0 ? totalPips / totalTrades : 0;
+            const performance = avgPips > 10 ? "strong" : avgPips < -10 ? "weak" : "neutral";
+            
             return {
-              time: timeSlot,
-              wins: timeData?.wins || 0,
-              losses: timeData?.losses || 0,
-              avgPips: timeData?.avg_pips || 0,
-              performance: timeData?.avg_pips > 10 ? "strong" : timeData?.avg_pips < -10 ? "weak" : "neutral"
+              time: timeSlot.label,
+              wins: hourData.win_count || 0,
+              losses: hourData.loss_count || 0,
+              avgPips: avgPips,
+              performance: performance
             };
-          });
+                    });
           
           setTimeData(processedData);
         }
