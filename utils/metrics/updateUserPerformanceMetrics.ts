@@ -37,6 +37,7 @@ type PeriodType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'total'
 function cleanPeriodValue(periodValue: string): string {
   if (!periodValue) return periodValue;
   // Remove any leading/trailing whitespace and normalize
+  // Also ensure the value is URL-safe for Supabase queries
   return periodValue.trim();
 }
 
@@ -69,7 +70,7 @@ function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string
   const weekNumber = getISOWeek(date);
 
   const periodValues = {
-    hourly: `${year}-${month}-${day}T${hour}`,
+    hourly: `${year}-${month}-${day}-${hour}`,
     daily: `${year}-${month}-${day}`,
     weekly: `${year}-W${String(weekNumber).padStart(2, '0')}`,
     monthly: `${year}-${month}`,
@@ -95,6 +96,9 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
     // Extract period values from exit_time
     const periodValues = extractPeriodValues(trade.exit_time);
     
+    // Debug logging
+    console.log('Period values generated:', periodValues);
+    
     // Determine if this is a win or loss
     const isWin = trade.profit_loss >= 0;
     
@@ -104,13 +108,24 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
       const cleanedPeriodValue = cleanPeriodValue(periodValue);
       
       // Get existing metric record
-      const { data: existingMetric, error: fetchError } = await supabase
-        .from('user_performance_metrics')
-        .select('*')
-        .eq('user_id', trade.user_id)
-        .eq('period_type', typedPeriodType)
-        .eq('period_value', cleanedPeriodValue)
-        .single();
+      let existingMetric = null;
+      let fetchError = null;
+      
+      try {
+        const result = await supabase
+          .from('user_performance_metrics')
+          .select('*')
+          .eq('user_id', trade.user_id)
+          .eq('period_type', typedPeriodType)
+          .eq('period_value', cleanedPeriodValue)
+          .maybeSingle();
+        
+        existingMetric = result.data;
+        fetchError = result.error;
+      } catch (error: any) {
+        console.warn(`Error fetching existing metric for ${periodType}: ${error.message}`);
+        // Continue with creating a new record instead of throwing
+      }
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
         console.warn(`Error fetching existing metric for ${periodType}: ${fetchError.message}`);
@@ -259,13 +274,25 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
       const cleanedPeriodValue = cleanPeriodValue(periodValue);
       
       // Get existing metric record
-      const { data: existingMetric, error: fetchError } = await supabase
-        .from('user_performance_metrics')
-        .select('*')
-        .eq('user_id', trade.user_id)
-        .eq('period_type', typedPeriodType)
-        .eq('period_value', cleanedPeriodValue)
-        .single();
+      let existingMetric = null;
+      let fetchError = null;
+      
+      try {
+        const result = await supabase
+          .from('user_performance_metrics')
+          .select('*')
+          .eq('user_id', trade.user_id)
+          .eq('period_type', typedPeriodType)
+          .eq('period_value', cleanedPeriodValue)
+          .maybeSingle();
+        
+        existingMetric = result.data;
+        fetchError = result.error;
+      } catch (error: any) {
+        console.warn(`Error fetching existing metric for ${periodType}: ${error.message}`);
+        // Continue without throwing error
+        return;
+      }
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         console.warn(`Error fetching existing metric for ${periodType}: ${fetchError.message}`);
@@ -331,56 +358,3 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
     throw error;
   }
 }
-
-/**
- * Clean up any existing performance metrics with incorrect period_value formatting
- * This function should be called once to fix any existing data issues
- */
-export async function cleanupPerformanceMetricsData(): Promise<void> {
-  try {
-    console.log('Starting cleanup of performance metrics data...');
-    
-    // Get all performance metrics records
-    const { data: allMetrics, error: fetchError } = await supabase
-      .from('user_performance_metrics')
-      .select('*');
-    
-    if (fetchError) {
-      throw new Error(`Error fetching metrics: ${fetchError.message}`);
-    }
-    
-    if (!allMetrics || allMetrics.length === 0) {
-      console.log('No metrics found to clean up');
-      return;
-    }
-    
-    let cleanedCount = 0;
-    const updatePromises = allMetrics.map(async (metric) => {
-      const originalPeriodValue = metric.period_value;
-      const cleanedPeriodValue = cleanPeriodValue(originalPeriodValue);
-      
-      // Only update if the value needs cleaning
-      if (originalPeriodValue !== cleanedPeriodValue) {
-        const { error: updateError } = await supabase
-          .from('user_performance_metrics')
-          .update({ period_value: cleanedPeriodValue })
-          .eq('user_id', metric.user_id)
-          .eq('period_type', metric.period_type)
-          .eq('period_value', originalPeriodValue);
-        
-        if (updateError) {
-          console.error(`Error updating metric ${metric.user_id}-${metric.period_type}-${originalPeriodValue}:`, updateError);
-        } else {
-          cleanedCount++;
-        }
-      }
-    });
-    
-    await Promise.all(updatePromises);
-    console.log(`Cleanup completed. Updated ${cleanedCount} records.`);
-    
-  } catch (error) {
-    console.error('Error during cleanup:', error);
-    throw error;
-  }
-} 
