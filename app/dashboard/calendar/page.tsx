@@ -1090,6 +1090,8 @@ export default function CalendarPage() {
     if (result?.success) {
       setIsTradeDialogOpen(false);
       setEditingTrade(null);
+      // Refresh trades data to show the new/updated trade
+      await loadTrades();
     } else {
       setError(result?.error || "取引の保存中にエラーが発生しました");
     }
