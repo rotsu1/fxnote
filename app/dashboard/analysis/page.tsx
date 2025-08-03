@@ -556,13 +556,14 @@ function MonthlyBreakdown() {
     setLoading(true);
     setError("");
     
-    // Fetch monthly performance data for the selected year
+    // Fetch monthly performance data from user_performance_metrics for the selected year
     supabase
-      .from("monthly_performance")
+      .from("user_performance_metrics")
       .select("*")
       .eq("user_id", user.id)
-      .eq("year", selectedYear)
-      .order("month", { ascending: true })
+      .eq("period_type", "monthly")
+      .like("period_value", `${selectedYear}-%`)
+      .order("period_value", { ascending: true })
       .then(({ data, error }) => {
         
         if (error) {
@@ -585,9 +586,13 @@ function MonthlyBreakdown() {
     
     const monthlyStats = months.map((month, index) => {
       const monthNumber = index + 1;
+      const monthString = monthNumber.toString().padStart(2, '0');
       
-      // Match by integer month number (1, 2, 3, etc.)
-      let monthData = performanceData.find(data => data.month === monthNumber);
+      // Match by period_value format "YYYY-MM"
+      let monthData = performanceData.find(data => {
+        const periodValue = data.period_value;
+        return periodValue && periodValue.endsWith(`-${monthString}`);
+      });
 
       if (!monthData) {
         // Return default values for months without data
@@ -600,12 +605,21 @@ function MonthlyBreakdown() {
         };
       }
 
+      // Calculate values from raw data
+      const totalTrades = (monthData.win_count || 0) + (monthData.loss_count || 0);
+      const winRate = totalTrades > 0 
+        ? ((monthData.win_count || 0) / totalTrades) * 100 
+        : 0;
+      const profit = (monthData.win_profit || 0) + (monthData.loss_loss || 0);
+      const totalPips = (monthData.win_pips || 0) + (monthData.loss_pips || 0);
+      const avgPips = totalTrades > 0 ? totalPips / totalTrades : 0;
+
       return {
         month,
-        trades: monthData.trades || 0,
-        winRate: monthData.win_rate || 0,
-        profit: monthData.profit || 0,
-        avgPips: monthData.avg_pips || 0
+        trades: totalTrades,
+        winRate: winRate,
+        profit: profit,
+        avgPips: avgPips
       };
     });
 
