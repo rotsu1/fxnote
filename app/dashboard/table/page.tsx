@@ -76,8 +76,9 @@ import {
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
 import { saveTrade } from "@/utils/tradeUtils"
-import { localDateTimeToUTC, utcToLocalDateTime } from "@/utils/timeUtils"
+import { localDateTimeToUTC, utcToLocalDateTime, formatHoldTimeCompact, formatLocalTime, formatDateTime, parseTimeToMinutes } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
+import { isFieldEditable, validateCellValue, mapFieldToDatabase, getColumnValue, transformTradeData } from "@/utils/tableUtils"
 
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
@@ -324,72 +325,9 @@ export default function TablePage() {
         }, {});
 
         // Transform DB data to match Trade interface
-        const transformedTrades = (tradesData || []).map((trade: any) => {
-          const entryTime = new Date(trade.entry_time);
-          const exitTime = new Date(trade.exit_time);
-          
-          // Convert UTC to local timezone
-          const convertToLocalTime = (date: Date) => {
-            // The Date object automatically handles timezone conversion when created from UTC
-            return date;
-          };
-          
-          const localEntryTime = convertToLocalTime(entryTime);
-          const localExitTime = convertToLocalTime(exitTime);
-          
-          // Convert hold_time from seconds to readable format
-          const formatHoldTime = (seconds: number) => {
-            if (!seconds) return "";
-            const hours = Math.floor(seconds / 3600);
-            const minutes = Math.floor((seconds % 3600) / 60);
-            const remainingSeconds = seconds % 60;
-            
-            if (hours > 0) {
-              return `${hours}h ${minutes}m`;
-            } else if (minutes > 0) {
-              return `${minutes}m ${remainingSeconds}s`;
-            } else {
-              return `${remainingSeconds}s`;
-            }
-          };
-
-          // Format local time properly
-          const formatLocalTime = (date: Date) => {
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `${hours}:${minutes}`;
-          };
-
-          // Format datetime with seconds
-          const formatDateTime = (date: Date) => {
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            const seconds = String(date.getSeconds()).padStart(2, '0');
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-          };
-
-          return {
-            id: trade.id,
-            date: localEntryTime.toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
-            time: formatLocalTime(localEntryTime),
-            entryTime: formatDateTime(localEntryTime),
-            exitTime: formatDateTime(localExitTime),
-            pair: trade.symbols?.symbol || "",
-            type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
-            lot: trade.lot_size || 0,
-            entry: trade.entry_price,
-            exit: trade.exit_price,
-            pips: trade.pips || 0,
-            profit: trade.profit_loss,
-            emotion: emotionsByTradeId[trade.id] || [],
-            holdingTime: trade.hold_time || 0,
-            notes: trade.trade_memo || "",
-            tags: tagsByTradeId[trade.id] || [],
-          };
-        }) as Trade[];
+        const transformedTrades = (tradesData || []).map((trade: any) => 
+          transformTradeData(trade, tagsByTradeId, emotionsByTradeId)
+        ) as Trade[];
 
         setTrades(transformedTrades);
       } catch (error: any) {
@@ -431,8 +369,6 @@ export default function TablePage() {
     };
   }, [cellEditingState.editingCell, cellEditingState.editingValues]);
 
-
-
   const filteredTrades = useMemo(() => {
     if (!selectedDate) return [];
     const dateString = format(selectedDate, "yyyy-MM-dd");
@@ -463,33 +399,8 @@ export default function TablePage() {
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           // Special handling for holding time (保有時間)
           if (tableConfig.sortConfig.key === 'holdingTime') {
-            const parseTime = (timeStr: string) => {
-              if (!timeStr) return 0;
-              let totalMinutes = 0;
-              
-              // Parse hours
-              const hourMatch = timeStr.match(/(\d+)h/);
-              if (hourMatch) {
-                totalMinutes += parseInt(hourMatch[1]) * 60;
-              }
-              
-              // Parse minutes
-              const minuteMatch = timeStr.match(/(\d+)m/);
-              if (minuteMatch) {
-                totalMinutes += parseInt(minuteMatch[1]);
-              }
-              
-              // Parse seconds
-              const secondMatch = timeStr.match(/(\d+)s/);
-              if (secondMatch) {
-                totalMinutes += parseInt(secondMatch[1]) / 60;
-              }
-              
-              return totalMinutes;
-            };
-            
-            const aMinutes = parseTime(aValue);
-            const bMinutes = parseTime(bValue);
+            const aMinutes = parseTimeToMinutes(aValue);
+            const bMinutes = parseTimeToMinutes(bValue);
             
             // For holding time: arrow up = shortest time, arrow down = longest time
             return tableConfig.sortConfig.direction === 'asc' ? aMinutes - bMinutes : bMinutes - aMinutes;
@@ -596,11 +507,7 @@ export default function TablePage() {
     }));
   };
 
-  const isFieldEditable = (field: keyof Trade): boolean => {
-    // Fields that should not be directly edited in the table
-    const nonEditableFields: (keyof Trade)[] = ['tags', 'date', 'time', 'id'];
-    return !nonEditableFields.includes(field);
-  };
+
 
   const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
     const cellKey = `${id}-${field}`;
@@ -643,76 +550,9 @@ export default function TablePage() {
     }));
   }, []);
 
-  const validateCellValue = (field: keyof Trade, value: any): { isValid: boolean; error?: string } => {
-    // Basic validation rules
-    if (field === 'lot' || field === 'entry' || field === 'exit' || field === 'pips' || field === 'profit') {
-      const numValue = Number(value);
-      if (isNaN(numValue)) {
-        return { isValid: false, error: '数値を入力してください' };
-      }
-      if (field === 'lot' && numValue <= 0) {
-        return { isValid: false, error: 'ロットは0より大きい値を入力してください' };
-      }
-      if ((field === 'entry' || field === 'exit') && numValue <= 0) {
-        return { isValid: false, error: '価格は0より大きい値を入力してください' };
-      }
-    }
-    
-    if (field === 'pair' && !value?.trim()) {
-      return { isValid: false, error: 'シンボルを入力してください' };
-    }
-    
-    if (field === 'type' && !['買い', '売り'].includes(value)) {
-      return { isValid: false, error: '有効な取引種別を選択してください' };
-    }
-    
-    return { isValid: true };
-  };
 
-  const mapFieldToDatabase = (field: keyof Trade, value: any) => {
-    // Map frontend field names to database column names
-    const fieldMapping: Record<keyof Trade, string> = {
-      id: 'id',
-      date: 'entry_time',
-      time: 'entry_time',
-      entryTime: 'entry_time',
-      exitTime: 'exit_time',
-      pair: 'symbol',
-      type: 'trade_type',
-      lot: 'lot_size',
-      entry: 'entry_price',
-      exit: 'exit_price',
-      pips: 'pips',
-      profit: 'profit_loss',
-      emotion: 'emotion',
-      holdingTime: 'hold_time',
-      holdingDays: 'hold_time',
-      holdingHours: 'hold_time',
-      holdingMinutes: 'hold_time',
-      holdingSeconds: 'hold_time',
-      notes: 'trade_memo',
-      tags: 'tags'
-    };
-    
-    const dbField = fieldMapping[field];
-    
-    // Transform values for database
-    if (field === 'type') {
-      return { field: dbField, value: value === '買い' ? 0 : 1 };
-    }
-    
-    if (field === 'entryTime' || field === 'exitTime') {
-      // For datetime fields, value should already be in ISO format
-      return { field: dbField, value };
-    }
-    
-    if (field === 'date' || field === 'time') {
-      // Handle date/time updates - this is complex and might need special handling
-      return { field: dbField, value, needsSpecialHandling: true };
-    }
-    
-    return { field: dbField, value };
-  };
+
+
 
   const handleCellSave = useCallback(async (id: number, field: keyof Trade) => {
     const cellKey = `${id}-${field}`;
@@ -1440,34 +1280,11 @@ export default function TablePage() {
     }
   };
 
-  const getColumnValue = (trade: Trade, columnId: string) => {
-    const column = allColumns.find((c) => c.id === columnId);
-    if (!column) return "";
-
-    const value = trade[column.id as keyof Trade];
-
-    if (column.id === "profit" && typeof value === "number") {
-      return `¥${value.toLocaleString()}`;
-    }
-    if (column.id === "pips" && typeof value === "number") {
-      return `${value} pips`;
-    }
-    if (column.id === "holdingTime" && typeof value === "number") {
-      const totalSeconds = value;
-      const days = Math.floor(totalSeconds / (24 * 60 * 60));
-      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
-      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
-      const seconds = totalSeconds % 60;
-      
-      let result = "";
-      if (days > 0) result += `${days}日`;
-      if (hours > 0) result += `${hours}時間`;
-      if (minutes > 0) result += `${minutes}分`;
-      if (seconds > 0) result += `${seconds}秒`;
-      
-      return result || "0秒";
-    }
-    if (column.id === "tags" && Array.isArray(value)) {
+  const getColumnDisplayValue = (trade: Trade, columnId: string) => {
+    const value = getColumnValue(trade, columnId, allColumns);
+    
+    // Handle JSX rendering for arrays
+    if (columnId === "tags" && Array.isArray(value)) {
       return (
         <div className="flex flex-wrap gap-1">
           {value.map((tag, idx) => (
@@ -1478,7 +1295,7 @@ export default function TablePage() {
         </div>
       );
     }
-    if (column.id === "emotion" && Array.isArray(value)) {
+    if (columnId === "emotion" && Array.isArray(value)) {
       return (
         <div className="flex flex-wrap gap-1">
           {value.map((emotion, idx) => (
@@ -1489,7 +1306,7 @@ export default function TablePage() {
         </div>
       );
     }
-    return String(value);
+    return value;
   };
 
   return (
@@ -1930,7 +1747,7 @@ export default function TablePage() {
                                               "block min-h-[24px] py-1 flex-1",
                                             )}
                                           >
-                                            {getColumnValue(trade, column.id)}
+                                            {getColumnDisplayValue(trade, column.id)}
                                           </span>
                                           {!isFieldEditable(column.id as keyof Trade) && column.id !== "tags" && (
                                             <TooltipProvider>
