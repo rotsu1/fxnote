@@ -29,11 +29,19 @@ import { DisplaySettingsDialog } from "@/components/ui/display-settings-dialog"
 import { saveTrade } from "@/utils/tradeUtils"
 import { groupTradesByDate } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
-import { loadDisplaySettings, saveDisplaySettings, convertToDisplaySettings, type DisplaySettings } from "@/utils/displaySettingsUtils"
-import { transformTradeForEditing, deleteTrade, loadUserTags } from "@/utils/tradeCrudUtils"
+import { 
+  loadDisplaySettings,
+  saveDisplaySettings,
+  convertToDisplaySettings,
+  type DisplaySettings
+} from "@/utils/displaySettingsUtils"
+import {
+  transformTradeForEditing,
+  deleteTrade,
+  loadUserTags
+} from "@/utils/tradeCrudUtils"
 import { loadTrades as loadTradesData } from "@/utils/dataLoadingUtils"
 
-import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
 export default function CalendarPage() {

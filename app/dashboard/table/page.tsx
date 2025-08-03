@@ -85,41 +85,43 @@ import { useAuth } from "@/hooks/useAuth";
 
 export default function TablePage() {
   const user = useAuth();
+  // Grouped cell editing states
+  const [cellEditingState, setCellEditingState] = useState({
+    editingCell: null as { id: number; field: keyof Trade } | null,
+    editingValues: {} as Record<string, any>,
+    savingCells: new Set<string>(),
+    cellErrors: {} as Record<string, string>,
+    originalValues: {} as Record<string, any>
+  });
+  // Grouped dialog/modal states
+  const [dialogState, setDialogState] = useState({
+    isTradeDialogOpen: false,
+    isTableSettingsOpen: false,
+    showDiscardWarning: false
+  });
+  // Grouped table configuration states
+  const [tableConfig, setTableConfig] = useState({
+    visibleColumns: allColumns.filter((col) => col.defaultVisible).map((col) => col.id),
+    originalVisibleColumns: [] as string[],
+    sortConfig: { key: null as keyof Trade | null, direction: 'asc' as 'asc' | 'desc' },
+    draggedColumn: null as string | null,
+    hasUnsavedChanges: false
+  });
+  // Grouped loading/error states
+  const [status, setStatus] = useState({
+    loading: false,
+    error: "",
+    isSaving: false
+  });
+  // Individual states for distinct concepts
   const [trades, setTrades] = useState<Trade[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [editingCell, setEditingCell] = useState<{ id: number; field: keyof Trade } | null>(null);
   const [editingTrade, setEditingTrade] = useState<any>(null);
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState(false);
-  const [isTableSettingsOpen, setIsTableSettingsOpen] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
   const [selectedTrades, setSelectedTrades] = useState<Set<number>>(new Set());
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(
-    allColumns.filter((col) => col.defaultVisible).map((col) => col.id),
-  );
-  const [sortConfig, setSortConfig] = useState<{
-    key: keyof Trade | null;
-    direction: 'asc' | 'desc';
-  }>({ key: null, direction: 'asc' });
-  const [draggedColumn, setDraggedColumn] = useState<string | null>(null);
-  const [originalVisibleColumns, setOriginalVisibleColumns] = useState<string[]>([]);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [showDiscardWarning, setShowDiscardWarning] = useState(false);
-
-  // New state for improved cell editing
-  const [editingValues, setEditingValues] = useState<Record<string, any>>({});
-  const [savingCells, setSavingCells] = useState<Set<string>>(new Set());
-  const [cellErrors, setCellErrors] = useState<Record<string, string>>({});
-  const [originalValues, setOriginalValues] = useState<Record<string, any>>({});
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // Add state for availableTags (array of { id, tag_name })
   const [availableTags, setAvailableTags] = useState<{ id: number, tag_name: string }[]>([]);
-
-  // Add isComposing state for IME handling in notes editing
   const [isComposing, setIsComposing] = useState(false);
 
   // Load tags from trade_tags for the current user
@@ -207,8 +209,8 @@ export default function TablePage() {
     loadEmotionsForTable();
     
     const loadTrades = async () => {
-      setLoading(true);
-      setError("");
+      setStatus({ loading: true, error: "", isSaving: false });
+      setStatus({ loading: false, error: "", isSaving: false });
       try {
         // Load user's column preferences first
         const { data: preferencesData, error: preferencesError } = await supabase
@@ -257,8 +259,7 @@ export default function TablePage() {
               }
             });
 
-          setVisibleColumns(orderedColumns);
-          setOriginalVisibleColumns(orderedColumns);
+          setTableConfig({ ...tableConfig, visibleColumns: orderedColumns, originalVisibleColumns: orderedColumns });
         }
 
         // Fetch trades with symbol information
@@ -272,7 +273,7 @@ export default function TablePage() {
           .order("entry_time", { ascending: true });
 
         if (tradesError) {
-          setError(tradesError.message);
+          setStatus({ loading: false, error: tradesError.message, isSaving: false });
           setTrades([]);
           return;
         }
@@ -393,9 +394,9 @@ export default function TablePage() {
         setTrades(transformedTrades);
       } catch (error: any) {
         console.error("Error loading trades:", error);
-        setError(error.message || "取引データの読み込み中にエラーが発生しました");
+        setStatus({ loading: false, error: error.message || "取引データの読み込み中にエラーが発生しました", isSaving: false });
       } finally {
-        setLoading(false);
+        setStatus({ loading: false, error: "", isSaving: false });
       }
     };
 
@@ -416,7 +417,7 @@ export default function TablePage() {
   // Cleanup effect to handle unsaved changes when component unmounts
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (editingCell || Object.keys(editingValues).length > 0) {
+      if (cellEditingState.editingCell || Object.keys(cellEditingState.editingValues).length > 0) {
         e.preventDefault();
         e.returnValue = '編集中のデータがあります。ページを離れますか？';
         return e.returnValue;
@@ -428,7 +429,7 @@ export default function TablePage() {
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [editingCell, editingValues]);
+  }, [cellEditingState.editingCell, cellEditingState.editingValues]);
 
 
 
@@ -444,24 +445,24 @@ export default function TablePage() {
     });
     
     // Apply sorting
-    if (sortConfig.key) {
+    if (tableConfig.sortConfig.key) {
       filtered.sort((a, b) => {
-        const aValue = a[sortConfig.key!];
-        const bValue = b[sortConfig.key!];
+        const aValue = a[tableConfig.sortConfig.key!];
+        const bValue = b[tableConfig.sortConfig.key!];
         
         // Handle different data types
         if (typeof aValue === 'number' && typeof bValue === 'number') {
           // For profit and pips, reverse the logic so highest values appear at top when arrow is up
-          if (sortConfig.key === 'profit' || sortConfig.key === 'pips') {
-            return sortConfig.direction === 'asc' ? bValue - aValue : aValue - bValue;
+          if (tableConfig.sortConfig.key === 'profit' || tableConfig.sortConfig.key === 'pips') {
+            return tableConfig.sortConfig.direction === 'asc' ? bValue - aValue : aValue - bValue;
           }
           // For other numeric fields (lot, entry, exit), use normal sorting
-          return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
+          return tableConfig.sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
         }
         
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           // Special handling for holding time (保有時間)
-          if (sortConfig.key === 'holdingTime') {
+          if (tableConfig.sortConfig.key === 'holdingTime') {
             const parseTime = (timeStr: string) => {
               if (!timeStr) return 0;
               let totalMinutes = 0;
@@ -491,12 +492,12 @@ export default function TablePage() {
             const bMinutes = parseTime(bValue);
             
             // For holding time: arrow up = shortest time, arrow down = longest time
-            return sortConfig.direction === 'asc' ? aMinutes - bMinutes : bMinutes - aMinutes;
+            return tableConfig.sortConfig.direction === 'asc' ? aMinutes - bMinutes : bMinutes - aMinutes;
           }
           
           // Regular string comparison for other string fields
           const comparison = aValue.localeCompare(bValue);
-          return sortConfig.direction === 'asc' ? comparison : -comparison;
+          return tableConfig.sortConfig.direction === 'asc' ? comparison : -comparison;
         }
         
         // Handle arrays (tags)
@@ -504,7 +505,7 @@ export default function TablePage() {
           const aStr = aValue.join(', ');
           const bStr = bValue.join(', ');
           const comparison = aStr.localeCompare(bStr);
-          return sortConfig.direction === 'asc' ? comparison : -comparison;
+          return tableConfig.sortConfig.direction === 'asc' ? comparison : -comparison;
         }
         
         return 0;
@@ -512,13 +513,13 @@ export default function TablePage() {
     }
     
     return filtered;
-  }, [trades, selectedDate, sortConfig]);
+  }, [trades, selectedDate, tableConfig.sortConfig]);
 
   const handleCellClick = (id: number, field: keyof Trade) => {
     const cellKey = `${id}-${field}`;
     
     // Don't allow editing if the cell is currently being saved
-    if (savingCells.has(cellKey)) {
+    if (cellEditingState.savingCells.has(cellKey)) {
       return;
     }
     
@@ -528,7 +529,7 @@ export default function TablePage() {
       const trade = trades.find(t => t.id === id);
       if (trade) {
         setEditingTrade(trade);
-        setIsTradeDialogOpen(true);
+        setDialogState({ ...dialogState, isTradeDialogOpen: true });
       }
       return;
     }
@@ -537,9 +538,12 @@ export default function TablePage() {
     if (!trade) return;
     
     // Store original value for potential rollback
-    setOriginalValues(prev => ({
+    setCellEditingState(prev => ({
       ...prev,
-      [cellKey]: trade[field]
+      originalValues: {
+        ...prev.originalValues,
+        [cellKey]: trade[field]
+      }
     }));
     
     // Initialize editing value - convert datetime fields to datetime-local format
@@ -556,29 +560,40 @@ export default function TablePage() {
       const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
       const seconds = totalSeconds % 60;
       
-      setEditingValues(prev => ({
+      setCellEditingState(prev => ({
         ...prev,
-        [`${id}-holdingDays`]: days || "",
-        [`${id}-holdingHours`]: hours || "",
-        [`${id}-holdingMinutes`]: minutes || "",
-        [`${id}-holdingSeconds`]: seconds || "",
-        [cellKey]: totalSeconds
+        editingValues: {
+          ...prev.editingValues,
+          [`${id}-holdingDays`]: days || "",
+          [`${id}-holdingHours`]: hours || "",
+          [`${id}-holdingMinutes`]: minutes || "",
+          [`${id}-holdingSeconds`]: seconds || "",
+          [cellKey]: totalSeconds
+        }
       }));
     } else {
-      setEditingValues(prev => ({
+      setCellEditingState(prev => ({
         ...prev,
-        [cellKey]: editingValue
+        editingValues: {
+          ...prev.editingValues,
+          [cellKey]: editingValue
+        }
       }));
     }
     
     // Clear any previous errors for this cell
-    setCellErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[cellKey];
-      return newErrors;
-    });
+    setCellEditingState(prev => ({
+      ...prev,
+      cellErrors: {
+        ...prev.cellErrors,
+        [cellKey]: ""
+      }
+    }));
     
-    setEditingCell({ id, field });
+    setCellEditingState(prev => ({
+      ...prev,
+      editingCell: { id, field }
+    }));
   };
 
   const isFieldEditable = (field: keyof Trade): boolean => {
@@ -589,9 +604,12 @@ export default function TablePage() {
 
   const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
     const cellKey = `${id}-${field}`;
-    setEditingValues(prev => ({
+    setCellEditingState(prev => ({
       ...prev,
-      [cellKey]: value
+      editingValues: {
+        ...prev.editingValues,
+        [cellKey]: value
+      }
     }));
     
     // For holding time, also update the individual field that was changed
@@ -602,22 +620,27 @@ export default function TablePage() {
       const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
       const seconds = totalSeconds % 60;
       
-      setEditingValues(prev => ({
+      setCellEditingState(prev => ({
         ...prev,
-        [`${id}-holdingDays`]: days || "",
-        [`${id}-holdingHours`]: hours || "",
-        [`${id}-holdingMinutes`]: minutes || "",
-        [`${id}-holdingSeconds`]: seconds || "",
-        [cellKey]: value
+        editingValues: {
+          ...prev.editingValues,
+          [`${id}-holdingDays`]: days || "",
+          [`${id}-holdingHours`]: hours || "",
+          [`${id}-holdingMinutes`]: minutes || "",
+          [`${id}-holdingSeconds`]: seconds || "",
+          [cellKey]: value
+        }
       }));
     }
     
     // Clear error when user starts typing
-    setCellErrors(prev => {
-      const newErrors = { ...prev };
-      delete newErrors[cellKey];
-      return newErrors;
-    });
+    setCellEditingState(prev => ({
+      ...prev,
+      cellErrors: {
+        ...prev.cellErrors,
+        [cellKey]: ""
+      }
+    }));
   }, []);
 
   const validateCellValue = (field: keyof Trade, value: any): { isValid: boolean; error?: string } => {
@@ -693,7 +716,7 @@ export default function TablePage() {
 
   const handleCellSave = useCallback(async (id: number, field: keyof Trade) => {
     const cellKey = `${id}-${field}`;
-    let value = editingValues[cellKey];
+    let value = cellEditingState.editingValues[cellKey];
     
     console.log('handleCellSave called:', { id, field, value, cellKey });
     
@@ -710,15 +733,18 @@ export default function TablePage() {
     // Validate the value
     const validation = validateCellValue(field, value);
     if (!validation.isValid) {
-      setCellErrors(prev => ({
+      setCellEditingState(prev => ({
         ...prev,
-        [cellKey]: validation.error!
+        cellErrors: {
+          ...prev.cellErrors,
+          [cellKey]: validation.error!
+        }
       }));
       return;
     }
     
     // Check if value actually changed
-    const originalValue = originalValues[cellKey];
+    const originalValue = cellEditingState.originalValues[cellKey];
     let valuesEqual = false;
     if (Array.isArray(value) && Array.isArray(originalValue)) {
       valuesEqual = value.length === originalValue.length && 
@@ -732,29 +758,26 @@ export default function TablePage() {
     if (valuesEqual) {
       console.log('No changes detected, exiting editing mode');
       // No changes made, just exit editing mode
-      setEditingCell(null);
-      setEditingValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        // Also clean up holding time individual fields
-        if (field === 'holdingTime') {
-          delete newValues[`${id}-holdingDays`];
-          delete newValues[`${id}-holdingHours`];
-          delete newValues[`${id}-holdingMinutes`];
-          delete newValues[`${id}-holdingSeconds`];
+      setCellEditingState(prev => ({
+        ...prev,
+        editingCell: null,
+        editingValues: {
+          ...prev.editingValues,
+          [cellKey]: undefined // Clear the value from editingValues
+        },
+        originalValues: {
+          ...prev.originalValues,
+          [cellKey]: undefined // Clear the value from originalValues
         }
-        return newValues;
-      });
-      setOriginalValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        return newValues;
-      });
-      setIsSaving(false);
+      }));
+      setStatus({ ...status, isSaving: false });
       return;
     }
     
-    setSavingCells(prev => new Set(prev).add(cellKey));
+    setCellEditingState(prev => ({
+      ...prev,
+      savingCells: new Set(prev.savingCells).add(cellKey)
+    }));
     
     console.log('Starting database save for field:', field);
     
@@ -802,34 +825,38 @@ export default function TablePage() {
       );
       
       // Clear editing state
-      setEditingCell(null);
-      setEditingValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        return newValues;
-      });
-      setOriginalValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        return newValues;
-      });
-      setIsSaving(false);
+      setCellEditingState(prev => ({
+        ...prev,
+        editingCell: null,
+        editingValues: {
+          ...prev.editingValues,
+          [cellKey]: undefined
+        },
+        originalValues: {
+          ...prev.originalValues,
+          [cellKey]: undefined
+        }
+      }));
+      setStatus({ ...status, isSaving: false });
       
     } catch (error: any) {
       console.error("Error updating cell:", error);
-      setCellErrors(prev => ({
+      setCellEditingState(prev => ({
         ...prev,
-        [cellKey]: error.message || '更新に失敗しました'
+        cellErrors: {
+          ...prev.cellErrors,
+          [cellKey]: error.message || '更新に失敗しました'
+        }
       }));
     } finally {
-      setSavingCells(prev => {
-        const newSet = new Set(prev);
+      setCellEditingState(prev => {
+        const newSet = new Set(prev.savingCells);
         newSet.delete(cellKey);
-        return newSet;
+        return { ...prev, savingCells: newSet };
       });
-      setIsSaving(false);
+      setStatus({ ...status, isSaving: false });
     }
-  }, [editingValues, originalValues, user]);
+  }, [cellEditingState.editingValues, cellEditingState.originalValues, user, status]);
 
   const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: any) => {
     console.log('handleSpecialFieldUpdate called:', { id, field, value });
@@ -997,11 +1024,11 @@ export default function TablePage() {
   };
 
   const handleCellBlur = useCallback(() => {
-    console.log('handleCellBlur called, editingCell:', editingCell);
-    if (editingCell && !isSaving) {
-      const cellKey = `${editingCell.id}-${editingCell.field}`;
-      const currentValue = editingValues[cellKey];
-      const originalValue = originalValues[cellKey];
+    console.log('handleCellBlur called, editingCell:', cellEditingState.editingCell);
+    if (cellEditingState.editingCell && !status.isSaving) {
+      const cellKey = `${cellEditingState.editingCell.id}-${cellEditingState.editingCell.field}`;
+      const currentValue = cellEditingState.editingValues[cellKey];
+      const originalValue = cellEditingState.originalValues[cellKey];
       
       console.log('Blur values:', { cellKey, currentValue, originalValue });
       
@@ -1015,33 +1042,27 @@ export default function TablePage() {
       }
       
       // Always exit editing mode first
-      setEditingCell(null);
-      setEditingValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        // Also clean up holding time individual fields
-        if (editingCell.field === 'holdingTime') {
-          delete newValues[`${editingCell.id}-holdingDays`];
-          delete newValues[`${editingCell.id}-holdingHours`];
-          delete newValues[`${editingCell.id}-holdingMinutes`];
-          delete newValues[`${editingCell.id}-holdingSeconds`];
+      setCellEditingState(prev => ({
+        ...prev,
+        editingCell: null,
+        editingValues: {
+          ...prev.editingValues,
+          [cellKey]: undefined // Clear the value from editingValues
+        },
+        originalValues: {
+          ...prev.originalValues,
+          [cellKey]: undefined // Clear the value from originalValues
         }
-        return newValues;
-      });
-      setOriginalValues(prev => {
-        const newValues = { ...prev };
-        delete newValues[cellKey];
-        return newValues;
-      });
+      }));
       
       // If changes were made, save them
       if (!valuesEqual) {
         console.log('Changes detected, calling handleCellSave');
-        setIsSaving(true);
-        handleCellSave(editingCell.id, editingCell.field);
+        setStatus({ ...status, isSaving: true });
+        handleCellSave(cellEditingState.editingCell.id, cellEditingState.editingCell.field);
       }
     }
-  }, [editingCell, editingValues, originalValues, handleCellSave, isSaving]);
+  }, [cellEditingState.editingCell, cellEditingState.editingValues, cellEditingState.originalValues, handleCellSave, status]);
 
   // Global click handler for emotions and tags containers
   useEffect(() => {
@@ -1049,18 +1070,18 @@ export default function TablePage() {
     
     const handleGlobalClick = (event: MouseEvent) => {
       if (
-        editingCell &&
-        (editingCell.field === 'emotion' || editingCell.field === 'tags') &&
-        !isSaving
+        cellEditingState.editingCell &&
+        (cellEditingState.editingCell.field === 'emotion' || cellEditingState.editingCell.field === 'tags') &&
+        !status.isSaving
       ) {
         const target = event.target as Element;
-        const containerSelector = editingCell.field === 'emotion' 
+        const containerSelector = cellEditingState.editingCell.field === 'emotion' 
           ? '[data-emotions-container="true"]'
           : '[data-tags-container="true"]';
         const container = document.querySelector(containerSelector);
         
         if (container && !container.contains(target)) {
-          console.log(`Global click detected outside ${editingCell.field} container`);
+          console.log(`Global click detected outside ${cellEditingState.editingCell.field} container`);
           // Clear any existing timeout
           if (timeoutId) {
             clearTimeout(timeoutId);
@@ -1081,7 +1102,7 @@ export default function TablePage() {
         clearTimeout(timeoutId);
       }
     };
-  }, [editingCell, handleCellBlur, isSaving]);
+  }, [cellEditingState.editingCell, handleCellBlur, status.isSaving]);
 
   const handleCellKeyDown = useCallback((e: React.KeyboardEvent, id: number, field: keyof Trade) => {
     if (e.key === 'Enter') {
@@ -1091,7 +1112,7 @@ export default function TablePage() {
       e.preventDefault();
       // Cancel editing and restore original value
       const cellKey = `${id}-${field}`;
-      let originalValue = originalValues[cellKey];
+      let originalValue = cellEditingState.originalValues[cellKey];
       
       // Convert datetime fields back to datetime-local format for display
       if (field === 'entryTime' || field === 'exitTime') {
@@ -1106,43 +1127,54 @@ export default function TablePage() {
         const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
         const seconds = totalSeconds % 60;
         
-        setEditingValues(prev => ({
+        setCellEditingState(prev => ({
           ...prev,
-          [`${id}-holdingDays`]: days || "",
-          [`${id}-holdingHours`]: hours || "",
-          [`${id}-holdingMinutes`]: minutes || "",
-          [`${id}-holdingSeconds`]: seconds || "",
-          [cellKey]: originalValue
+          editingValues: {
+            ...prev.editingValues,
+            [`${id}-holdingDays`]: days || "",
+            [`${id}-holdingHours`]: hours || "",
+            [`${id}-holdingMinutes`]: minutes || "",
+            [`${id}-holdingSeconds`]: seconds || "",
+            [cellKey]: originalValue
+          }
         }));
       } else {
-        setEditingValues(prev => ({
+        setCellEditingState(prev => ({
           ...prev,
-          [cellKey]: originalValue
+          editingValues: {
+            ...prev.editingValues,
+            [cellKey]: originalValue
+          }
         }));
       }
       
-      setCellErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[cellKey];
-        return newErrors;
-      });
-      setEditingCell(null);
+      setCellEditingState(prev => ({
+        ...prev,
+        cellErrors: {
+          ...prev.cellErrors,
+          [cellKey]: ""
+        }
+      }));
+      setCellEditingState(prev => ({
+        ...prev,
+        editingCell: null
+      }));
     }
-  }, [handleCellSave, originalValues]);
+  }, [cellEditingState.originalValues, handleCellSave]);
 
   const handleAddTrade = () => {
     setEditingTrade(null);
-    setIsTradeDialogOpen(true);
+    setDialogState({ ...dialogState, isTradeDialogOpen: true });
   };
 
   const handleSaveTrade = async (tradeData: Partial<Trade>) => {
     const result = await saveTrade(tradeData, editingTrade, user);
     
     if (result?.success) {
-      setIsTradeDialogOpen(false);
+      setDialogState({ ...dialogState, isTradeDialogOpen: false });
       setEditingTrade(null);
     } else {
-      setError(result?.error || "取引の保存中にエラーが発生しました");
+      setStatus({ ...status, error: result?.error || "取引の保存中にエラーが発生しました", isSaving: false });
     }
   };
 
@@ -1205,17 +1237,23 @@ export default function TablePage() {
       setDeleteConfirmId(null);
     } catch (error: any) {
       console.error("Error deleting trade:", error);
-      setError(error.message);
+      setStatus({ ...status, error: error.message, isSaving: false });
     }
   };
 
   const handleToggleColumn = (columnId: string, isVisible: boolean) => {
-    setVisibleColumns((prev) => (isVisible ? [...prev, columnId] : prev.filter((id) => id !== columnId)));
-    setHasUnsavedChanges(true);
+    setTableConfig(prev => ({
+      ...prev,
+      visibleColumns: isVisible ? [...prev.visibleColumns, columnId] : prev.visibleColumns.filter((id) => id !== columnId),
+      hasUnsavedChanges: true
+    }));
   };
 
   const handleDragStart = (columnId: string) => {
-    setDraggedColumn(columnId);
+    setTableConfig(prev => ({
+      ...prev,
+      draggedColumn: columnId
+    }));
   };
 
   const handleDragOver = (e: React.DragEvent, columnId: string) => {
@@ -1223,23 +1261,29 @@ export default function TablePage() {
   };
 
   const handleDrop = (targetColumnId: string) => {
-    if (!draggedColumn || draggedColumn === targetColumnId) {
-      setDraggedColumn(null);
+    if (!tableConfig.draggedColumn || tableConfig.draggedColumn === targetColumnId) {
+      setTableConfig(prev => ({
+        ...prev,
+        draggedColumn: null
+      }));
       return;
     }
 
-    const newOrder = [...visibleColumns];
-    const draggedIndex = newOrder.indexOf(draggedColumn);
+    const newOrder = [...tableConfig.visibleColumns];
+    const draggedIndex = newOrder.indexOf(tableConfig.draggedColumn);
     const targetIndex = newOrder.indexOf(targetColumnId);
 
     // Remove dragged item from its current position
     newOrder.splice(draggedIndex, 1);
     // Insert it at the target position
-    newOrder.splice(targetIndex, 0, draggedColumn);
+    newOrder.splice(targetIndex, 0, tableConfig.draggedColumn);
 
-    setVisibleColumns(newOrder);
-    setDraggedColumn(null);
-    setHasUnsavedChanges(true);
+    setTableConfig(prev => ({
+      ...prev,
+      visibleColumns: newOrder,
+      draggedColumn: null,
+      hasUnsavedChanges: true
+    }));
   };
 
   const saveColumnPreferences = async () => {
@@ -1265,7 +1309,7 @@ export default function TablePage() {
       const preferences: any = {};
       
       // Set order for visible columns (1-based indexing to match database)
-      visibleColumns.forEach((columnId, index) => {
+      tableConfig.visibleColumns.forEach((columnId, index) => {
         const dbField = columnMapping[columnId as keyof typeof columnMapping];
         if (dbField) {
           preferences[dbField] = index + 1; // Convert 0-based to 1-based
@@ -1275,7 +1319,7 @@ export default function TablePage() {
       // Set null for hidden columns
       allColumns.forEach((column) => {
         const dbField = columnMapping[column.id as keyof typeof columnMapping];
-        if (dbField && !visibleColumns.includes(column.id)) {
+        if (dbField && !tableConfig.visibleColumns.includes(column.id)) {
           preferences[dbField] = null;
         }
       });
@@ -1306,61 +1350,76 @@ export default function TablePage() {
           }]);
       }
       
-      setHasUnsavedChanges(false);
-      setIsTableSettingsOpen(false);
+      setTableConfig(prev => ({
+        ...prev,
+        hasUnsavedChanges: false
+      }));
+      setDialogState({ ...dialogState, isTableSettingsOpen: false });
     } catch (error) {
       console.error("Error saving column preferences:", error);
     }
   };
 
   const handleCloseSettings = () => {
-    if (hasUnsavedChanges) {
-      setShowDiscardWarning(true);
+    if (tableConfig.hasUnsavedChanges) {
+      setDialogState({ ...dialogState, showDiscardWarning: true });
     } else {
-      setIsTableSettingsOpen(false);
+      setDialogState({ ...dialogState, isTableSettingsOpen: false });
     }
   };
 
   const handleDiscardChanges = () => {
-    setVisibleColumns(originalVisibleColumns);
-    setHasUnsavedChanges(false);
-    setShowDiscardWarning(false);
-    setIsTableSettingsOpen(false);
+    setTableConfig(prev => ({
+      ...prev,
+      visibleColumns: prev.originalVisibleColumns,
+      hasUnsavedChanges: false
+    }));
+    setDialogState({ ...dialogState, showDiscardWarning: false });
+    setDialogState({ ...dialogState, isTableSettingsOpen: false });
   };
 
   const handleCancelDiscard = () => {
-    setShowDiscardWarning(false);
+    setDialogState({ ...dialogState, showDiscardWarning: false });
   };
 
   const handleSort = (key: keyof Trade) => {
-    setSortConfig(prev => {
-      if (prev.key === key) {
+    setTableConfig(prev => {
+      if (prev.sortConfig.key === key) {
         // If clicking the same column, cycle through: asc -> desc -> none
-        if (prev.direction === 'asc') {
+        if (prev.sortConfig.direction === 'asc') {
           return {
-            key,
-            direction: 'desc'
+            ...prev,
+            sortConfig: {
+              key,
+              direction: 'desc'
+            }
           };
-        } else if (prev.direction === 'desc') {
+        } else if (prev.sortConfig.direction === 'desc') {
           return {
-            key: null,
-            direction: 'asc'
+            ...prev,
+            sortConfig: {
+              key: null,
+              direction: 'asc'
+            }
           };
         }
       }
       // If clicking a different column, set it as the new sort key with ascending direction
       return {
-        key,
-        direction: 'asc'
+        ...prev,
+        sortConfig: {
+          key,
+          direction: 'asc'
+        }
       };
     });
   };
 
   const getSortIcon = (columnId: string) => {
-    if (sortConfig.key !== columnId) {
+    if (tableConfig.sortConfig.key !== columnId) {
       return <ArrowUpDown className="h-4 w-4 text-muted-foreground" />;
     }
-    return sortConfig.direction === 'asc' 
+    return tableConfig.sortConfig.direction === 'asc' 
       ? <ArrowUp className="h-4 w-4 text-primary" />
       : <ArrowDown className="h-4 w-4 text-primary" />;
   };
@@ -1446,10 +1505,10 @@ export default function TablePage() {
         </header>
 
         <main className="flex-1 p-4 md:p-6 w-full max-w-[calc(100vw-350px)] overflow-hidden responsive-main">
-          {loading ? (
+          {status.loading ? (
             <div className="text-center py-10">読み込み中...</div>
-          ) : error ? (
-            <div className="text-center text-red-600 py-10">{error}</div>
+          ) : status.error ? (
+            <div className="text-center text-red-600 py-10">{status.error}</div>
           ) : (
             <>
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
@@ -1505,9 +1564,12 @@ export default function TablePage() {
                     </Button>
                   )}
                   <Button variant="outline" onClick={() => {
-                    setOriginalVisibleColumns(visibleColumns);
-                    setHasUnsavedChanges(false);
-                    setIsTableSettingsOpen(true);
+                    setTableConfig(prev => ({
+                      ...prev,
+                      originalVisibleColumns: prev.visibleColumns,
+                      hasUnsavedChanges: false
+                    }));
+                    setDialogState({ ...dialogState, isTableSettingsOpen: true });
                   }}>
                     <Settings className="h-4 w-4" />
                     <span className="sr-only">設定</span>
@@ -1534,7 +1596,7 @@ export default function TablePage() {
                               onCheckedChange={handleSelectAllTrades}
                             />
                           </TableHead>
-                          {visibleColumns.map((colId) => {
+                          {tableConfig.visibleColumns.map((colId) => {
                             const column = allColumns.find((c) => c.id === colId);
                             return column ? (
                               <TableHead 
@@ -1561,15 +1623,15 @@ export default function TablePage() {
                                   onCheckedChange={(checked) => handleSelectTrade(trade.id, checked as boolean)}
                                 />
                               </TableCell>
-                              {visibleColumns.map((colId) => {
+                              {tableConfig.visibleColumns.map((colId) => {
                                 const column = allColumns.find((c) => c.id === colId);
                                 if (!column) return null;
 
-                                const isEditing = editingCell?.id === trade.id && editingCell.field === column.id;
+                                const isEditing = cellEditingState.editingCell?.id === trade.id && cellEditingState.editingCell.field === column.id;
                                 const cellKey = `${trade.id}-${column.id}`;
-                                const editingValue = editingValues[cellKey];
-                                const isSaving = savingCells.has(cellKey);
-                                const cellError = cellErrors[cellKey];
+                                const editingValue = cellEditingState.editingValues[cellKey];
+                                const isSaving = cellEditingState.savingCells.has(cellKey);
+                                const cellError = cellEditingState.cellErrors[cellKey];
                                 const value = isEditing && editingValue !== undefined ? editingValue : trade[column.id as keyof Trade];
 
                                 return (
@@ -1646,7 +1708,7 @@ export default function TablePage() {
                                             onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                             autoFocus
                                             className="h-8"
-                                            disabled={isSaving}
+                                            disabled={status.isSaving}
                                           />
                                         ) : column.id === "holdingTime" ? (
                                           <div className="flex gap-1" onBlur={(e) => {
@@ -1660,72 +1722,72 @@ export default function TablePage() {
                                               min="0"
                                               max="365"
                                               placeholder="日"
-                                              value={editingValues[`${trade.id}-holdingDays`] || ""}
+                                              value={cellEditingState.editingValues[`${trade.id}-holdingDays`] || ""}
                                               onChange={(e) => {
                                                 const days = e.target.value ? parseInt(e.target.value) : 0;
-                                                const hours = editingValues[`${trade.id}-holdingHours`] || 0;
-                                                const minutes = editingValues[`${trade.id}-holdingMinutes`] || 0;
-                                                const seconds = editingValues[`${trade.id}-holdingSeconds`] || 0;
+                                                const hours = cellEditingState.editingValues[`${trade.id}-holdingHours`] || 0;
+                                                const minutes = cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || 0;
+                                                const seconds = cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || 0;
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
-                                              disabled={isSaving}
+                                              disabled={status.isSaving}
                                             />
                                             <Input
                                               type="number"
                                               min="0"
                                               max="23"
                                               placeholder="時"
-                                              value={editingValues[`${trade.id}-holdingHours`] || ""}
+                                              value={cellEditingState.editingValues[`${trade.id}-holdingHours`] || ""}
                                               onChange={(e) => {
-                                                const days = editingValues[`${trade.id}-holdingDays`] || 0;
+                                                const days = cellEditingState.editingValues[`${trade.id}-holdingDays`] || 0;
                                                 const hours = e.target.value ? parseInt(e.target.value) : 0;
-                                                const minutes = editingValues[`${trade.id}-holdingMinutes`] || 0;
-                                                const seconds = editingValues[`${trade.id}-holdingSeconds`] || 0;
+                                                const minutes = cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || 0;
+                                                const seconds = cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || 0;
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
-                                              disabled={isSaving}
+                                              disabled={status.isSaving}
                                             />
                                             <Input
                                               type="number"
                                               min="0"
                                               max="59"
                                               placeholder="分"
-                                              value={editingValues[`${trade.id}-holdingMinutes`] || ""}
+                                              value={cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || ""}
                                               onChange={(e) => {
-                                                const days = editingValues[`${trade.id}-holdingDays`] || 0;
-                                                const hours = editingValues[`${trade.id}-holdingHours`] || 0;
+                                                const days = cellEditingState.editingValues[`${trade.id}-holdingDays`] || 0;
+                                                const hours = cellEditingState.editingValues[`${trade.id}-holdingHours`] || 0;
                                                 const minutes = e.target.value ? parseInt(e.target.value) : 0;
-                                                const seconds = editingValues[`${trade.id}-holdingSeconds`] || 0;
+                                                const seconds = cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || 0;
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
-                                              disabled={isSaving}
+                                              disabled={status.isSaving}
                                             />
                                             <Input
                                               type="number"
                                               min="0"
                                               max="59"
                                               placeholder="秒"
-                                              value={editingValues[`${trade.id}-holdingSeconds`] || ""}
+                                              value={cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || ""}
                                               onChange={(e) => {
-                                                const days = editingValues[`${trade.id}-holdingDays`] || 0;
-                                                const hours = editingValues[`${trade.id}-holdingHours`] || 0;
-                                                const minutes = editingValues[`${trade.id}-holdingMinutes`] || 0;
+                                                const days = cellEditingState.editingValues[`${trade.id}-holdingDays`] || 0;
+                                                const hours = cellEditingState.editingValues[`${trade.id}-holdingHours`] || 0;
+                                                const minutes = cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || 0;
                                                 const seconds = e.target.value ? parseInt(e.target.value) : 0;
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
-                                              disabled={isSaving}
+                                              disabled={status.isSaving}
                                             />
                                           </div>
                                         ) : column.type === "emotions" ? (
@@ -1837,10 +1899,10 @@ export default function TablePage() {
                                               "h-8",
                                               (column.id === "profit" || column.id === "lot" || column.id === "entry" || column.id === "exit" || column.id === "pips") && "no-spinner"
                                             )}
-                                            disabled={isSaving}
+                                            disabled={status.isSaving}
                                           />
                                         )}
-                                        {isSaving && (
+                                        {status.isSaving && (
                                           <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
                                             <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                           </div>
@@ -1892,7 +1954,7 @@ export default function TablePage() {
                         ) : (
                           <TableRow>
                             <TableCell
-                              colSpan={visibleColumns.length + 1}
+                              colSpan={tableConfig.visibleColumns.length + 1}
                               className="h-24 text-center text-muted-foreground"
                             >
                               選択された日付の取引はありません。
@@ -1911,8 +1973,8 @@ export default function TablePage() {
         {/* Modals */}
         <TradeEditDialog
           trade={editingTrade}
-          isOpen={isTradeDialogOpen}
-          onClose={() => setIsTradeDialogOpen(false)}
+          isOpen={dialogState.isTradeDialogOpen}
+          onClose={() => setDialogState({ ...dialogState, isTradeDialogOpen: false })}
           onSave={handleSaveTrade}
           defaultDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
           user={user}
@@ -1920,15 +1982,15 @@ export default function TablePage() {
         />
 
         <TableSettingsDialog
-          isOpen={isTableSettingsOpen}
+          isOpen={dialogState.isTableSettingsOpen}
           onClose={handleCloseSettings}
-          visibleColumns={visibleColumns}
+          visibleColumns={tableConfig.visibleColumns}
           onToggleColumn={handleToggleColumn}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
           onSave={saveColumnPreferences}
-          draggedColumn={draggedColumn}
+          draggedColumn={tableConfig.draggedColumn}
         />
 
         <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
@@ -1951,7 +2013,7 @@ export default function TablePage() {
           </AlertDialogContent>
         </AlertDialog>
 
-        <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
+        <AlertDialog open={dialogState.showDiscardWarning} onOpenChange={(open) => setDialogState({ ...dialogState, showDiscardWarning: open })}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
