@@ -98,3 +98,17 @@ export const getDashboardMetrics = (performanceData: any): PerformanceMetric[] =
     performanceData[metric.column] !== undefined
   );
 }; 
+
+// Get color based on P/L
+export const getPLColor = (pnl: number) => {
+  if (pnl > 0) {
+    if (pnl > 5000) return "bg-green-600 text-white"
+    if (pnl > 2000) return "bg-green-500 text-white"
+    return "bg-green-300 text-green-900"
+  } else if (pnl < 0) {
+    if (pnl < -3000) return "bg-red-600 text-white"
+    if (pnl < -1000) return "bg-red-500 text-white"
+    return "bg-red-300 text-red-900"
+  }
+  return "bg-gray-100 text-gray-600"
+}

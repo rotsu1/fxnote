@@ -8,7 +8,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Tag,
   ChevronLeft,
   ChevronRight,
   ArrowUpDown,
@@ -50,7 +49,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
-import { saveTrade, localDateTimeToUTC, utcToLocalDateTime } from "@/utils/tradeUtils"
+import { saveTrade } from "@/utils/tradeUtils"
+import { localDateTimeToUTC, utcToLocalDateTime } from "@/utils/timeUtils"
 
 // Sample trade data (expanded for table view)
 interface Trade {

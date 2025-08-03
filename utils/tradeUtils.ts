@@ -1,41 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-
-// Helper to convert local datetime string to UTC ISO string
-export function localDateTimeToUTC(localDateTimeString: string): string {
-    if (!localDateTimeString || localDateTimeString.trim() === "") {
-      console.log("localDateTimeToUTC: Empty input, using current time");
-      return new Date().toISOString();
-    }
-    
-    console.log("localDateTimeToUTC: Input:", localDateTimeString);
-    
-    // Create a date object from the local datetime string
-    const date = new Date(localDateTimeString);
-    
-    // Check if the date is valid
-    if (isNaN(date.getTime())) {
-      console.error("localDateTimeToUTC: Invalid date string:", localDateTimeString);
-      return new Date().toISOString();
-    }
-    
-    const result = date.toISOString();
-    console.log("localDateTimeToUTC: Output:", result);
-    return result;
-}
-
-export function utcToLocalDateTime(input: string): string {
-    if (!input) return "";
-    const date = new Date(input);
-    if (isNaN(date.getTime())) return "";
-  
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-  }
+import { localDateTimeToUTC } from "./timeUtils";
 
 interface Trade {
     id: number
