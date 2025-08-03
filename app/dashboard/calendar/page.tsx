@@ -1010,7 +1010,7 @@ export default function CalendarPage() {
           ...trade,
           symbol_name: trade.symbols?.symbol,
           tradeTags: trade.trade_tag_links?.map((link: any) => link.trade_tags?.tag_name).filter(Boolean) || [],
-          tradeEmotion: trade.trade_emotion_links?.[0]?.emotions?.emotion || ""
+          tradeEmotions: trade.trade_emotion_links?.map((link: any) => link.emotions?.emotion).filter(Boolean) || []
         })) || [];
         setTrades(transformedData);
       }
@@ -1038,7 +1038,7 @@ export default function CalendarPage() {
     try {
       // Use pre-loaded trade data
       const tradeTags = trade.tradeTags || [];
-      const tradeEmotion = trade.tradeEmotion || "";
+      const tradeEmotions = trade.tradeEmotions || [];
 
       // Transform database trade data to form format
       const transformedTrade = {
@@ -1054,7 +1054,7 @@ export default function CalendarPage() {
         lot: trade.lot_size,
         pips: trade.pips,
         profit: trade.profit_loss,
-        emotion: tradeEmotion ? [tradeEmotion] : [],
+        emotion: tradeEmotions,
         holdingTime: trade.hold_time || 0,
         holdingDays: trade.hold_time ? Math.floor(trade.hold_time / (24 * 60 * 60)) : 0,
         holdingHours: trade.hold_time ? Math.floor((trade.hold_time % (24 * 60 * 60)) / (60 * 60)) : 0,

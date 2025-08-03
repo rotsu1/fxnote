@@ -30,7 +30,7 @@ export function TradeCard({
 
     // Use pre-loaded trade data
     const tradeTags = trade.tradeTags || [];
-    const tradeEmotion = trade.tradeEmotion || "";
+    const tradeEmotions = trade.tradeEmotions || [];
   
     return (
       <Card className="mb-3">
@@ -116,9 +116,14 @@ export function TradeCard({
             </div>
           )}
   
-          {displaySettings.show_emotion && tradeEmotion && (
-            <div className="text-sm mb-1">
-              感情: {tradeEmotion}
+          {displaySettings.show_emotion && tradeEmotions.length > 0 && (
+            <div className="flex flex-wrap gap-1 mb-1">
+              <span className="text-sm">感情:</span>
+              {tradeEmotions.map((emotion: string, index: number) => (
+                <Badge key={index} variant="outline" className="text-xs">
+                  {emotion}
+                </Badge>
+              ))}
             </div>
           )}
   
