@@ -1491,16 +1491,16 @@ export default function CalendarPage() {
         id: trade.id,
         date: trade.entry_time?.split("T")[0] || "",
         time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
-              entryDateTime: utcToLocalDateTime(trade.entry_time),
-        exitDateTime: utcToLocalDateTime(trade.exit_time),
+        entryTime: utcToLocalDateTime(trade.entry_time),
+        exitTime: utcToLocalDateTime(trade.exit_time),
         pair: trade.symbol_name || "", // Use symbol name for display
         type: trade.trade_type === 0 ? "買い" : "売り",
         entry: trade.entry_price,
         exit: trade.exit_price,
-        lotSize: trade.lot_size,
+        lot: trade.lot_size,
         pips: trade.pips,
         profit: trade.profit_loss,
-        emotion: tradeEmotion,
+        emotion: tradeEmotion ? [tradeEmotion] : [],
         holdingTime: trade.hold_time || 0,
         holdingDays: trade.hold_time ? Math.floor(trade.hold_time / (24 * 60 * 60)) : 0,
         holdingHours: trade.hold_time ? Math.floor((trade.hold_time % (24 * 60 * 60)) / (60 * 60)) : 0,
@@ -1987,7 +1987,7 @@ export default function CalendarPage() {
           isOpen={isTradeDialogOpen}
           onClose={() => setIsTradeDialogOpen(false)}
           onSave={handleSaveTrade}
-          defaultDate={selectedDate ? format(selectedDate, "yyyy-MM-dd") : undefined}
+          defaultDate={selectedDate || undefined}
           user={user}
           availableTags={availableTags}
         />
