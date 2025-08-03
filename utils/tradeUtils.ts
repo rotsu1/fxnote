@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { localDateTimeToUTC } from "./timeUtils";
-import { updateUserPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
+import { updateUserPerformanceMetrics, updateExistingTradePerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 interface Trade {
     id: number
@@ -184,7 +184,17 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         }
         
         // Update performance metrics for the updated trade
-        const tradeInput: TradeInput = {
+        const oldTradeInput: TradeInput = {
+          user_id: user.id,
+          exit_time: editingTrade.exitTime || "",
+          profit_loss: editingTrade.profit,
+          pips: editingTrade.pips,
+          hold_time: editingTrade.holdingTime,
+          trade_type: editingTrade.type === "買い" ? 0 : 1,
+          entry_time: editingTrade.entryTime || "",
+        };
+
+        const newTradeInput: TradeInput = {
           user_id: user.id,
           exit_time: localDateTimeToUTC(tradeData.exitTime || ""),
           profit_loss: tradeData.profit || 0,
@@ -195,7 +205,7 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         };
 
         try {
-          await updateUserPerformanceMetrics(tradeInput);
+          await updateExistingTradePerformanceMetrics(oldTradeInput, newTradeInput);
         } catch (metricsError) {
           console.error("Error updating performance metrics after trade update:", metricsError);
           // Don't fail the update if metrics update fails

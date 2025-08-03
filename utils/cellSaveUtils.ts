@@ -2,7 +2,7 @@ import { Trade } from "./types"
 import { localDateTimeToUTC } from "./timeUtils"
 import { validateCellValue, mapFieldToDatabase } from "./tableUtils"
 import { supabase } from "@/lib/supabaseClient"
-import { updateUserPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
+import { updateUserPerformanceMetrics, updateExistingTradePerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 export interface CellSaveResult {
   success: boolean
@@ -74,42 +74,65 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
       // Handle regular field updates
       const { field: dbField, value: dbValue } = mapFieldToDatabase(field, processedValue)
       
-      const { error } = await supabase
-        .from("trades")
-        .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .eq("user_id", user.id)
-      
-      if (error) throw error
-      
       // Update performance metrics if the field affects metrics
       if (field === 'profit' || field === 'pips' || field === 'exitTime' || field === 'entryTime') {
         try {
-          // Get the updated trade data to calculate performance metrics
-          const { data: tradeData, error: fetchError } = await supabase
+          // First, get the original trade data before the update
+          const { data: originalTradeData, error: originalFetchError } = await supabase
             .from("trades")
             .select("*")
             .eq("id", id)
             .eq("user_id", user.id)
             .single();
           
-          if (!fetchError && tradeData) {
-            const tradeInput: TradeInput = {
-              user_id: tradeData.user_id,
-              exit_time: tradeData.exit_time,
-              profit_loss: tradeData.profit_loss,
-              pips: tradeData.pips,
-              hold_time: tradeData.hold_time || 0,
-              trade_type: tradeData.trade_type,
-              entry_time: tradeData.entry_time,
+          if (!originalFetchError && originalTradeData) {
+            // Create the old trade input
+            const oldTradeInput: TradeInput = {
+              user_id: originalTradeData.user_id,
+              exit_time: originalTradeData.exit_time,
+              profit_loss: originalTradeData.profit_loss,
+              pips: originalTradeData.pips,
+              hold_time: originalTradeData.hold_time || 0,
+              trade_type: originalTradeData.trade_type,
+              entry_time: originalTradeData.entry_time,
             };
             
-            await updateUserPerformanceMetrics(tradeInput);
+            // Create the new trade input with the updated value
+            const newTradeInput: TradeInput = {
+              user_id: originalTradeData.user_id,
+              exit_time: field === 'exitTime' ? processedValue : originalTradeData.exit_time,
+              profit_loss: field === 'profit' ? processedValue : originalTradeData.profit_loss,
+              pips: field === 'pips' ? processedValue : originalTradeData.pips,
+              hold_time: originalTradeData.hold_time || 0,
+              trade_type: originalTradeData.trade_type,
+              entry_time: field === 'entryTime' ? processedValue : originalTradeData.entry_time,
+            };
+            
+            // Update the trade in the database first
+            const { error: updateError } = await supabase
+              .from("trades")
+              .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
+              .eq("id", id)
+              .eq("user_id", user.id)
+            
+            if (updateError) throw updateError;
+            
+            // Then update performance metrics
+            await updateExistingTradePerformanceMetrics(oldTradeInput, newTradeInput);
           }
         } catch (metricsError) {
           console.error("Error updating performance metrics after cell update:", metricsError);
           // Don't fail the cell update if metrics update fails
         }
+      } else {
+        // For non-metrics fields, just update the database
+        const { error } = await supabase
+          .from("trades")
+          .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .eq("user_id", user.id)
+        
+        if (error) throw error;
       }
     }
     

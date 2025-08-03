@@ -204,6 +204,26 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
 }
 
 /**
+ * Update performance metrics for an existing trade (replaces old values instead of incrementing)
+ * This function should be used when updating an existing trade, not for new trades
+ * @param oldTrade - The original trade data before the update
+ * @param newTrade - The updated trade data
+ * @returns Promise<void>
+ */
+export async function updateExistingTradePerformanceMetrics(oldTrade: TradeInput, newTrade: TradeInput): Promise<void> {
+  try {
+    // First, remove the old trade's contribution
+    await removeTradeFromPerformanceMetrics(oldTrade);
+    
+    // Then, add the new trade's contribution
+    await updateUserPerformanceMetrics(newTrade);
+  } catch (error) {
+    console.error('Error updating existing trade performance metrics:', error);
+    throw error;
+  }
+}
+
+/**
  * Batch update user performance metrics for multiple trades
  * @param trades - Array of trade objects
  * @returns Promise<void>
