@@ -97,7 +97,12 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
     const periodValues = extractPeriodValues(trade.exit_time);
     
     // Debug logging
-    console.log('Period values generated:', periodValues);
+    console.log('Adding trade to performance metrics:', {
+      trade_id: trade.user_id,
+      profit_loss: trade.profit_loss,
+      pips: trade.pips,
+      exit_time: trade.exit_time
+    });
     
     // Determine if this is a win or loss
     const isWin = trade.profit_loss >= 0;
@@ -136,16 +141,25 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
 
       if (!existingMetric) {
         // Create new record with initial values
+        const tradeProfit = Math.abs(Number(trade.profit_loss));
+        const tradePips = Math.abs(Number(trade.pips));
+        
+        console.log(`Creating new metric for ${periodType}:`, {
+          isWin,
+          tradeProfit,
+          tradePips
+        });
+        
         updatedMetric = {
           user_id: trade.user_id,
           period_type: typedPeriodType,
           period_value: periodValue,
           win_count: isWin ? 1 : 0,
           loss_count: isWin ? 0 : 1,
-          win_profit: isWin ? trade.profit_loss : 0,
-          loss_loss: isWin ? 0 : -Math.abs(trade.profit_loss), // Store loss as negative value
-          win_pips: isWin ? trade.pips : 0,
-          loss_pips: isWin ? 0 : -Math.abs(trade.pips), // Store loss pips as negative value
+          win_profit: isWin ? tradeProfit : 0,
+          loss_loss: isWin ? 0 : -tradeProfit, // Store loss as negative value
+          win_pips: isWin ? tradePips : 0,
+          loss_pips: isWin ? 0 : -tradePips, // Store loss pips as negative value
           win_holding_time: isWin ? trade.hold_time : 0,
           loss_holding_time: isWin ? 0 : trade.hold_time,
           updated_at: new Date().toISOString()
@@ -154,19 +168,31 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
         // Update existing record
         const currentWinCount = existingMetric.win_count || 0;
         const currentLossCount = existingMetric.loss_count || 0;
-        const currentWinProfit = existingMetric.win_profit || 0;
-        const currentLossLoss = existingMetric.loss_loss || 0;
-        const currentWinPips = existingMetric.win_pips || 0;
-        const currentLossPips = existingMetric.loss_pips || 0;
+        const currentWinProfit = Number(existingMetric.win_profit || 0);
+        const currentLossLoss = Number(existingMetric.loss_loss || 0);
+        const currentWinPips = Number(existingMetric.win_pips || 0);
+        const currentLossPips = Number(existingMetric.loss_pips || 0);
         const currentWinHoldingTime = existingMetric.win_holding_time || 0;
         const currentLossHoldingTime = existingMetric.loss_holding_time || 0;
 
         if (isWin) {
           // Update win-related metrics
+          const tradeProfit = Math.abs(Number(trade.profit_loss));
+          const tradePips = Math.abs(Number(trade.pips));
+          
           const newWinCount = currentWinCount + 1;
-          const newWinProfit = currentWinProfit + trade.profit_loss;
-          const newWinPips = currentWinPips + trade.pips;
+          const newWinProfit = currentWinProfit + tradeProfit;
+          const newWinPips = currentWinPips + tradePips;
           const newWinHoldingTime = currentWinHoldingTime + trade.hold_time;
+          
+          console.log(`Adding win trade to ${periodType}:`, {
+            currentWinProfit,
+            tradeProfit,
+            newWinProfit,
+            currentWinPips,
+            tradePips,
+            newWinPips
+          });
           
           updatedMetric = {
             win_count: newWinCount,
@@ -177,10 +203,22 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
           };
         } else {
           // Update loss-related metrics
+          const tradeLoss = Math.abs(Number(trade.profit_loss));
+          const tradePips = Math.abs(Number(trade.pips));
+          
           const newLossCount = currentLossCount + 1;
-          const newLossLoss = currentLossLoss - Math.abs(trade.profit_loss);
-          const newLossPips = currentLossPips - Math.abs(trade.pips);
+          const newLossLoss = currentLossLoss - tradeLoss;
+          const newLossPips = currentLossPips - tradePips;
           const newLossHoldingTime = currentLossHoldingTime + trade.hold_time;
+
+          console.log(`Adding loss trade to ${periodType}:`, {
+            currentLossLoss,
+            tradeLoss,
+            newLossLoss,
+            currentLossPips,
+            tradePips,
+            newLossPips
+          });
 
           updatedMetric = {
             loss_count: newLossCount,
@@ -227,11 +265,26 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
  */
 export async function updateExistingTradePerformanceMetrics(oldTrade: TradeInput, newTrade: TradeInput): Promise<void> {
   try {
+    console.log('Updating existing trade performance metrics:', {
+      oldTrade: {
+        profit_loss: oldTrade.profit_loss,
+        pips: oldTrade.pips,
+        exit_time: oldTrade.exit_time
+      },
+      newTrade: {
+        profit_loss: newTrade.profit_loss,
+        pips: newTrade.pips,
+        exit_time: newTrade.exit_time
+      }
+    });
+    
     // First, remove the old trade's contribution
     await removeTradeFromPerformanceMetrics(oldTrade);
     
     // Then, add the new trade's contribution
     await updateUserPerformanceMetrics(newTrade);
+    
+    console.log('Successfully updated existing trade performance metrics');
   } catch (error) {
     console.error('Error updating existing trade performance metrics:', error);
     throw error;
@@ -268,6 +321,15 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
     // Determine if this was a win or loss
     const isWin = trade.profit_loss >= 0;
     
+    // Debug logging
+    console.log('Removing trade from performance metrics:', {
+      trade_id: trade.user_id,
+      profit_loss: trade.profit_loss,
+      pips: trade.pips,
+      isWin,
+      exit_time: trade.exit_time
+    });
+    
     // Process each period type
     const updatePromises = Object.entries(periodValues).map(async ([periodType, periodValue]) => {
       const typedPeriodType = periodType as PeriodType;
@@ -302,6 +364,7 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
 
       if (!existingMetric) {
         // No metric record exists, nothing to remove
+        console.log(`No existing metric found for ${periodType}: ${cleanedPeriodValue}`);
         return;
       }
 
@@ -309,10 +372,24 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
 
       if (isWin) {
         // Remove win-related metrics
+        const currentWinProfit = Number(existingMetric.win_profit || 0);
+        const currentWinPips = Number(existingMetric.win_pips || 0);
+        const tradeProfit = Math.abs(Number(trade.profit_loss));
+        const tradePips = Math.abs(Number(trade.pips));
+        
         const newWinCount = Math.max(0, (existingMetric.win_count || 0) - 1);
-        const newWinProfit = Math.max(0, (existingMetric.win_profit || 0) - trade.profit_loss);
-        const newWinPips = Math.max(0, (existingMetric.win_pips || 0) - trade.pips);
+        const newWinProfit = Math.max(0, currentWinProfit - tradeProfit);
+        const newWinPips = Math.max(0, currentWinPips - tradePips);
         const newWinHoldingTime = Math.max(0, (existingMetric.win_holding_time || 0) - trade.hold_time);
+        
+        console.log(`Removing win trade from ${periodType}:`, {
+          currentWinProfit,
+          tradeProfit,
+          newWinProfit,
+          currentWinPips,
+          tradePips,
+          newWinPips
+        });
         
         updatedMetric = {
           win_count: newWinCount,
@@ -323,10 +400,24 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         };
       } else {
         // Remove loss-related metrics
+        const currentLossLoss = Number(existingMetric.loss_loss || 0);
+        const currentLossPips = Number(existingMetric.loss_pips || 0);
+        const tradeLoss = Math.abs(Number(trade.profit_loss));
+        const tradePips = Math.abs(Number(trade.pips));
+        
         const newLossCount = Math.max(0, (existingMetric.loss_count || 0) - 1);
-        const newLossLoss = Math.min(0, (existingMetric.loss_loss || 0) + Math.abs(trade.profit_loss));
-        const newLossPips = Math.min(0, (existingMetric.loss_pips || 0) + Math.abs(trade.pips));
+        const newLossLoss = Math.min(0, currentLossLoss + tradeLoss);
+        const newLossPips = Math.min(0, currentLossPips + tradePips);
         const newLossHoldingTime = Math.max(0, (existingMetric.loss_holding_time || 0) - trade.hold_time);
+
+        console.log(`Removing loss trade from ${periodType}:`, {
+          currentLossLoss,
+          tradeLoss,
+          newLossLoss,
+          currentLossPips,
+          tradePips,
+          newLossPips
+        });
 
         updatedMetric = {
           loss_count: newLossCount,

@@ -77,6 +77,8 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
       // Update performance metrics if the field affects metrics
       if (field === 'profit' || field === 'pips' || field === 'exitTime' || field === 'entryTime') {
         try {
+          console.log('Updating performance metrics for field:', field, 'with value:', processedValue);
+          
           // First, get the original trade data before the update
           const { data: originalTradeData, error: originalFetchError } = await supabase
             .from("trades")
@@ -101,12 +103,17 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
             const newTradeInput: TradeInput = {
               user_id: originalTradeData.user_id,
               exit_time: field === 'exitTime' ? processedValue : originalTradeData.exit_time,
-              profit_loss: field === 'profit' ? processedValue : originalTradeData.profit_loss,
-              pips: field === 'pips' ? processedValue : originalTradeData.pips,
+              profit_loss: field === 'profit' ? Number(processedValue) : originalTradeData.profit_loss,
+              pips: field === 'pips' ? Number(processedValue) : originalTradeData.pips,
               hold_time: originalTradeData.hold_time || 0,
               trade_type: originalTradeData.trade_type,
               entry_time: field === 'entryTime' ? processedValue : originalTradeData.entry_time,
             };
+            
+            console.log('Trade inputs for metrics update:', {
+              oldTrade: oldTradeInput,
+              newTrade: newTradeInput
+            });
             
             // Update the trade in the database first
             const { error: updateError } = await supabase
