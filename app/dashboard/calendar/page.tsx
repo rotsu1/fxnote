@@ -27,8 +27,11 @@ import { CSVImportDialog } from "@/components/ui/csv-import-dialog"
 import { DisplaySettingsDialog } from "@/components/ui/display-settings-dialog"
 
 import { saveTrade } from "@/utils/tradeUtils"
-import { utcToLocalDateTime, groupTradesByDate } from "@/utils/timeUtils"
+import { groupTradesByDate } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
+import { loadDisplaySettings, saveDisplaySettings, convertToDisplaySettings, type DisplaySettings } from "@/utils/displaySettingsUtils"
+import { transformTradeForEditing, deleteTrade, loadUserTags } from "@/utils/tradeCrudUtils"
+import { loadTrades as loadTradesData } from "@/utils/dataLoadingUtils"
 
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,7 +59,7 @@ export default function CalendarPage() {
     loading: false,
     error: "",
   });
-  const [displaySettings, setDisplaySettings] = useState<Record<string, boolean>>({
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>({
     show_symbol: true,
     show_direction: true,
     show_entry_price: true,
@@ -73,38 +76,12 @@ export default function CalendarPage() {
   });
 
   // Load display settings from database
-  const loadDisplaySettings = async () => {
+  const loadDisplaySettingsFromDB = async () => {
     if (!user) return;
     
     try {
-      const { data, error } = await supabase
-        .from("trade_settings")
-        .select("*")
-        .eq("user_id", user.id)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        console.error("Error loading display settings:", error);
-        return;
-      }
-      
-      if (data) {
-        setDisplaySettings({
-          show_symbol: data.show_symbol ?? true,
-          show_direction: data.show_direction ?? true,
-          show_entry_price: data.show_entry_price ?? true,
-          show_exit_price: data.show_exit_price ?? true,
-          show_entry_time: data.show_entry_time ?? true,
-          show_exit_time: data.show_exit_time ?? true,
-          show_hold_time: data.show_hold_time ?? true,
-          show_emotion: data.show_emotion ?? true,
-          show_tag: data.show_tag ?? true,
-          show_lot: data.show_lot ?? true,
-          show_pips: data.show_pips ?? true,
-          show_profit: data.show_profit ?? true,
-          show_note: data.show_note ?? true,
-        });
-      }
+      const settings = await loadDisplaySettings(user.id);
+      setDisplaySettings(settings);
     } catch (error) {
       console.error("Error loading display settings:", error);
     }
@@ -114,17 +91,8 @@ export default function CalendarPage() {
     loadTrades();
     if (!user) return;
     const loadTags = async () => {
-      const { data, error } = await supabase
-        .from("trade_tags")
-        .select("id, tag_name")
-        .eq("user_id", user.id)
-        .order("tag_name");
-      if (error) {
-        console.error("Error loading tags for table:", error);
-        setTradeData(prev => ({ ...prev, availableTags: [] }));
-        return;
-      }
-      setTradeData(prev => ({ ...prev, availableTags: data || [] }));
+      const tags = await loadUserTags(user.id);
+      setTradeData(prev => ({ ...prev, availableTags: tags }));
     };
     loadTags();
   }, [user]);
@@ -134,32 +102,13 @@ export default function CalendarPage() {
     if (!user) return;
     setStatus(prev => ({ ...prev, loading: true, error: "" }));
     try {
-      const { data, error } = await supabase
-        .from("trades")
-        .select(`
-          *,
-          symbols!inner(symbol),
-          trade_tag_links(
-            trade_tags(tag_name)
-          ),
-          trade_emotion_links(
-            emotions(emotion)
-          )
-        `)
-        .eq("user_id", user.id);
+      const { data, error } = await loadTradesData(user.id);
       
       if (error) {
-        setStatus(prev => ({ ...prev, error: error.message }));
+        setStatus(prev => ({ ...prev, error }));
         setTradeData(prev => ({ ...prev, trades: [] }));
       } else {
-        // Transform data to include symbol_name, tags, and emotions
-        const transformedData = data?.map(trade => ({
-          ...trade,
-          symbol_name: trade.symbols?.symbol,
-          tradeTags: trade.trade_tag_links?.map((link: any) => link.trade_tags?.tag_name).filter(Boolean) || [],
-          tradeEmotions: trade.trade_emotion_links?.map((link: any) => link.emotions?.emotion).filter(Boolean) || []
-        })) || [];
-        setTradeData(prev => ({ ...prev, trades: transformedData }));
+        setTradeData(prev => ({ ...prev, trades: data }));
       }
     } catch (error) {
       setStatus(prev => ({ ...prev, error: "Failed to load trades" }));
@@ -171,7 +120,7 @@ export default function CalendarPage() {
 
   // Load display settings when user changes
   useEffect(() => {
-    loadDisplaySettings();
+    loadDisplaySettingsFromDB();
   }, [user]);
 
   const groupedTrades = groupTradesByDate(tradeData.trades);
@@ -183,32 +132,7 @@ export default function CalendarPage() {
 
   const handleEditTrade = async (trade: any) => {
     try {
-      // Use pre-loaded trade data
-      const tradeTags = trade.tradeTags || [];
-      const tradeEmotions = trade.tradeEmotions || [];
-
-      // Transform database trade data to form format
-      const transformedTrade = {
-        id: trade.id,
-        date: trade.entry_time?.split("T")[0] || "",
-        time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
-        entryTime: utcToLocalDateTime(trade.entry_time),
-        exitTime: utcToLocalDateTime(trade.exit_time),
-        pair: trade.symbol_name || "", // Use symbol name for display
-        type: trade.trade_type === 0 ? "買い" : "売り",
-        entry: trade.entry_price,
-        exit: trade.exit_price,
-        lot: trade.lot_size,
-        pips: trade.pips,
-        profit: trade.profit_loss,
-        emotion: tradeEmotions,
-        holdingTime: trade.hold_time || 0,
-        holdingDays: trade.hold_time ? Math.floor(trade.hold_time / (24 * 60 * 60)) : 0,
-        holdingHours: trade.hold_time ? Math.floor((trade.hold_time % (24 * 60 * 60)) / (60 * 60)) : 0,
-        holdingMinutes: trade.hold_time ? Math.floor((trade.hold_time % (60 * 60)) / 60) : 0,
-        notes: trade.trade_memo || "",
-        tags: tradeTags,
-      };
+      const transformedTrade = transformTradeForEditing(trade);
       
       console.log("Transformed trade for editing:", transformedTrade);
       setTradeData(prev => ({ ...prev, editingTrade: transformedTrade }));
@@ -216,8 +140,6 @@ export default function CalendarPage() {
     } catch (error) {
       console.error("Error preparing trade for editing:", error);
       setStatus(prev => ({ ...prev, error: "取引の編集準備中にエラーが発生しました" }));
-    } finally {
-
     }
   };
 
@@ -255,43 +177,15 @@ export default function CalendarPage() {
     }
 
     try {
-      // Delete trade emotion links
-      const { error: emotionError } = await supabase
-        .from("trade_emotion_links")
-        .delete()
-        .eq("trade_id", tradeData.deleteTradeId);
-
-      if (emotionError) {
-        console.error("Error deleting trade emotion links:", emotionError);
-      }
-
-      // Delete trade tag links
-      const { error: tagError } = await supabase
-        .from("trade_tag_links")
-        .delete()
-        .eq("trade_id", tradeData.deleteTradeId);
-
-      if (tagError) {
-        console.error("Error deleting trade tag links:", tagError);
-      }
-
-      // Delete the main trade record
-      const { error: tradeError } = await supabase
-        .from("trades")
-        .delete()
-        .eq("id", tradeData.deleteTradeId)
-        .eq("user_id", user.id);
-
-      if (tradeError) {
-        console.error("Error deleting trade:", tradeError);
-        setStatus(prev => ({ ...prev, error: "取引の削除中にエラーが発生しました" }));
-        return;
-      }
-
-      // Refresh the trades data
-      await loadTrades();
+      const result = await deleteTrade(tradeData.deleteTradeId, user.id);
       
-      console.log("Trade deleted successfully");
+      if (result.success) {
+        // Refresh the trades data
+        await loadTrades();
+        console.log("Trade deleted successfully");
+      } else {
+        setStatus(prev => ({ ...prev, error: result.error || "取引の削除中にエラーが発生しました" }));
+      }
     } catch (error) {
       console.error("Error deleting trade:", error);
       setStatus(prev => ({ ...prev, error: "取引の削除中にエラーが発生しました" }));
@@ -300,72 +194,26 @@ export default function CalendarPage() {
     }
   };
 
-  const handleSaveDisplaySettings = async (settings: Record<string, boolean>) => {
+  const handleSaveDisplaySettings = async (settings: DisplaySettings) => {
     if (!user) return;
     
     try {
-      // Check if settings exist for this user
-      const { data: existingSettings, error: checkError } = await supabase
-        .from("trade_settings")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
+      const success = await saveDisplaySettings(user.id, settings);
       
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error("Error checking existing settings:", checkError);
-        return;
+      if (success) {
+        // Update local state
+        setDisplaySettings(settings);
+        console.log("Display settings saved successfully");
       }
-      
-      const settingsData = {
-        user_id: user.id,
-        show_symbol: settings.show_symbol,
-        show_direction: settings.show_direction,
-        show_entry_price: settings.show_entry_price,
-        show_exit_price: settings.show_exit_price,
-        show_entry_time: settings.show_entry_time,
-        show_exit_time: settings.show_exit_time,
-        show_hold_time: settings.show_hold_time,
-        show_emotion: settings.show_emotion,
-        show_tag: settings.show_tag,
-        show_lot: settings.show_lot,
-        show_pips: settings.show_pips,
-        show_profit: settings.show_profit,
-        show_note: settings.show_note,
-        updated_at: new Date().toISOString(),
-      };
-      
-      if (existingSettings) {
-        // Update existing settings
-        const { error: updateError } = await supabase
-          .from("trade_settings")
-          .update(settingsData)
-          .eq("user_id", user.id);
-        
-        if (updateError) {
-          console.error("Error updating display settings:", updateError);
-          return;
-        }
-      } else {
-        // Insert new settings
-        const { error: insertError } = await supabase
-          .from("trade_settings")
-          .insert([{
-            ...settingsData,
-            created_at: new Date().toISOString(),
-          }]);
-        
-        if (insertError) {
-          console.error("Error inserting display settings:", insertError);
-          return;
-        }
-      }
-      
-      // Update local state
-      setDisplaySettings(settings);
-      console.log("Display settings saved successfully");
     } catch (error) {
       console.error("Error saving display settings:", error);
     }
+  };
+
+  // Wrapper function to handle type conversion for DisplaySettingsDialog
+  const handleSaveDisplaySettingsWrapper = (settings: Record<string, boolean>) => {
+    const displaySettings = convertToDisplaySettings(settings);
+    handleSaveDisplaySettings(displaySettings);
   };
 
   const selectedTrades = groupedTrades[selectedDate] || [];
@@ -426,7 +274,7 @@ export default function CalendarPage() {
           isOpen={dialogs.isDisplaySettingsOpen} 
           onClose={() => setDialogs(prev => ({ ...prev, isDisplaySettingsOpen: false }))}
           displaySettings={displaySettings}
-          onSaveSettings={handleSaveDisplaySettings}
+          onSaveSettings={handleSaveDisplaySettingsWrapper}
         />
         <AlertDialog open={tradeData.deleteTradeId !== null} onOpenChange={() => setTradeData(prev => ({ ...prev, deleteTradeId: null }))}>
           <AlertDialogContent>
