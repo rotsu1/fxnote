@@ -38,7 +38,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
-import { saveTrade } from "@/utils/tradeUtils"
+import { saveTrade, localDateTimeToUTC, utcToLocalDateTime } from "@/utils/tradeUtils"
 
 interface Trade {
   id: number
@@ -60,42 +60,6 @@ interface Trade {
   holdingMinutes?: number
   notes?: string
   tags: string[]
-}
-
-// Helper to convert UTC datetime to local datetime string for input
-function utcToLocalDateTime(utcString: string): string {
-  if (!utcString) return "";
-  const date = new Date(utcString);
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  const seconds = String(date.getSeconds()).padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-}
-
-// Helper to convert local datetime string to UTC ISO string
-function localDateTimeToUTC(localDateTimeString: string): string {
-  if (!localDateTimeString || localDateTimeString.trim() === "") {
-    console.log("localDateTimeToUTC: Empty input, using current time");
-    return new Date().toISOString();
-  }
-  
-  console.log("localDateTimeToUTC: Input:", localDateTimeString);
-  
-  // Create a date object from the local datetime string
-  const date = new Date(localDateTimeString);
-  
-  // Check if the date is valid
-  if (isNaN(date.getTime())) {
-    console.error("localDateTimeToUTC: Invalid date string:", localDateTimeString);
-    return new Date().toISOString();
-  }
-  
-  const result = date.toISOString();
-  console.log("localDateTimeToUTC: Output:", result);
-  return result;
 }
 
 // Helper to format hold time from seconds to readable format

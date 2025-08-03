@@ -50,30 +50,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
-import { saveTrade } from "@/utils/tradeUtils"
-
-// Helper to convert local datetime string to UTC ISO string
-function localDateTimeToUTC(localDateTimeString: string): string {
-  if (!localDateTimeString || localDateTimeString.trim() === "") {
-    console.log("localDateTimeToUTC: Empty input, using current time");
-    return new Date().toISOString();
-  }
-  
-  console.log("localDateTimeToUTC: Input:", localDateTimeString);
-  
-  // Create a date object from the local datetime string
-  const date = new Date(localDateTimeString);
-  
-  // Check if the date is valid
-  if (isNaN(date.getTime())) {
-    console.error("localDateTimeToUTC: Invalid date string:", localDateTimeString);
-    return new Date().toISOString();
-  }
-  
-  const result = date.toISOString();
-  console.log("localDateTimeToUTC: Output:", result);
-  return result;
-}
+import { saveTrade, localDateTimeToUTC, utcToLocalDateTime } from "@/utils/tradeUtils"
 
 // Sample trade data (expanded for table view)
 interface Trade {
@@ -690,7 +667,7 @@ export default function TablePage() {
     // Initialize editing value - convert datetime fields to datetime-local format
     let editingValue = trade[field];
     if (field === 'entryTime' || field === 'exitTime') {
-      editingValue = convertToDateTimeLocal(trade[field] as string);
+      editingValue = utcToLocalDateTime(trade[field] as string);
     }
     
     // Initialize holding time fields
@@ -849,7 +826,7 @@ export default function TablePage() {
     
     // Convert datetime-local format back to ISO string for datetime fields
     if (field === 'entryTime' || field === 'exitTime') {
-      value = convertFromDateTimeLocal(value as string);
+      value = localDateTimeToUTC(value as string);
     }
     
     // Validate the value
@@ -1240,7 +1217,7 @@ export default function TablePage() {
       
       // Convert datetime fields back to datetime-local format for display
       if (field === 'entryTime' || field === 'exitTime') {
-        originalValue = convertToDateTimeLocal(originalValue as string);
+        originalValue = utcToLocalDateTime(originalValue as string);
       }
       
       // For holding time, restore individual fields
@@ -1280,11 +1257,6 @@ export default function TablePage() {
     setIsTradeDialogOpen(true);
   };
 
-  const handleEditTrade = (trade: Trade) => {
-    setEditingTrade(trade);
-    setIsTradeDialogOpen(true);
-  };
-
   const handleSaveTrade = async (tradeData: Partial<Trade>) => {
     const result = await saveTrade(tradeData, editingTrade, user);
     
@@ -1318,10 +1290,6 @@ export default function TablePage() {
 
   const handleDeleteSelectedTrades = () => {
     setDeleteConfirmId(-1); // Use -1 to indicate bulk delete
-  };
-
-  const handleDeleteTrade = (id: number) => {
-    setDeleteConfirmId(id);
   };
 
   const confirmDelete = async () => {
@@ -1585,29 +1553,6 @@ export default function TablePage() {
       );
     }
     return String(value);
-  };
-
-  // Helper function to convert datetime string to datetime-local format
-  const convertToDateTimeLocal = (dateTimeString: string): string => {
-    if (!dateTimeString) return "";
-    const date = new Date(dateTimeString);
-    if (isNaN(date.getTime())) return "";
-    
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-  };
-
-  // Helper function to convert datetime-local format to ISO string
-  const convertFromDateTimeLocal = (dateTimeLocalString: string): string => {
-    if (!dateTimeLocalString) return "";
-    const date = new Date(dateTimeLocalString);
-    if (isNaN(date.getTime())) return "";
-    return date.toISOString();
   };
 
   return (
