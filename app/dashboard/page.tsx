@@ -54,44 +54,76 @@ function PLSummaryCards() {
       try {
         const periods = getCurrentPeriods();
         
-        // Fetch data for all periods
-        const { data: dailyData, error: dailyError } = await supabase
-          .from("user_performance_metrics")
-          .select("win_profit, loss_loss")
-          .eq("user_id", user.id)
-          .eq("period_type", "daily")
-          .eq("period_value", periods.daily)
-          .single();
+        // Fetch data for all periods - handle each query individually to avoid 406 errors
+        let dailyProfit = 0, weeklyProfit = 0, monthlyProfit = 0, totalProfit = 0;
+        
+        // Daily data
+        try {
+          const { data: dailyData, error: dailyError } = await supabase
+            .from("user_performance_metrics")
+            .select("win_profit, loss_loss")
+            .eq("user_id", user.id)
+            .eq("period_type", "daily")
+            .eq("period_value", periods.daily)
+            .maybeSingle(); // Use maybeSingle instead of single
 
-        const { data: weeklyData, error: weeklyError } = await supabase
-          .from("user_performance_metrics")
-          .select("win_profit, loss_loss")
-          .eq("user_id", user.id)
-          .eq("period_type", "weekly")
-          .eq("period_value", periods.weekly)
-          .single();
+          if (dailyData) {
+            dailyProfit = (dailyData.win_profit || 0) + (dailyData.loss_loss || 0);
+          }
+        } catch (dailyError) {
+          console.log("No daily data found for period:", periods.daily);
+        }
 
-        const { data: monthlyData, error: monthlyError } = await supabase
-          .from("user_performance_metrics")
-          .select("win_profit, loss_loss")
-          .eq("user_id", user.id)
-          .eq("period_type", "monthly")
-          .eq("period_value", periods.monthly)
-          .single();
+        // Weekly data
+        try {
+          const { data: weeklyData, error: weeklyError } = await supabase
+            .from("user_performance_metrics")
+            .select("win_profit, loss_loss")
+            .eq("user_id", user.id)
+            .eq("period_type", "weekly")
+            .eq("period_value", periods.weekly)
+            .maybeSingle(); // Use maybeSingle instead of single
 
-        const { data: totalData, error: totalError } = await supabase
-          .from("user_performance_metrics")
-          .select("win_profit, loss_loss")
-          .eq("user_id", user.id)
-          .eq("period_type", "total")
-          .eq("period_value", "total")
-          .single();
+          if (weeklyData) {
+            weeklyProfit = (weeklyData.win_profit || 0) + (weeklyData.loss_loss || 0);
+          }
+        } catch (weeklyError) {
+          console.log("No weekly data found for period:", periods.weekly);
+        }
 
-        // Calculate profits (handle null/undefined values)
-        const dailyProfit = (dailyData?.win_profit || 0) + (dailyData?.loss_loss || 0);
-        const weeklyProfit = (weeklyData?.win_profit || 0) + (weeklyData?.loss_loss || 0);
-        const monthlyProfit = (monthlyData?.win_profit || 0) + (monthlyData?.loss_loss || 0);
-        const totalProfit = (totalData?.win_profit || 0) + (totalData?.loss_loss || 0);
+        // Monthly data
+        try {
+          const { data: monthlyData, error: monthlyError } = await supabase
+            .from("user_performance_metrics")
+            .select("win_profit, loss_loss")
+            .eq("user_id", user.id)
+            .eq("period_type", "monthly")
+            .eq("period_value", periods.monthly)
+            .maybeSingle(); // Use maybeSingle instead of single
+
+          if (monthlyData) {
+            monthlyProfit = (monthlyData.win_profit || 0) + (monthlyData.loss_loss || 0);
+          }
+        } catch (monthlyError) {
+          console.log("No monthly data found for period:", periods.monthly);
+        }
+
+        // Total data
+        try {
+          const { data: totalData, error: totalError } = await supabase
+            .from("user_performance_metrics")
+            .select("win_profit, loss_loss")
+            .eq("user_id", user.id)
+            .eq("period_type", "total")
+            .eq("period_value", "total")
+            .maybeSingle(); // Use maybeSingle instead of single
+
+          if (totalData) {
+            totalProfit = (totalData.win_profit || 0) + (totalData.loss_loss || 0);
+          }
+        } catch (totalError) {
+          console.log("No total data found");
+        }
 
         setPlSummary({
           daily_profit: dailyProfit,
@@ -273,13 +305,15 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
           .eq("user_id", user.id)
           .eq("period_type", period.period_type)
           .eq("period_value", period.period_value)
-          .single();
+          .maybeSingle(); // Use maybeSingle instead of single
 
-        if (error && error.code !== 'PGRST116') {
-          throw error;
+        if (error) {
+          console.error("Error fetching performance data:", error);
+          // Don't throw error if no data found, just set to null
+          setPerformanceData(null);
+        } else {
+          setPerformanceData(data || null);
         }
-
-        setPerformanceData(data || null);
       } catch (error: any) {
         console.error("Error fetching performance data:", error);
         setError(error.message || "データの取得に失敗しました");
