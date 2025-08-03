@@ -130,3 +130,52 @@ export const loadTrades = async (userId: string): Promise<{ data: TradeData[]; e
     return { data: [], error: "Failed to load trades" };
   }
 }; 
+
+/**
+ * Generic function to load data for table editing
+ */
+export const loadDataForTable = async <T>(
+  loaderFunction: () => Promise<{ data: T[]; error?: any }>,
+  setterFunction: (data: T[]) => void,
+  errorMessage: string
+): Promise<void> => {
+  try {
+    const { data, error } = await loaderFunction();
+    
+    if (error) {
+      console.error(errorMessage, error);
+      return;
+    }
+    
+    setterFunction(data);
+  } catch (error) {
+    console.error(errorMessage, error);
+  }
+}
+
+/**
+ * Load symbols for table editing
+ */
+export const loadSymbolsForTable = async (
+  setAvailableSymbols: (symbols: string[]) => void
+): Promise<void> => {
+  await loadDataForTable(
+    loadSymbols,
+    setAvailableSymbols,
+    "Error loading symbols for table:"
+  );
+}
+
+/**
+ * Load emotions for table editing
+ */
+export const loadEmotionsForTable = async (
+  userId: string,
+  setAvailableEmotions: (emotions: string[]) => void
+): Promise<void> => {
+  await loadDataForTable(
+    () => loadEmotions(userId),
+    setAvailableEmotions,
+    "Error loading emotions for table:"
+  );
+} 

@@ -75,11 +75,9 @@ import {
 } from "@/components/ui/table-settings-dialog"
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
-import { saveTrade } from "@/utils/tradeUtils"
-import { localDateTimeToUTC, utcToLocalDateTime } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
-import { isFieldEditable, validateCellValue, mapFieldToDatabase, getColumnValue, transformTradeData } from "@/utils/tableUtils"
-import { loadSymbols, loadEmotions, loadTags } from "@/utils/dataLoadingUtils"
+import { isFieldEditable, getColumnValue, transformTradeData } from "@/utils/tableUtils"
+import { loadTags, loadSymbolsForTable, loadEmotionsForTable } from "@/utils/dataLoadingUtils"
 import { filterAndSortTrades } from "@/utils/tableFilterUtils"
 import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/cellEditingUtils"
 import { saveCellValue } from "@/utils/cellSaveUtils"
@@ -132,63 +130,30 @@ export default function TablePage() {
   const [availableTags, setAvailableTags] = useState<{ id: number, tag_name: string }[]>([]);
   const [isComposing, setIsComposing] = useState(false);
 
-  // Load tags from trade_tags for the current user
-  useEffect(() => {
-    if (!user) return;
-    const loadTagsForTable = async () => {
-      const { data, error } = await loadTags(user.id);
-      if (error) {
-        console.error("Error loading tags for table:", error);
-        setAvailableTags([]);
-        return;
-      }
-      setAvailableTags(data);
-    };
-    loadTagsForTable();
-  }, [user]);
-
-  // Load symbols from database for table editing
-  const loadSymbolsForTable = async () => {
-    if (!user) return;
-    
-    const { data: symbols, error } = await loadSymbols();
-    
-    if (error) {
-      console.error("Error loading symbols for table:", error);
-      return;
-    }
-    
-    setAvailableSymbols(symbols);
-  }
-
-  // Load emotions from database for table editing
-  const loadEmotionsForTable = async () => {
-    if (!user) return;
-    
-    const { data: emotions, error } = await loadEmotions(user.id);
-    
-    if (error) {
-      console.error("Error loading emotions for table:", error);
-      return;
-    }
-    
-    setAvailableEmotions(emotions);
-  }
-
+  // Load all initial data when user changes
   useEffect(() => {
     if (!user) return;
     
-    // Load symbols for table editing
-    loadSymbolsForTable();
-    
-    // Load emotions for table editing
-    loadEmotionsForTable();
-    
-    const loadTrades = async () => {
+    const initializeData = async () => {
       setStatus({ loading: true, error: "", isSaving: false });
-      setStatus({ loading: false, error: "", isSaving: false });
+      
       try {
-        // Load user's column preferences first
+        // Load all data in parallel for better performance
+        const [tagsResult, symbolsResult, emotionsResult] = await Promise.all([
+          loadTags(user.id),
+          loadSymbolsForTable(setAvailableSymbols),
+          loadEmotionsForTable(user.id, setAvailableEmotions)
+        ]);
+
+        // Handle tags loading
+        if (tagsResult.error) {
+          console.error("Error loading tags for table:", tagsResult.error);
+          setAvailableTags([]);
+        } else {
+          setAvailableTags(tagsResult.data);
+        }
+
+        // Load user's column preferences
         const { data: preferencesData, error: preferencesError } = await supabase
           .from("table_column_preferences")
           .select("*")
@@ -254,34 +219,34 @@ export default function TablePage() {
           return;
         }
 
-        // Fetch tags for all trades
-        const { data: tagLinksData, error: tagLinksError } = await supabase
-          .from("trade_tag_links")
-          .select(`
-            trade_id,
-            trade_tags!inner(tag_name)
-          `);
+        // Fetch tags and emotions for all trades in parallel
+        const [tagLinksResult, emotionLinksResult] = await Promise.all([
+          supabase
+            .from("trade_tag_links")
+            .select(`
+              trade_id,
+              trade_tags!inner(tag_name)
+            `),
+          supabase
+            .from("trade_emotion_links")
+            .select(`
+              trade_id,
+              emotions!inner(emotion)
+            `)
+        ]);
 
-        if (tagLinksError) {
-          console.error("Error loading tags:", tagLinksError);
+        if (tagLinksResult.error) {
+          console.error("Error loading tags:", tagLinksResult.error);
         }
 
-        // Fetch emotions for all trades
-        const { data: emotionLinksData, error: emotionLinksError } = await supabase
-          .from("trade_emotion_links")
-          .select(`
-            trade_id,
-            emotions!inner(emotion)
-          `);
-
-        if (emotionLinksError) {
-          console.error("Error loading emotions:", emotionLinksError);
+        if (emotionLinksResult.error) {
+          console.error("Error loading emotions:", emotionLinksResult.error);
         }
 
         // Group tags and emotions by trade_id, but only for trades that belong to the current user
         const userTradeIds = new Set((tradesData || []).map(trade => trade.id));
         
-        const tagsByTradeId = (tagLinksData || []).reduce((acc: Record<number, string[]>, link: any) => {
+        const tagsByTradeId = (tagLinksResult.data || []).reduce((acc: Record<number, string[]>, link: any) => {
           // Only include tags for trades that belong to the current user
           if (userTradeIds.has(link.trade_id)) {
             if (!acc[link.trade_id]) acc[link.trade_id] = [];
@@ -290,7 +255,7 @@ export default function TablePage() {
           return acc;
         }, {});
 
-        const emotionsByTradeId = (emotionLinksData || []).reduce((acc: Record<number, string[]>, link: any) => {
+        const emotionsByTradeId = (emotionLinksResult.data || []).reduce((acc: Record<number, string[]>, link: any) => {
           // Only include emotions for trades that belong to the current user
           if (userTradeIds.has(link.trade_id)) {
             if (!acc[link.trade_id]) acc[link.trade_id] = [];
@@ -306,18 +271,18 @@ export default function TablePage() {
 
         setTrades(transformedTrades);
       } catch (error: any) {
-        console.error("Error loading trades:", error);
-        setStatus({ loading: false, error: error.message || "取引データの読み込み中にエラーが発生しました", isSaving: false });
+        console.error("Error loading data:", error);
+        setStatus({ loading: false, error: error.message || "データの読み込み中にエラーが発生しました", isSaving: false });
       } finally {
         setStatus({ loading: false, error: "", isSaving: false });
       }
     };
 
-    loadTrades();
+    initializeData();
     
     // Listen for trade updates
     const handleTradeUpdate = () => {
-      loadTrades();
+      initializeData();
     };
     
     window.addEventListener('tradeUpdated', handleTradeUpdate);
