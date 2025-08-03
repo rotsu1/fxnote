@@ -99,8 +99,8 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
         loss_loss: (acc.loss_loss || 0) + (row.loss_loss || 0),
         win_pips: (acc.win_pips || 0) + (row.win_pips || 0),
         loss_pips: (acc.loss_pips || 0) + (row.loss_pips || 0),
-        avg_win_holding_time: (acc.avg_win_holding_time || 0) + (row.avg_win_holding_time || 0),
-        avg_loss_holding_time: (acc.avg_loss_holding_time || 0) + (row.avg_loss_holding_time || 0),
+        win_holding_time: (acc.win_holding_time || 0) + (row.win_holding_time || 0),
+        loss_holding_time: (acc.loss_holding_time || 0) + (row.loss_holding_time || 0),
       };
     }, {});
 
@@ -127,12 +127,12 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       ? total.loss_pips / total.loss_count 
       : 0;
     
-    const avg_win_holding_time = count > 0 
-      ? total.avg_win_holding_time / count 
+    const avg_win_holding_time = total.win_count > 0 
+      ? total.win_holding_time / total.win_count 
       : 0;
     
-    const avg_loss_holding_time = count > 0 
-      ? total.avg_loss_holding_time / count 
+    const avg_loss_holding_time = total.loss_count > 0 
+      ? total.loss_holding_time / total.loss_count 
       : 0;
     
     const payoff_ratio = total.loss_count > 0 && Math.abs(avg_loss_trade_loss) > 0

@@ -22,8 +22,8 @@ export interface UserPerformanceMetric {
   loss_loss: number;
   win_pips: number;
   loss_pips: number;
-  avg_win_holding_time: number;
-  avg_loss_holding_time: number;
+  win_holding_time: number; // Total holding time for wins in seconds
+  loss_holding_time: number; // Total holding time for losses in seconds
   created_at?: string;
   updated_at?: string;
 }
@@ -113,8 +113,8 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
           loss_loss: isWin ? 0 : -Math.abs(trade.profit_loss), // Store loss as negative value
           win_pips: isWin ? trade.pips : 0,
           loss_pips: isWin ? 0 : -Math.abs(trade.pips), // Store loss pips as negative value
-          avg_win_holding_time: isWin ? trade.hold_time : 0,
-          avg_loss_holding_time: isWin ? 0 : trade.hold_time,
+          win_holding_time: isWin ? trade.hold_time : 0,
+          loss_holding_time: isWin ? 0 : trade.hold_time,
           updated_at: new Date().toISOString()
         };
       } else {
@@ -125,25 +125,21 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
         const currentLossLoss = existingMetric.loss_loss || 0;
         const currentWinPips = existingMetric.win_pips || 0;
         const currentLossPips = existingMetric.loss_pips || 0;
-        const currentAvgWinHoldingTime = existingMetric.avg_win_holding_time || 0;
-        const currentAvgLossHoldingTime = existingMetric.avg_loss_holding_time || 0;
+        const currentWinHoldingTime = existingMetric.win_holding_time || 0;
+        const currentLossHoldingTime = existingMetric.loss_holding_time || 0;
 
         if (isWin) {
           // Update win-related metrics
           const newWinCount = currentWinCount + 1;
           const newWinProfit = currentWinProfit + trade.profit_loss;
           const newWinPips = currentWinPips + trade.pips;
+          const newWinHoldingTime = currentWinHoldingTime + trade.hold_time;
           
-          // Update average win holding time using incremental average formula
-          const newAvgWinHoldingTime = currentWinCount === 0 
-            ? trade.hold_time 
-            : (currentAvgWinHoldingTime * currentWinCount + trade.hold_time) / newWinCount;
-
           updatedMetric = {
             win_count: newWinCount,
             win_profit: newWinProfit,
             win_pips: newWinPips,
-            avg_win_holding_time: newAvgWinHoldingTime,
+            win_holding_time: newWinHoldingTime,
             updated_at: new Date().toISOString()
           };
         } else {
@@ -151,17 +147,13 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
           const newLossCount = currentLossCount + 1;
           const newLossLoss = currentLossLoss - Math.abs(trade.profit_loss);
           const newLossPips = currentLossPips - Math.abs(trade.pips);
-          
-          // Update average loss holding time using incremental average formula
-          const newAvgLossHoldingTime = currentLossCount === 0 
-            ? trade.hold_time 
-            : (currentAvgLossHoldingTime * currentLossCount + trade.hold_time) / newLossCount;
+          const newLossHoldingTime = currentLossHoldingTime + trade.hold_time;
 
           updatedMetric = {
             loss_count: newLossCount,
             loss_loss: newLossLoss,
             loss_pips: newLossPips,
-            avg_loss_holding_time: newAvgLossHoldingTime,
+            loss_holding_time: newLossHoldingTime,
             updated_at: new Date().toISOString()
           };
         }
@@ -252,19 +244,13 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         const newWinCount = Math.max(0, (existingMetric.win_count || 0) - 1);
         const newWinProfit = Math.max(0, (existingMetric.win_profit || 0) - trade.profit_loss);
         const newWinPips = Math.max(0, (existingMetric.win_pips || 0) - trade.pips);
+        const newWinHoldingTime = Math.max(0, (existingMetric.win_holding_time || 0) - trade.hold_time);
         
-        // Recalculate average win holding time
-        let newAvgWinHoldingTime = 0;
-        if (newWinCount > 0) {
-          const currentTotalTime = (existingMetric.avg_win_holding_time || 0) * (existingMetric.win_count || 0);
-          newAvgWinHoldingTime = (currentTotalTime - trade.hold_time) / newWinCount;
-        }
-
         updatedMetric = {
           win_count: newWinCount,
           win_profit: newWinProfit,
           win_pips: newWinPips,
-          avg_win_holding_time: newAvgWinHoldingTime,
+          win_holding_time: newWinHoldingTime,
           updated_at: new Date().toISOString()
         };
       } else {
@@ -272,19 +258,13 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         const newLossCount = Math.max(0, (existingMetric.loss_count || 0) - 1);
         const newLossLoss = Math.min(0, (existingMetric.loss_loss || 0) + Math.abs(trade.profit_loss));
         const newLossPips = Math.min(0, (existingMetric.loss_pips || 0) + Math.abs(trade.pips));
-        
-        // Recalculate average loss holding time
-        let newAvgLossHoldingTime = 0;
-        if (newLossCount > 0) {
-          const currentTotalTime = (existingMetric.avg_loss_holding_time || 0) * (existingMetric.loss_count || 0);
-          newAvgLossHoldingTime = (currentTotalTime - trade.hold_time) / newLossCount;
-        }
+        const newLossHoldingTime = Math.max(0, (existingMetric.loss_holding_time || 0) - trade.hold_time);
 
         updatedMetric = {
           loss_count: newLossCount,
           loss_loss: newLossLoss,
           loss_pips: newLossPips,
-          avg_loss_holding_time: newAvgLossHoldingTime,
+          loss_holding_time: newLossHoldingTime,
           updated_at: new Date().toISOString()
         };
       }

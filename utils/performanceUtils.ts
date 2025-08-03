@@ -25,10 +25,10 @@ export const formatPerformanceValue = (value: number | null | undefined, columnN
     return `${value.toFixed(1)} pips`;
   }
   
-  // Handle time values (assuming minutes)
+  // Handle time values (assuming seconds)
   if (columnName.includes('holding_time')) {
-    const hours = Math.floor(value / 60);
-    const minutes = value % 60;
+    const hours = Math.floor(value / 3600);
+    const minutes = Math.floor((value % 3600) / 60);
     return `${hours}h ${minutes}m`;
   }
   
