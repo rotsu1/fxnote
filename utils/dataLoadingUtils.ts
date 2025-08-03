@@ -17,6 +17,80 @@ export interface TradeData {
   tradeEmotions: string[];
 }
 
+export const loadSymbols = async (): Promise<{ data: string[]; error?: string }> => {
+  try {
+    const { data, error } = await supabase
+      .from("symbols")
+      .select("symbol")
+      .order("symbol")
+    
+    if (error) {
+      console.error("Error loading symbols:", error)
+      return { data: [], error: error.message }
+    }
+    
+    const symbols = data?.map(item => item.symbol) || []
+    return { data: symbols }
+  } catch (error) {
+    console.error("Error loading symbols:", error)
+    return { data: [], error: "Failed to load symbols" }
+  }
+}
+
+export const loadEmotions = async (userId: string): Promise<{ data: string[]; error?: string }> => {
+  if (!userId) {
+    return { data: [], error: "User not authenticated" };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("emotions")
+      .select("emotion")
+      .eq("user_id", userId)
+      .order("emotion")
+    
+    if (error) {
+      console.error("Error loading emotions:", error)
+      return { data: [], error: error.message }
+    }
+    
+    const emotions = data?.map(item => item.emotion) || []
+    return { data: emotions }
+  } catch (error) {
+    console.error("Error loading emotions:", error)
+    return { data: [], error: "Failed to load emotions" }
+  }
+}
+
+export interface TagData {
+  id: number;
+  tag_name: string;
+}
+
+export const loadTags = async (userId: string): Promise<{ data: TagData[]; error?: string }> => {
+  if (!userId) {
+    return { data: [], error: "User not authenticated" };
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from("trade_tags")
+      .select("id, tag_name")
+      .eq("user_id", userId)
+      .order("tag_name")
+    
+    if (error) {
+      console.error("Error loading tags:", error)
+      return { data: [], error: error.message }
+    }
+    
+    return { data: data || [] }
+  } catch (error) {
+    console.error("Error loading tags:", error)
+    return { data: [], error: "Failed to load tags" }
+  }
+}
+
 export const loadTrades = async (userId: string): Promise<{ data: TradeData[]; error?: string }> => {
   if (!userId) {
     return { data: [], error: "User not authenticated" };

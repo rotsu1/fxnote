@@ -79,6 +79,7 @@ import { saveTrade } from "@/utils/tradeUtils"
 import { localDateTimeToUTC, utcToLocalDateTime, formatHoldTimeCompact, formatLocalTime, formatDateTime, parseTimeToMinutes } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
 import { isFieldEditable, validateCellValue, mapFieldToDatabase, getColumnValue, transformTradeData } from "@/utils/tableUtils"
+import { loadSymbols, loadEmotions, loadTags } from "@/utils/dataLoadingUtils"
 
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
@@ -128,76 +129,44 @@ export default function TablePage() {
   // Load tags from trade_tags for the current user
   useEffect(() => {
     if (!user) return;
-    const loadTags = async () => {
-      const { data, error } = await supabase
-        .from("trade_tags")
-        .select("id, tag_name")
-        .eq("user_id", user.id)
-        .order("tag_name");
+    const loadTagsForTable = async () => {
+      const { data, error } = await loadTags(user.id);
       if (error) {
         console.error("Error loading tags for table:", error);
         setAvailableTags([]);
         return;
       }
-      setAvailableTags(data || []);
+      setAvailableTags(data);
     };
-    loadTags();
+    loadTagsForTable();
   }, [user]);
 
   // Load symbols from database for table editing
   const loadSymbolsForTable = async () => {
     if (!user) return;
     
-    try {
-      const { data, error } = await supabase
-        .from("symbols")
-        .select("symbol")
-        .order("symbol")
-      
-      if (error) {
-        console.error("Error loading symbols for table:", error)
-        return
-      }
-      
-      const symbols = data?.map(item => item.symbol) || []
-      setAvailableSymbols(symbols)
-      
-      // Update the pair column options
-      const updatedColumns = allColumns.map(col => {
-        if (col.id === 'pair') {
-          return { ...col, options: symbols }
-        }
-        return col
-      })
-      
-      // Update the allColumns array (this is a bit of a workaround since allColumns is const)
-      // We'll handle this in the cell rendering logic instead
-    } catch (error) {
-      console.error("Error loading symbols for table:", error)
+    const { data: symbols, error } = await loadSymbols();
+    
+    if (error) {
+      console.error("Error loading symbols for table:", error);
+      return;
     }
+    
+    setAvailableSymbols(symbols);
   }
 
   // Load emotions from database for table editing
   const loadEmotionsForTable = async () => {
     if (!user) return;
     
-    try {
-      const { data, error } = await supabase
-        .from("emotions")
-        .select("emotion")
-        .eq("user_id", user.id)
-        .order("emotion")
-      
-      if (error) {
-        console.error("Error loading emotions for table:", error)
-        return
-      }
-      
-      const emotions = data?.map(item => item.emotion) || []
-      setAvailableEmotions(emotions)
-    } catch (error) {
-      console.error("Error loading emotions for table:", error)
+    const { data: emotions, error } = await loadEmotions(user.id);
+    
+    if (error) {
+      console.error("Error loading emotions for table:", error);
+      return;
     }
+    
+    setAvailableEmotions(emotions);
   }
 
   useEffect(() => {
@@ -507,8 +476,6 @@ export default function TablePage() {
     }));
   };
 
-
-
   const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
     const cellKey = `${id}-${field}`;
     setCellEditingState(prev => ({
@@ -549,10 +516,6 @@ export default function TablePage() {
       }
     }));
   }, []);
-
-
-
-
 
   const handleCellSave = useCallback(async (id: number, field: keyof Trade) => {
     const cellKey = `${id}-${field}`;
