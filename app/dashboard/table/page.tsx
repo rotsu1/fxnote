@@ -80,6 +80,7 @@ import { localDateTimeToUTC, utcToLocalDateTime, formatHoldTimeCompact, formatLo
 import { Trade } from "@/utils/types"
 import { isFieldEditable, validateCellValue, mapFieldToDatabase, getColumnValue, transformTradeData } from "@/utils/tableUtils"
 import { loadSymbols, loadEmotions, loadTags } from "@/utils/dataLoadingUtils"
+import { filterAndSortTrades } from "@/utils/tableFilterUtils"
 
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
@@ -339,60 +340,10 @@ export default function TablePage() {
   }, [cellEditingState.editingCell, cellEditingState.editingValues]);
 
   const filteredTrades = useMemo(() => {
-    if (!selectedDate) return [];
-    const dateString = format(selectedDate, "yyyy-MM-dd");
-    let filtered = trades.filter((trade) => {
-      // Use exit time for filtering instead of entry time
-      if (!trade.exitTime) return false;
-      const exitDate = new Date(trade.exitTime);
-      const exitDateString = exitDate.toLocaleDateString('en-CA'); // YYYY-MM-DD format
-      return exitDateString === dateString;
+    return filterAndSortTrades(trades, {
+      selectedDate,
+      sortConfig: tableConfig.sortConfig
     });
-    
-    // Apply sorting
-    if (tableConfig.sortConfig.key) {
-      filtered.sort((a, b) => {
-        const aValue = a[tableConfig.sortConfig.key!];
-        const bValue = b[tableConfig.sortConfig.key!];
-        
-        // Handle different data types
-        if (typeof aValue === 'number' && typeof bValue === 'number') {
-          // For profit and pips, reverse the logic so highest values appear at top when arrow is up
-          if (tableConfig.sortConfig.key === 'profit' || tableConfig.sortConfig.key === 'pips') {
-            return tableConfig.sortConfig.direction === 'asc' ? bValue - aValue : aValue - bValue;
-          }
-          // For other numeric fields (lot, entry, exit), use normal sorting
-          return tableConfig.sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-        }
-        
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          // Special handling for holding time (保有時間)
-          if (tableConfig.sortConfig.key === 'holdingTime') {
-            const aMinutes = parseTimeToMinutes(aValue);
-            const bMinutes = parseTimeToMinutes(bValue);
-            
-            // For holding time: arrow up = shortest time, arrow down = longest time
-            return tableConfig.sortConfig.direction === 'asc' ? aMinutes - bMinutes : bMinutes - aMinutes;
-          }
-          
-          // Regular string comparison for other string fields
-          const comparison = aValue.localeCompare(bValue);
-          return tableConfig.sortConfig.direction === 'asc' ? comparison : -comparison;
-        }
-        
-        // Handle arrays (tags)
-        if (Array.isArray(aValue) && Array.isArray(bValue)) {
-          const aStr = aValue.join(', ');
-          const bStr = bValue.join(', ');
-          const comparison = aStr.localeCompare(bStr);
-          return tableConfig.sortConfig.direction === 'asc' ? comparison : -comparison;
-        }
-        
-        return 0;
-      });
-    }
-    
-    return filtered;
   }, [trades, selectedDate, tableConfig.sortConfig]);
 
   const handleCellClick = (id: number, field: keyof Trade) => {
