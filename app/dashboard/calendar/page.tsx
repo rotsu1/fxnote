@@ -26,12 +26,12 @@ import { RightSidebar } from "@/components/ui/right-sidebar"
 import { CSVImportDialog } from "@/components/ui/csv-import-dialog"
 import { DisplaySettingsDialog } from "@/components/ui/display-settings-dialog"
 
-import { supabase } from "@/lib/supabaseClient";
-import { useAuth } from "@/hooks/useAuth";
-
 import { saveTrade } from "@/utils/tradeUtils"
 import { utcToLocalDateTime, groupTradesByDate } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
+
+import { supabase } from "@/lib/supabaseClient";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function CalendarPage() {
   const user = useAuth();
@@ -204,7 +204,7 @@ export default function CalendarPage() {
       
       console.log("Transformed trade for editing:", transformedTrade);
       setEditingTrade(transformedTrade);
-    setIsTradeDialogOpen(true);
+      setIsTradeDialogOpen(true);
     } catch (error) {
       console.error("Error preparing trade for editing:", error);
       setError("取引の編集準備中にエラーが発生しました");
@@ -247,8 +247,6 @@ export default function CalendarPage() {
     }
 
     try {
-      // Delete related records first (foreign key constraints)
-      
       // Delete trade emotion links
       const { error: emotionError } = await supabase
         .from("trade_emotion_links")

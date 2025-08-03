@@ -16,6 +16,7 @@ export interface Trade {
     holdingDays?: number
     holdingHours?: number
     holdingMinutes?: number
+    holdingSeconds?: number
     notes?: string
     tags: string[]
-  }
+}
