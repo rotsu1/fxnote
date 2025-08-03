@@ -45,10 +45,22 @@ export function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { curr
             const tradeCount = (groupedTrades[dateStr] || []).length;
             const colorClass = isCurrentMonth && tradeCount > 0 ? getPLColor(dailyPL) : "";
   
+            // Debug logging
+            if (isCurrentMonth && tradeCount > 0) {
+              console.log(`Date: ${dateStr}, P/L: ${dailyPL}, Color: ${colorClass}`);
+            }
+  
             return (
               <div
                 key={index}
-                className={`min-h-[80px] p-2 border-r border-b cursor-pointer hover:bg-gray-50 transition-colors ${!isCurrentMonth ? "text-gray-400 bg-gray-50" : ""} ${colorClass}`}
+                className={`min-h-[80px] p-2 border-r border-b cursor-pointer transition-colors ${
+                  !isCurrentMonth 
+                    ? "text-gray-400 bg-gray-50" 
+                    : colorClass 
+                      ? colorClass 
+                      : "hover:bg-gray-50"
+                }`}
+                style={colorClass ? { backgroundColor: colorClass.includes('green') ? '#10b981' : colorClass.includes('red') ? '#ef4444' : '#6b7280' } : {}}
                 onClick={() => isCurrentMonth && onDateClick(dateStr)}
               >
                 <div className="text-sm font-medium mb-1">{day.getDate()}</div>
