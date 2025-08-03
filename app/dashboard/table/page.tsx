@@ -83,6 +83,9 @@ import { loadSymbols, loadEmotions, loadTags } from "@/utils/dataLoadingUtils"
 import { filterAndSortTrades } from "@/utils/tableFilterUtils"
 import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/cellEditingUtils"
 import { saveCellValue } from "@/utils/cellSaveUtils"
+import { handleTradeSelection, handleSelectAllTrades as handleSelectAllTradesUtil, handleTradeSave, handleTradeDeletion } from "@/utils/tradeManagementUtils"
+import { handleColumnToggle, handleColumnDragStart, handleColumnDrop, saveColumnPreferences as saveColumnPreferencesUtil } from "@/utils/columnManagementUtils"
+import { handlePreviousDay as handlePreviousDayUtil, handleNextDay as handleNextDayUtil } from "@/utils/dateNavigationUtils"
 
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
@@ -526,34 +529,24 @@ export default function TablePage() {
   };
 
   const handleSaveTrade = async (tradeData: Partial<Trade>) => {
-    const result = await saveTrade(tradeData, editingTrade, user);
+    const result = await handleTradeSave(tradeData, editingTrade, user);
     
-    if (result?.success) {
+    if (result.success) {
       setDialogState({ ...dialogState, isTradeDialogOpen: false });
       setEditingTrade(null);
     } else {
-      setStatus({ ...status, error: result?.error || "取引の保存中にエラーが発生しました", isSaving: false });
+      setStatus({ ...status, error: result.error || "取引の保存中にエラーが発生しました", isSaving: false });
     }
   };
 
   const handleSelectTrade = (id: number, checked: boolean) => {
-    setSelectedTrades(prev => {
-      const newSet = new Set(prev);
-      if (checked) {
-        newSet.add(id);
-      } else {
-        newSet.delete(id);
-      }
-      return newSet;
-    });
+    const newSelectedTrades = handleTradeSelection(id, checked, selectedTrades);
+    setSelectedTrades(newSelectedTrades);
   };
 
   const handleSelectAllTrades = (checked: boolean) => {
-    if (checked) {
-      setSelectedTrades(new Set(filteredTrades.map(trade => trade.id)));
-    } else {
-      setSelectedTrades(new Set());
-    }
+    const newSelectedTrades = handleSelectAllTradesUtil(checked, filteredTrades);
+    setSelectedTrades(newSelectedTrades);
   };
 
   const handleDeleteSelectedTrades = () => {
@@ -569,27 +562,23 @@ export default function TablePage() {
         const selectedIds = Array.from(selectedTrades);
         if (selectedIds.length === 0) return;
         
-        const { error } = await supabase
-          .from("trades")
-          .delete()
-          .in("id", selectedIds)
-          .eq("user_id", user.id);
+        const result = await handleTradeDeletion(selectedIds, user);
         
-        if (error) throw error;
-        
-        setTrades((prevTrades) => prevTrades.filter((t) => !selectedIds.includes(t.id)));
-        setSelectedTrades(new Set());
+        if (result.success) {
+          setTrades((prevTrades) => prevTrades.filter((t) => !selectedIds.includes(t.id)));
+          setSelectedTrades(new Set());
+        } else {
+          throw new Error(result.error);
+        }
       } else {
         // Single trade delete
-        const { error } = await supabase
-          .from("trades")
-          .delete()
-          .eq("id", deleteConfirmId)
-          .eq("user_id", user.id);
+        const result = await handleTradeDeletion([deleteConfirmId], user);
         
-        if (error) throw error;
-        
-        setTrades((prevTrades) => prevTrades.filter((t) => t.id !== deleteConfirmId));
+        if (result.success) {
+          setTrades((prevTrades) => prevTrades.filter((t) => t.id !== deleteConfirmId));
+        } else {
+          throw new Error(result.error);
+        }
       }
       
       setDeleteConfirmId(null);
@@ -600,17 +589,18 @@ export default function TablePage() {
   };
 
   const handleToggleColumn = (columnId: string, isVisible: boolean) => {
+    const result = handleColumnToggle(columnId, isVisible, tableConfig);
     setTableConfig(prev => ({
       ...prev,
-      visibleColumns: isVisible ? [...prev.visibleColumns, columnId] : prev.visibleColumns.filter((id) => id !== columnId),
-      hasUnsavedChanges: true
+      ...result
     }));
   };
 
   const handleDragStart = (columnId: string) => {
+    const result = handleColumnDragStart(columnId, tableConfig);
     setTableConfig(prev => ({
       ...prev,
-      draggedColumn: columnId
+      draggedColumn: result.draggedColumn
     }));
   };
 
@@ -619,102 +609,26 @@ export default function TablePage() {
   };
 
   const handleDrop = (targetColumnId: string) => {
-    if (!tableConfig.draggedColumn || tableConfig.draggedColumn === targetColumnId) {
-      setTableConfig(prev => ({
-        ...prev,
-        draggedColumn: null
-      }));
-      return;
-    }
-
-    const newOrder = [...tableConfig.visibleColumns];
-    const draggedIndex = newOrder.indexOf(tableConfig.draggedColumn);
-    const targetIndex = newOrder.indexOf(targetColumnId);
-
-    // Remove dragged item from its current position
-    newOrder.splice(draggedIndex, 1);
-    // Insert it at the target position
-    newOrder.splice(targetIndex, 0, tableConfig.draggedColumn);
-
+    const result = handleColumnDrop(targetColumnId, tableConfig);
     setTableConfig(prev => ({
       ...prev,
-      visibleColumns: newOrder,
-      draggedColumn: null,
-      hasUnsavedChanges: true
+      ...result
     }));
   };
 
   const saveColumnPreferences = async () => {
     if (!user) return;
 
-    try {
-      const columnMapping = {
-        'pair': 'symbol',
-        'entryTime': 'entry_time',
-        'exitTime': 'exit_time',
-        'type': 'type',
-        'lot': 'lot',
-        'entry': 'entry_price',
-        'exit': 'exit_price',
-        'pips': 'pips',
-        'profit': 'profit_loss',
-        'emotion': 'emotion',
-        'holdingTime': 'hold_time',
-        'notes': 'note',
-        'tags': 'tag',
-      };
-
-      const preferences: any = {};
-      
-      // Set order for visible columns (1-based indexing to match database)
-      tableConfig.visibleColumns.forEach((columnId, index) => {
-        const dbField = columnMapping[columnId as keyof typeof columnMapping];
-        if (dbField) {
-          preferences[dbField] = index + 1; // Convert 0-based to 1-based
-        }
-      });
-
-      // Set null for hidden columns
-      allColumns.forEach((column) => {
-        const dbField = columnMapping[column.id as keyof typeof columnMapping];
-        if (dbField && !tableConfig.visibleColumns.includes(column.id)) {
-          preferences[dbField] = null;
-        }
-      });
-
-      // Check if preferences exist
-      const { data: existingPrefs } = await supabase
-        .from("table_column_preferences")
-        .select("id")
-        .eq("user_id", user.id)
-        .single();
-
-      if (existingPrefs) {
-        // Update existing preferences
-        await supabase
-          .from("table_column_preferences")
-          .update({
-            ...preferences,
-            updated_at: new Date().toISOString(),
-          })
-          .eq("user_id", user.id);
-      } else {
-        // Create new preferences
-        await supabase
-          .from("table_column_preferences")
-          .insert([{
-            user_id: user.id,
-            ...preferences,
-          }]);
-      }
-      
+    const result = await saveColumnPreferencesUtil(tableConfig.visibleColumns, user, allColumns);
+    
+    if (result.success) {
       setTableConfig(prev => ({
         ...prev,
         hasUnsavedChanges: false
       }));
       setDialogState({ ...dialogState, isTableSettingsOpen: false });
-    } catch (error) {
-      console.error("Error saving column preferences:", error);
+    } else {
+      console.error("Error saving column preferences:", result.error);
     }
   };
 
@@ -783,18 +697,16 @@ export default function TablePage() {
   };
 
   const handlePreviousDay = () => {
-    if (selectedDate) {
-      const previousDay = new Date(selectedDate);
-      previousDay.setDate(previousDay.getDate() - 1);
-      setSelectedDate(previousDay);
+    const newDate = handlePreviousDayUtil(selectedDate);
+    if (newDate) {
+      setSelectedDate(newDate);
     }
   };
 
   const handleNextDay = () => {
-    if (selectedDate) {
-      const nextDay = new Date(selectedDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      setSelectedDate(nextDay);
+    const newDate = handleNextDayUtil(selectedDate);
+    if (newDate) {
+      setSelectedDate(newDate);
     }
   };
 
