@@ -1,5 +1,3 @@
-import * as fs from 'fs';
-import * as path from 'path';
 import { supabase } from '../lib/supabaseClient';
 import { updateUserPerformanceMetricsBatch, TradeInput } from './metrics/updateUserPerformanceMetrics';
 
@@ -46,7 +44,7 @@ interface DatabaseTrade {
 
 // Helper function to convert Japanese date format to ISO string
 function parseJapaneseDateTime(dateTimeStr: string): string {
-  // Handle format: "DD/MM/YYYY HH:MM" or "DD/MM/YYYY HH:MM:SS 午前/午後"
+  // Handle format: "YYYY/MM/DD HH:MM:SS" (Hirose format)
   const parts = dateTimeStr.split(' ');
   
   if (parts.length < 2) {
@@ -56,13 +54,13 @@ function parseJapaneseDateTime(dateTimeStr: string): string {
   const datePart = parts[0];
   const timePart = parts[1];
   
-  // Parse date (DD/MM/YYYY)
-  const [day, month, year] = datePart.split('/').map(Number);
+  // Parse date (YYYY/MM/DD) - Hirose uses YYYY/MM/DD format
+  const [year, month, day] = datePart.split('/').map(Number);
   
-  // Parse time (HH:MM or HH:MM:SS)
+  // Parse time (HH:MM:SS)
   let [hours, minutes, seconds = '00'] = timePart.split(':');
   
-  // Handle AM/PM if present
+  // Handle AM/PM if present (though Hirose typically uses 24-hour format)
   if (parts.length > 2) {
     const ampm = parts[2];
     const hour = parseInt(hours);
@@ -84,12 +82,12 @@ function parseJapaneseDateTime(dateTimeStr: string): string {
 function convertLotSize(lotSizeStr: string): number {
   const lotSize = parseFloat(lotSizeStr);
   // Convert from 1000 currency per lot to 10000 currency per lot
-  return lotSize * 10;
+  return lotSize / 10;
 }
 
 // Helper function to convert trade type
 function convertTradeType(buySellStr: string): number {
-  return buySellStr === '買' ? 0 : 1; // 0 for buy, 1 for sell
+  return buySellStr === '売' ? 0 : 1; // 売 = buy trade (0), 買 = sell trade (1)
 }
 
 // Helper function to calculate holding time in seconds
@@ -130,25 +128,73 @@ async function getOrCreateSymbol(symbolName: string): Promise<string> {
   return newSymbol.id;
 }
 
-// Main parsing function
-async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
+
+
+
+
+// Main execution function for File object (for use in browser)
+export async function importHiroseTradesFromFile(file: File, userId: string): Promise<{ successCount: number; errorCount: number }> {
+  console.log('=== Hirose Trade Import Tool (Browser) ===');
+  console.log(`CSV File: ${file.name}`);
+  console.log(`User ID: ${userId}`);
+  
   try {
-    console.log('Starting Hirose CSV parsing...');
+    let text = await file.text();
     
-    // Read CSV file
-    const csvContent = fs.readFileSync(filePath, 'utf-8');
-    const lines = csvContent.split('\n');
+    // Try to handle potential encoding issues
+    if (text.includes('') || text.includes('')) {
+      console.log('Detected encoding issues, trying to fix...');
+      
+      // Try reading as ArrayBuffer and decode with different encodings
+      const arrayBuffer = await file.arrayBuffer();
+      
+      // Try Shift_JIS (common for Japanese files)
+      try {
+        const decoder = new TextDecoder('shift-jis');
+        text = decoder.decode(arrayBuffer);
+        console.log('Successfully decoded with Shift_JIS');
+      } catch (e) {
+        console.log('Shift_JIS failed, trying UTF-8...');
+        try {
+          const decoder = new TextDecoder('utf-8');
+          text = decoder.decode(arrayBuffer);
+          console.log('Successfully decoded with UTF-8');
+        } catch (e2) {
+          console.log('UTF-8 failed, using original text');
+        }
+      }
+    }
+    
+    const lines = text.split('\n');
+    
+    console.log('CSV file content preview:');
+    console.log('First 5 lines:', lines.slice(0, 5));
+    console.log('Total lines:', lines.length);
     
     // Find the header row (skip any metadata rows)
     let headerIndex = -1;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes('決済約定日時') && lines[i].includes('通貨ペア')) {
+    for (let i = 0; i < Math.min(lines.length, 10); i++) {
+      console.log(`Line ${i}: "${lines[i]}"`);
+      
+      // Try multiple ways to detect the header
+      const line = lines[i];
+      if (
+        (line.includes('決済約定日時') && line.includes('通貨ペア')) ||
+        (line.includes('Settlement') && line.includes('Currency')) ||
+        (line.includes('USD/JPY') && line.includes('2025')) || // Look for data pattern
+        (line.includes(',') && line.split(',').length >= 17) // Look for row with many columns
+      ) {
         headerIndex = i;
+        console.log(`Found header at line ${i}`);
         break;
       }
     }
     
     if (headerIndex === -1) {
+      console.error('Could not find header row. Available lines:');
+      lines.slice(0, 10).forEach((line, index) => {
+        console.error(`Line ${index}: "${line}"`);
+      });
       throw new Error('Could not find header row in CSV file');
     }
     
@@ -214,18 +260,8 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
         // Get or create symbol
         const symbolId = await getOrCreateSymbol(trade.通貨ペア);
         
-        // Create trade memo with additional information
-        const tradeMemo = [
-          `注文番号: ${trade.注文番号}`,
-          `ポジション番号: ${trade.ポジション番号}`,
-          `約定区分: ${trade.約定区分}`,
-          `執行条件: ${trade.執行条件}`,
-          `pip損益: ${trade.pip損益}`,
-          trade.手数料 ? `手数料: ${trade.手数料}` : '',
-          trade.スワップ損益 ? `スワップ損益: ${trade.スワップ損益}` : '',
-          trade.決済損益 ? `決済損益: ${trade.決済損益}` : '',
-          trade.チャネル ? `チャネル: ${trade.チャネル}` : '',
-        ].filter(Boolean).join(', ');
+        // Trade memo should be empty
+        const tradeMemo = "";
         
         // Prepare database record
         const dbTrade: DatabaseTrade = {
@@ -292,63 +328,15 @@ async function parseHiroseCSV(filePath: string, userId: string): Promise<void> {
     console.log(`Errors: ${errorCount} trades`);
     console.log(`Total rows processed: ${dataRows.length}`);
     
+    return { successCount, errorCount };
+    
   } catch (error) {
     console.error('Error parsing Hirose CSV:', error);
     throw error;
   }
 }
 
-// Function to validate CSV file before processing
-function validateHiroseCSV(filePath: string): boolean {
-  try {
-    const csvContent = fs.readFileSync(filePath, 'utf-8');
-    const lines = csvContent.split('\n');
-    
-    // Check if file contains expected headers
-    const hasRequiredHeaders = lines.some(line => 
-      line.includes('決済約定日時') && 
-      line.includes('通貨ペア') && 
-      line.includes('売買') && 
-      line.includes('売買損益')
-    );
-    
-    if (!hasRequiredHeaders) {
-      console.error('CSV file does not contain required Hirose headers');
-      return false;
-    }
-    
-    console.log('CSV file validation passed');
-    return true;
-    
-  } catch (error) {
-    console.error('Error validating CSV file:', error);
-    return false;
-  }
-}
-
-// Main execution function
-export async function importHiroseTrades(csvFilePath: string, userId: string): Promise<void> {
-  console.log('=== Hirose Trade Import Tool ===');
-  console.log(`CSV File: ${csvFilePath}`);
-  console.log(`User ID: ${userId}`);
-  
-  // Validate file exists
-  if (!fs.existsSync(csvFilePath)) {
-    throw new Error(`CSV file not found: ${csvFilePath}`);
-  }
-  
-  // Validate CSV format
-  if (!validateHiroseCSV(csvFilePath)) {
-    throw new Error('Invalid Hirose CSV format');
-  }
-  
-  // Parse and import trades
-  await parseHiroseCSV(csvFilePath, userId);
-  
-  console.log('Import completed successfully!');
-}
-
 // Example usage:
-// importHiroseTrades('./path/to/hirose_export.csv', 'user-uuid-here');
+// importHiroseTradesFromFile(fileObject, 'user-uuid-here');
 
-export default importHiroseTrades; 
+export default importHiroseTradesFromFile; 

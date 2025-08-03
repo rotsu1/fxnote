@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { updateUserPerformanceMetricsBatch, TradeInput } from '@/utils/metrics/updateUserPerformanceMetrics';
+import { importHiroseTradesFromFile } from '@/utils/hiroseParser';
 
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
     const [isCustomBrokerOpen, setIsCustomBrokerOpen] = useState(false);
@@ -179,78 +180,7 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
       }
     };
   
-    // Helper function to parse Japanese date format
-    const parseJapaneseDateTime = (dateTimeStr: string): string => {
-      // Split by multiple spaces and filter out empty parts
-      const parts = dateTimeStr.split(/\s+/).filter(part => part.trim() !== '');
-      
-      if (parts.length < 2) {
-        return new Date().toISOString();
-      }
-      
-      const datePart = parts[0];
-      const timePart = parts[1];
-      
-      const [year, month, day] = datePart.split('/').map(Number);
-      let [hours, minutes, seconds = '00'] = timePart.split(':');
-      
-      // Handle AM/PM if present
-      if (parts.length > 2) {
-        const ampm = parts[2];
-        const hour = parseInt(hours);
-        if (ampm === '午後' && hour !== 12) {
-          hours = (hour + 12).toString();
-        } else if (ampm === '午前' && hour === 12) {
-          hours = '00';
-        }
-      }
-      
-      // Create a Date object in local timezone and convert to UTC ISO string
-      const localDate = new Date(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds));
-      return localDate.toISOString();
-    };
 
-    // Helper function to calculate holding time
-    const calculateHoldTime = (entryTime: string, exitTime: string): number => {
-      const entry = new Date(entryTime);
-      const exit = new Date(exitTime);
-      
-      // Calculate time difference in seconds
-      const timeDiffMs = exit.getTime() - entry.getTime();
-      const timeDiffSeconds = Math.floor(timeDiffMs / 1000);
-      
-      // Ensure positive value (exit time should be after entry time)
-      return Math.max(0, timeDiffSeconds);
-    };
-
-    // Helper function to get or create symbol
-    const getOrCreateSymbol = async (symbolName: string): Promise<string> => {
-      const { data: existingSymbol, error: findError } = await supabase
-        .from('symbols')
-        .select('id')
-        .eq('symbol', symbolName)
-        .single();
-      
-      if (findError && findError.code !== 'PGRST116') {
-        throw new Error(`Error finding symbol: ${findError.message}`);
-      }
-      
-      if (existingSymbol) {
-        return existingSymbol.id;
-      }
-      
-      const { data: newSymbol, error: insertError } = await supabase
-        .from('symbols')
-        .insert({ symbol: symbolName })
-        .select('id')
-        .single();
-      
-      if (insertError) {
-        throw new Error(`Error creating symbol: ${insertError.message}`);
-      }
-      
-      return newSymbol.id;
-    };
 
     // Import Hirose CSV
     const importHiroseCSV = async (file: File) => {
@@ -259,122 +189,10 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
       setImportSuccess("");
       
       try {
-        const text = await file.text();
-        const lines = text.split('\n');
+        setImportProgress("CSVファイルを処理中...");
         
-        // Skip header row and empty lines
-        const dataRows = lines.slice(1).filter(line => line.trim());
-        const transactionCount = dataRows.length;
-        
-        if (transactionCount === 0) {
-          setImportError("CSVファイルに有効なデータが含まれていません。");
-          return;
-        }
-        
-        setImportProgress(`0/${transactionCount}件の取引を処理中...`);
-        
-        let successCount = 0;
-        let errorCount = 0;
-        const tradesForMetrics: TradeInput[] = [];
-        
-        for (let i = 0; i < dataRows.length; i++) {
-          try {
-            const values = dataRows[i].split(',');
-            
-            if (values.length < 8) {
-              console.error(`Row ${i + 1} has insufficient columns: ${values.length}`);
-              errorCount++;
-              continue;
-            }
-            
-            // Parse values
-            const exitDateTime = values[0].trim(); // 決済約定日時
-            const symbolName = values[3].trim(); // 通貨ペア
-            const buySell = values[4].trim(); // 売買
-            const lotSizeStr = values[5].trim(); // Lot数
-            const entryDateTime = values[6].trim(); // 新規約定日時
-            const entryPriceStr = values[7].trim(); // 新規約定値
-            const exitPriceStr = values[8].trim(); // 決済約定値
-            const pipsStr = values[9].trim(); // pip損益
-            const profitLossStr = values[10].trim(); // 売買損益
-            
-            // Convert values
-            const entryPrice = parseFloat(entryPriceStr);
-            const exitPrice = parseFloat(exitPriceStr);
-            const lotSize = parseFloat(lotSizeStr);
-            const pips = parseFloat(pipsStr);
-            const profitLoss = parseFloat(profitLossStr);
-            const tradeType = buySell === '買' ? 0 : 1;
-            
-            // Parse dates
-            const entryTime = parseJapaneseDateTime(entryDateTime);
-            const exitTime = parseJapaneseDateTime(exitDateTime);
-            
-            // Calculate hold time
-            const holdTime = calculateHoldTime(entryTime, exitTime);
-            
-            // Get or create symbol
-            const symbolId = await getOrCreateSymbol(symbolName); // 通貨ペア
-            
-            // Trade memo should be empty
-            const tradeMemo = "";
-            
-            // Insert trade into database
-            const { error: insertError } = await supabase
-              .from('trades')
-              .insert({
-                user_id: user.id,
-                symbol: symbolId,
-                entry_price: entryPrice,
-                exit_price: exitPrice,
-                lot_size: lotSize,
-                trade_type: tradeType,
-                entry_time: entryTime,
-                exit_time: exitTime,
-                profit_loss: profitLoss,
-                pips: pips,
-                trade_memo: tradeMemo,
-                hold_time: holdTime,
-              });
-            
-            if (insertError) {
-              console.error(`Error inserting trade ${i + 1}:`, insertError);
-              errorCount++;
-            } else {
-              successCount++;
-              
-              // Add to metrics batch
-              tradesForMetrics.push({
-                user_id: user.id,
-                exit_time: exitTime,
-                profit_loss: profitLoss,
-                pips: pips,
-                hold_time: holdTime,
-                trade_type: tradeType,
-                entry_time: entryTime,
-              });
-              
-              if (successCount % 10 === 0) {
-                setImportProgress(`${successCount}/${transactionCount}件の取引を処理完了...`);
-              }
-            }
-            
-          } catch (rowError) {
-            console.error(`Error processing row ${i + 1}:`, rowError);
-            errorCount++;
-          }
-        }
-        
-        // Update performance metrics for all imported trades
-        if (tradesForMetrics.length > 0) {
-          try {
-            await updateUserPerformanceMetricsBatch(tradesForMetrics);
-            console.log(`Updated performance metrics for ${tradesForMetrics.length} trades`);
-          } catch (metricsError) {
-            console.error("Error updating performance metrics for batch import:", metricsError);
-            // Don't fail the import if metrics update fails
-          }
-        }
+        // Use the utility function from hiroseParser
+        const { successCount, errorCount } = await importHiroseTradesFromFile(file, user.id);
         
         setImportProgress("");
         setImportSuccess(`${successCount}件の取引をインポートしました。${errorCount > 0 ? ` (${errorCount}件エラー)` : ''}`);
