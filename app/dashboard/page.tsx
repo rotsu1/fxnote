@@ -395,12 +395,6 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
       }).format((winProfit + lossLoss) / tradeCount)
     : 'N/A';
 
-  const maxWinStreak = performanceData.max_win_streak || 0;
-  const maxLossStreak = performanceData.max_loss_streak || 0;
-  const maxStreakDisplay = (maxWinStreak > 0 || maxLossStreak > 0) 
-    ? `${maxWinStreak}勝 / ${maxLossStreak}敗` 
-    : 'N/A';
-
   const tradeCountDisplay = tradeCount > 0 
     ? `${tradeCount}回` 
     : 'N/A';
@@ -417,11 +411,6 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
       title: "平均利益/損失", 
       value: averageProfitLoss, 
       description: "取引平均" 
-    },
-    { 
-      title: "最大連勝・連敗", 
-      value: maxStreakDisplay, 
-      description: "現在の記録" 
     },
     { 
       title: "取引回数", 
