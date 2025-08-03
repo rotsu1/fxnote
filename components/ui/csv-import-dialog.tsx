@@ -1,12 +1,9 @@
 import { useState, useEffect } from "react"
-import { supabase } from "@/lib/supabaseClient"
-import { localDateTimeToUTC } from "@/utils/timeUtils"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { updateUserPerformanceMetricsBatch, TradeInput } from '@/utils/metrics/updateUserPerformanceMetrics';
 import { importHiroseTradesFromFile } from '@/utils/hiroseParser';
 
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
@@ -81,107 +78,6 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
       }
     };
   
-    // Validate Hirose CSV format
-    const validateHiroseCSV = async (file: File): Promise<boolean> => {
-      try {
-        // Try to read with proper encoding
-        let text = await file.text();
-        
-        // Check if we have encoding issues (replacement characters)
-        if (text.includes('')) {
-          console.log('Detected encoding issues, trying to fix...');
-          
-          // Try reading as ArrayBuffer and decode with different encodings
-          const arrayBuffer = await file.arrayBuffer();
-          
-          // Try Shift_JIS (common for Japanese files)
-          try {
-            const decoder = new TextDecoder('shift-jis');
-            text = decoder.decode(arrayBuffer);
-            console.log('Successfully decoded with Shift_JIS');
-          } catch (shiftJisError) {
-            console.log('Shift_JIS failed, trying other encodings...');
-            
-            // Try other common Japanese encodings
-            const encodings = ['cp932', 'euc-jp', 'iso-2022-jp'];
-            for (const encoding of encodings) {
-              try {
-                const decoder = new TextDecoder(encoding);
-                text = decoder.decode(arrayBuffer);
-                console.log(`Successfully decoded with ${encoding}`);
-                break;
-              } catch (e) {
-                console.log(`${encoding} failed`);
-              }
-            }
-          }
-        }
-        
-        const lines = text.split('\n');
-        
-        console.log('CSV Content Preview:', text.substring(0, 500));
-        console.log('First 5 lines:', lines.slice(0, 5));
-        console.log('File encoding check - first line bytes:', Array.from(text.substring(0, 100)).map(c => c.charCodeAt(0)));
-        
-        // Check if file contains expected Hirose headers
-        let foundHeaders = {
-          決済約定日時: false,
-          通貨ペア: false,
-          売買: false,
-          売買損益: false
-        };
-        
-        // Check each line for headers (check first 10 lines)
-        for (let i = 0; i < Math.min(lines.length, 10); i++) {
-          const line = lines[i];
-          console.log(`Line ${i}:`, line);
-          
-          // Check for exact matches and variations
-          if (line.includes('決済約定日時') || line.includes('決済約定日')) {
-            foundHeaders.決済約定日時 = true;
-            console.log(`Found 決済約定日時 in line ${i}`);
-          }
-          if (line.includes('通貨ペア') || line.includes('通貨')) {
-            foundHeaders.通貨ペア = true;
-            console.log(`Found 通貨ペア in line ${i}`);
-          }
-          if (line.includes('売買')) {
-            foundHeaders.売買 = true;
-            console.log(`Found 売買 in line ${i}`);
-          }
-          if (line.includes('売買損益') || line.includes('損益')) {
-            foundHeaders.売買損益 = true;
-            console.log(`Found 売買損益 in line ${i}`);
-          }
-        }
-        
-        console.log('Found headers:', foundHeaders);
-        
-        // More flexible validation - require at least 3 out of 4 key headers
-        const requiredHeaders = ['決済約定日時', '通貨ペア', '売買', '売買損益'];
-        const foundCount = requiredHeaders.filter(header => {
-          return foundHeaders[header as keyof typeof foundHeaders];
-        }).length;
-        
-        console.log(`Found ${foundCount} out of ${requiredHeaders.length} required headers`);
-        
-        // Test for exact header format you provided
-        const exactHeaderLine = '決済約定日時,注文番号,ポジション番号,通貨ペア,両建区分,注文手法,約定区分,執行条件,指定レート,売買,Lot数,新規約定日時,新規約定値,決済約定値,pip損益,円換算レート,売買損益,手数料,スワップ損益,決済損益,チャネル';
-        const hasExactFormat = lines.some(line => line.trim() === exactHeaderLine);
-        console.log('Has exact header format:', hasExactFormat);
-        
-        // Accept if we find at least 3 out of 4 headers OR the exact format
-        const hasRequiredHeaders = foundCount >= 3 || hasExactFormat;
-        
-        return hasRequiredHeaders;
-      } catch (error) {
-        console.error('Error validating CSV file:', error);
-        return false;
-      }
-    };
-  
-
-
     // Import Hirose CSV
     const importHiroseCSV = async (file: File) => {
       setIsImporting(true);

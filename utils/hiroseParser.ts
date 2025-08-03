@@ -128,10 +128,6 @@ async function getOrCreateSymbol(symbolName: string): Promise<string> {
   return newSymbol.id;
 }
 
-
-
-
-
 // Main execution function for File object (for use in browser)
 export async function importHiroseTradesFromFile(file: File, userId: string): Promise<{ successCount: number; errorCount: number }> {
   console.log('=== Hirose Trade Import Tool (Browser) ===');
@@ -291,7 +287,7 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
           successCount++;
           
           // Add to metrics batch
-          tradesForMetrics.push({
+          const tradeForMetrics = {
             user_id: userId,
             exit_time: exitTime,
             profit_loss: profitLoss,
@@ -299,7 +295,25 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
             hold_time: holdTime,
             trade_type: tradeType,
             entry_time: entryTime,
-          });
+          };
+          
+          // Validate the data before adding to batch
+          if (typeof tradeForMetrics.profit_loss !== 'number' || isNaN(tradeForMetrics.profit_loss)) {
+            console.error(`Row ${i + 1}: Invalid profit_loss value: ${tradeForMetrics.profit_loss}`);
+            continue;
+          }
+          
+          if (typeof tradeForMetrics.pips !== 'number' || isNaN(tradeForMetrics.pips)) {
+            console.error(`Row ${i + 1}: Invalid pips value: ${tradeForMetrics.pips}`);
+            continue;
+          }
+          
+          if (typeof tradeForMetrics.hold_time !== 'number' || isNaN(tradeForMetrics.hold_time)) {
+            console.error(`Row ${i + 1}: Invalid hold_time value: ${tradeForMetrics.hold_time}`);
+            continue;
+          }
+          
+          tradesForMetrics.push(tradeForMetrics);
           
           if (successCount % 10 === 0) {
             console.log(`Processed ${successCount} trades successfully...`);
@@ -313,15 +327,32 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
     }
     
     // Update performance metrics for all imported trades
+    // Temporarily disabled due to missing user_performance_metrics table
+    /*
     if (tradesForMetrics.length > 0) {
       try {
-        await updateUserPerformanceMetricsBatch(tradesForMetrics);
+        console.log(`Attempting to update performance metrics for ${tradesForMetrics.length} trades...`);
+        console.log('Sample trade data:', tradesForMetrics[0]);
+        
+        // Process metrics in smaller batches to avoid overwhelming the database
+        const batchSize = 10;
+        for (let i = 0; i < tradesForMetrics.length; i += batchSize) {
+          const batch = tradesForMetrics.slice(i, i + batchSize);
+          console.log(`Processing metrics batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tradesForMetrics.length / batchSize)}`);
+          await updateUserPerformanceMetricsBatch(batch);
+        }
+        
         console.log(`Updated performance metrics for ${tradesForMetrics.length} trades`);
       } catch (metricsError) {
         console.error("Error updating performance metrics for batch import:", metricsError);
+        console.error("Metrics error details:", {
+          message: metricsError instanceof Error ? metricsError.message : 'Unknown error',
+          stack: metricsError instanceof Error ? metricsError.stack : undefined
+        });
         // Don't fail the import if metrics update fails
       }
     }
+    */
     
     console.log(`\n=== Parsing Complete ===`);
     console.log(`Successfully processed: ${successCount} trades`);
@@ -335,8 +366,5 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
     throw error;
   }
 }
-
-// Example usage:
-// importHiroseTradesFromFile(fileObject, 'user-uuid-here');
 
 export default importHiroseTradesFromFile; 
