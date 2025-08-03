@@ -76,11 +76,12 @@ import {
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
 import { saveTrade } from "@/utils/tradeUtils"
-import { localDateTimeToUTC, utcToLocalDateTime, formatHoldTimeCompact, formatLocalTime, formatDateTime, parseTimeToMinutes } from "@/utils/timeUtils"
+import { localDateTimeToUTC, utcToLocalDateTime } from "@/utils/timeUtils"
 import { Trade } from "@/utils/types"
 import { isFieldEditable, validateCellValue, mapFieldToDatabase, getColumnValue, transformTradeData } from "@/utils/tableUtils"
 import { loadSymbols, loadEmotions, loadTags } from "@/utils/dataLoadingUtils"
 import { filterAndSortTrades } from "@/utils/tableFilterUtils"
+import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape } from "@/utils/cellEditingUtils"
 
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
@@ -347,126 +348,37 @@ export default function TablePage() {
   }, [trades, selectedDate, tableConfig.sortConfig]);
 
   const handleCellClick = (id: number, field: keyof Trade) => {
-    const cellKey = `${id}-${field}`;
-    
-    // Don't allow editing if the cell is currently being saved
-    if (cellEditingState.savingCells.has(cellKey)) {
-      return;
-    }
-    
-    // Don't allow editing of complex fields that need special handling
-    if (field === 'date' || field === 'time') {
-      // For these fields, open the edit dialog instead
-      const trade = trades.find(t => t.id === id);
-      if (trade) {
-        setEditingTrade(trade);
-        setDialogState({ ...dialogState, isTradeDialogOpen: true });
-      }
-      return;
-    }
-    
     const trade = trades.find(t => t.id === id);
     if (!trade) return;
     
-    // Store original value for potential rollback
-    setCellEditingState(prev => ({
-      ...prev,
-      originalValues: {
-        ...prev.originalValues,
-        [cellKey]: trade[field]
-      }
-    }));
+    const result = handleCellClickLogic(id, field, trade, cellEditingState);
     
-    // Initialize editing value - convert datetime fields to datetime-local format
-    let editingValue = trade[field];
-    if (field === 'entryTime' || field === 'exitTime') {
-      editingValue = utcToLocalDateTime(trade[field] as string);
+    if (result.shouldOpenDialog) {
+      setEditingTrade(trade);
+      setDialogState({ ...dialogState, isTradeDialogOpen: true });
+      return;
     }
     
-    // Initialize holding time fields
-    if (field === 'holdingTime') {
-      const totalSeconds = typeof trade[field] === 'number' ? trade[field] as number : 0;
-      const days = Math.floor(totalSeconds / (24 * 60 * 60));
-      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
-      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
-      const seconds = totalSeconds % 60;
-      
-      setCellEditingState(prev => ({
-        ...prev,
-        editingValues: {
-          ...prev.editingValues,
-          [`${id}-holdingDays`]: days || "",
-          [`${id}-holdingHours`]: hours || "",
-          [`${id}-holdingMinutes`]: minutes || "",
-          [`${id}-holdingSeconds`]: seconds || "",
-          [cellKey]: totalSeconds
-        }
-      }));
-    } else {
-      setCellEditingState(prev => ({
-        ...prev,
-        editingValues: {
-          ...prev.editingValues,
-          [cellKey]: editingValue
-        }
-      }));
-    }
-    
-    // Clear any previous errors for this cell
     setCellEditingState(prev => ({
       ...prev,
-      cellErrors: {
-        ...prev.cellErrors,
-        [cellKey]: ""
-      }
-    }));
-    
-    setCellEditingState(prev => ({
-      ...prev,
-      editingCell: { id, field }
+      ...result.newEditingState
     }));
   };
 
   const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
     const cellKey = `${id}-${field}`;
+    
+    const newState = handleHoldingTimeChange(id, field, value, cellEditingState);
+    
     setCellEditingState(prev => ({
       ...prev,
-      editingValues: {
-        ...prev.editingValues,
-        [cellKey]: value
-      }
-    }));
-    
-    // For holding time, also update the individual field that was changed
-    if (field === 'holdingTime') {
-      const totalSeconds = value;
-      const days = Math.floor(totalSeconds / (24 * 60 * 60));
-      const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
-      const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
-      const seconds = totalSeconds % 60;
-      
-      setCellEditingState(prev => ({
-        ...prev,
-        editingValues: {
-          ...prev.editingValues,
-          [`${id}-holdingDays`]: days || "",
-          [`${id}-holdingHours`]: hours || "",
-          [`${id}-holdingMinutes`]: minutes || "",
-          [`${id}-holdingSeconds`]: seconds || "",
-          [cellKey]: value
-        }
-      }));
-    }
-    
-    // Clear error when user starts typing
-    setCellEditingState(prev => ({
-      ...prev,
+      ...newState,
       cellErrors: {
         ...prev.cellErrors,
         [cellKey]: ""
       }
     }));
-  }, []);
+  }, [cellEditingState]);
 
   const handleCellSave = useCallback(async (id: number, field: keyof Trade) => {
     const cellKey = `${id}-${field}`;
@@ -865,56 +777,13 @@ export default function TablePage() {
     } else if (e.key === 'Escape') {
       e.preventDefault();
       // Cancel editing and restore original value
-      const cellKey = `${id}-${field}`;
-      let originalValue = cellEditingState.originalValues[cellKey];
-      
-      // Convert datetime fields back to datetime-local format for display
-      if (field === 'entryTime' || field === 'exitTime') {
-        originalValue = utcToLocalDateTime(originalValue as string);
-      }
-      
-      // For holding time, restore individual fields
-      if (field === 'holdingTime') {
-        const totalSeconds = originalValue as number || 0;
-        const days = Math.floor(totalSeconds / (24 * 60 * 60));
-        const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
-        const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
-        const seconds = totalSeconds % 60;
-        
-        setCellEditingState(prev => ({
-          ...prev,
-          editingValues: {
-            ...prev.editingValues,
-            [`${id}-holdingDays`]: days || "",
-            [`${id}-holdingHours`]: hours || "",
-            [`${id}-holdingMinutes`]: minutes || "",
-            [`${id}-holdingSeconds`]: seconds || "",
-            [cellKey]: originalValue
-          }
-        }));
-      } else {
-        setCellEditingState(prev => ({
-          ...prev,
-          editingValues: {
-            ...prev.editingValues,
-            [cellKey]: originalValue
-          }
-        }));
-      }
-      
+      const newState = handleCellEscape(id, field, cellEditingState);
       setCellEditingState(prev => ({
         ...prev,
-        cellErrors: {
-          ...prev.cellErrors,
-          [cellKey]: ""
-        }
-      }));
-      setCellEditingState(prev => ({
-        ...prev,
-        editingCell: null
+        ...newState
       }));
     }
-  }, [cellEditingState.originalValues, handleCellSave]);
+  }, [cellEditingState, handleCellSave]);
 
   const handleAddTrade = () => {
     setEditingTrade(null);
