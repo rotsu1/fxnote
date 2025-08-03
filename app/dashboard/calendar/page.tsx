@@ -37,16 +37,25 @@ export default function CalendarPage() {
   const user = useAuth();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<string>("");
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
-  const [editingTrade, setEditingTrade] = useState<any>(null);
-  const [isTradeDialogOpen, setIsTradeDialogOpen] = useState<boolean>(false);
-  const [isCSVDialogOpen, setIsCSVDialogOpen] = useState<boolean>(false);
-  const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState<boolean>(false);
-  const [deleteTradeId, setDeleteTradeId] = useState<number | null>(null);
-  const [trades, setTrades] = useState<any[]>([]);
-  const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [availableTags, setAvailableTags] = useState<{ id: number, tag_name: string }[]>([]);
+  // Dialog visibility states
+  const [dialogs, setDialogs] = useState({
+    isRightSidebarOpen: false,
+    isTradeDialogOpen: false,
+    isCSVDialogOpen: false,
+    isDisplaySettingsOpen: false,
+  });
+  // Trade-related data
+  const [tradeData, setTradeData] = useState({
+    editingTrade: null as any,
+    deleteTradeId: null as number | null,
+    trades: [] as any[],
+    availableTags: [] as { id: number, tag_name: string }[],
+  });
+  // Loading and error states
+  const [status, setStatus] = useState({
+    loading: false,
+    error: "",
+  });
   const [displaySettings, setDisplaySettings] = useState<Record<string, boolean>>({
     show_symbol: true,
     show_direction: true,
@@ -112,10 +121,10 @@ export default function CalendarPage() {
         .order("tag_name");
       if (error) {
         console.error("Error loading tags for table:", error);
-        setAvailableTags([]);
+        setTradeData(prev => ({ ...prev, availableTags: [] }));
         return;
       }
-      setAvailableTags(data || []);
+      setTradeData(prev => ({ ...prev, availableTags: data || [] }));
     };
     loadTags();
   }, [user]);
@@ -123,8 +132,7 @@ export default function CalendarPage() {
   // Function to load trades
   const loadTrades = async () => {
     if (!user) return;
-    setLoading(true);
-    setError("");
+    setStatus(prev => ({ ...prev, loading: true, error: "" }));
     try {
       const { data, error } = await supabase
         .from("trades")
@@ -141,8 +149,8 @@ export default function CalendarPage() {
         .eq("user_id", user.id);
       
       if (error) {
-        setError(error.message);
-        setTrades([]);
+        setStatus(prev => ({ ...prev, error: error.message }));
+        setTradeData(prev => ({ ...prev, trades: [] }));
       } else {
         // Transform data to include symbol_name, tags, and emotions
         const transformedData = data?.map(trade => ({
@@ -151,13 +159,13 @@ export default function CalendarPage() {
           tradeTags: trade.trade_tag_links?.map((link: any) => link.trade_tags?.tag_name).filter(Boolean) || [],
           tradeEmotions: trade.trade_emotion_links?.map((link: any) => link.emotions?.emotion).filter(Boolean) || []
         })) || [];
-        setTrades(transformedData);
+        setTradeData(prev => ({ ...prev, trades: transformedData }));
       }
     } catch (error) {
-      setError("Failed to load trades");
-      setTrades([]);
+      setStatus(prev => ({ ...prev, error: "Failed to load trades" }));
+      setTradeData(prev => ({ ...prev, trades: [] }));
     } finally {
-      setLoading(false);
+      setStatus(prev => ({ ...prev, loading: false }));
     }
   };
 
@@ -166,11 +174,11 @@ export default function CalendarPage() {
     loadDisplaySettings();
   }, [user]);
 
-  const groupedTrades = groupTradesByDate(trades);
+  const groupedTrades = groupTradesByDate(tradeData.trades);
 
   const handleDateClick = (date: string) => {
     setSelectedDate(date);
-    setIsRightSidebarOpen(true);
+    setDialogs(prev => ({ ...prev, isRightSidebarOpen: true }));
   };
 
   const handleEditTrade = async (trade: any) => {
@@ -203,46 +211,46 @@ export default function CalendarPage() {
       };
       
       console.log("Transformed trade for editing:", transformedTrade);
-      setEditingTrade(transformedTrade);
-      setIsTradeDialogOpen(true);
+      setTradeData(prev => ({ ...prev, editingTrade: transformedTrade }));
+      setDialogs(prev => ({ ...prev, isTradeDialogOpen: true }));
     } catch (error) {
       console.error("Error preparing trade for editing:", error);
-      setError("取引の編集準備中にエラーが発生しました");
+      setStatus(prev => ({ ...prev, error: "取引の編集準備中にエラーが発生しました" }));
     } finally {
 
     }
   };
 
   const handleAddTrade = () => {
-    setEditingTrade(null);
+    setTradeData(prev => ({ ...prev, editingTrade: null }));
     // If no date is selected, use today's date
     if (!selectedDate) {
       const today = new Date().toISOString().split("T")[0];
       setSelectedDate(today);
     }
-    setIsTradeDialogOpen(true);
+    setDialogs(prev => ({ ...prev, isTradeDialogOpen: true }));
   };
 
-  const handleSaveTrade = async (tradeData: Partial<Trade>) => {
-    const result = await saveTrade(tradeData, editingTrade, user);
+  const handleSaveTrade = async (tradeDataParam: Partial<Trade>) => {
+    const result = await saveTrade(tradeDataParam, tradeData.editingTrade, user);
     
     if (result?.success) {
-      setIsTradeDialogOpen(false);
-      setEditingTrade(null);
+      setDialogs(prev => ({ ...prev, isTradeDialogOpen: false }));
+      setTradeData(prev => ({ ...prev, editingTrade: null }));
       // Refresh trades data to show the new/updated trade
       await loadTrades();
     } else {
-      setError(result?.error || "取引の保存中にエラーが発生しました");
+      setStatus(prev => ({ ...prev, error: result?.error || "取引の保存中にエラーが発生しました" }));
     }
   };
 
   const handleDeleteTrade = (id: number) => {
-    setDeleteTradeId(id);
+    setTradeData(prev => ({ ...prev, deleteTradeId: id }));
   };
 
   const confirmDelete = async () => {
-    if (!deleteTradeId || !user) {
-      setDeleteTradeId(null);
+    if (!tradeData.deleteTradeId || !user) {
+      setTradeData(prev => ({ ...prev, deleteTradeId: null }));
       return;
     }
 
@@ -251,7 +259,7 @@ export default function CalendarPage() {
       const { error: emotionError } = await supabase
         .from("trade_emotion_links")
         .delete()
-        .eq("trade_id", deleteTradeId);
+        .eq("trade_id", tradeData.deleteTradeId);
 
       if (emotionError) {
         console.error("Error deleting trade emotion links:", emotionError);
@@ -261,7 +269,7 @@ export default function CalendarPage() {
       const { error: tagError } = await supabase
         .from("trade_tag_links")
         .delete()
-        .eq("trade_id", deleteTradeId);
+        .eq("trade_id", tradeData.deleteTradeId);
 
       if (tagError) {
         console.error("Error deleting trade tag links:", tagError);
@@ -271,12 +279,12 @@ export default function CalendarPage() {
       const { error: tradeError } = await supabase
         .from("trades")
         .delete()
-        .eq("id", deleteTradeId)
+        .eq("id", tradeData.deleteTradeId)
         .eq("user_id", user.id);
 
       if (tradeError) {
         console.error("Error deleting trade:", tradeError);
-        setError("取引の削除中にエラーが発生しました");
+        setStatus(prev => ({ ...prev, error: "取引の削除中にエラーが発生しました" }));
         return;
       }
 
@@ -286,9 +294,9 @@ export default function CalendarPage() {
       console.log("Trade deleted successfully");
     } catch (error) {
       console.error("Error deleting trade:", error);
-      setError("取引の削除中にエラーが発生しました");
+      setStatus(prev => ({ ...prev, error: "取引の削除中にエラーが発生しました" }));
     } finally {
-      setDeleteTradeId(null);
+      setTradeData(prev => ({ ...prev, deleteTradeId: null }));
     }
   };
 
@@ -374,53 +382,53 @@ export default function CalendarPage() {
           </div>
         </header>
         <main className="flex-1 p-4 md:p-6">
-          {loading ? (
+          {status.loading ? (
             <div className="text-center py-10">読み込み中...</div>
-          ) : error ? (
-            <div className="text-center text-red-600 py-10">{error}</div>
+          ) : status.error ? (
+            <div className="text-center text-red-600 py-10">{status.error}</div>
           ) : (
             <>
-              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} trades={trades} onImportCSV={() => setIsCSVDialogOpen(true)} />
+              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} trades={tradeData.trades} onImportCSV={() => setDialogs(prev => ({ ...prev, isCSVDialogOpen: true }))} />
               <CalendarGrid currentDate={currentDate} onDateClick={handleDateClick} groupedTrades={groupedTrades} />
             </>
           )}
         </main>
         <RightSidebar
-          isOpen={isRightSidebarOpen}
-          onClose={() => setIsRightSidebarOpen(false)}
+          isOpen={dialogs.isRightSidebarOpen}
+          onClose={() => setDialogs(prev => ({ ...prev, isRightSidebarOpen: false }))}
           selectedDate={selectedDate}
           trades={selectedTrades}
           onEditTrade={handleEditTrade}
           onDeleteTrade={handleDeleteTrade}
           onAddTrade={handleAddTrade}
-          onDisplaySettings={() => setIsDisplaySettingsOpen(true)}
+          onDisplaySettings={() => setDialogs(prev => ({ ...prev, isDisplaySettingsOpen: true }))}
           displaySettings={displaySettings}
         />
         <TradeEditDialog
-          trade={editingTrade}
-          isOpen={isTradeDialogOpen}
-          onClose={() => setIsTradeDialogOpen(false)}
+          trade={tradeData.editingTrade}
+          isOpen={dialogs.isTradeDialogOpen}
+          onClose={() => setDialogs(prev => ({ ...prev, isTradeDialogOpen: false }))}
           onSave={handleSaveTrade}
           defaultDate={selectedDate || undefined}
           user={user}
-          availableTags={availableTags}
+          availableTags={tradeData.availableTags}
         />
         <CSVImportDialog 
-          isOpen={isCSVDialogOpen} 
+          isOpen={dialogs.isCSVDialogOpen} 
           onClose={() => {
-            setIsCSVDialogOpen(false);
+            setDialogs(prev => ({ ...prev, isCSVDialogOpen: false }));
             // Refresh trades data after CSV import
             loadTrades();
           }} 
           user={user} 
         />
         <DisplaySettingsDialog 
-          isOpen={isDisplaySettingsOpen} 
-          onClose={() => setIsDisplaySettingsOpen(false)}
+          isOpen={dialogs.isDisplaySettingsOpen} 
+          onClose={() => setDialogs(prev => ({ ...prev, isDisplaySettingsOpen: false }))}
           displaySettings={displaySettings}
           onSaveSettings={handleSaveDisplaySettings}
         />
-        <AlertDialog open={deleteTradeId !== null} onOpenChange={() => setDeleteTradeId(null)}>
+        <AlertDialog open={tradeData.deleteTradeId !== null} onOpenChange={() => setTradeData(prev => ({ ...prev, deleteTradeId: null }))}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>取引を削除しますか？</AlertDialogTitle>
