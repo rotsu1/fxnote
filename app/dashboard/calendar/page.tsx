@@ -32,13 +32,16 @@ import {
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
+import { MonthlyNavigation } from "@/components/ui/monthly-navigation"
+
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
 import { saveTrade } from "@/utils/tradeUtils"
 import { localDateTimeToUTC, utcToLocalDateTime, formatHoldTime, groupTradesByDate } from "@/utils/timeUtils"
-import { getPLColor } from "@/utils/performanceUtils"
+import { CalendarGrid } from "@/components/ui/calendar-grid"
+import { TradeCard } from "@/components/ui/trade-card"
 
 interface Trade {
   id: number
@@ -60,343 +63,6 @@ interface Trade {
   holdingMinutes?: number
   notes?: string
   tags: string[]
-}
-
-function MonthlyNavigation({ currentDate, onDateChange, trades, onImportCSV }: { currentDate: Date; onDateChange: (date: Date) => void; trades: any[]; onImportCSV: () => void }) {
-  const monthNames = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"]
-  const currentYear = currentDate.getFullYear()
-  const currentMonth = currentDate.getMonth()
-  const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i) // 10 years before and after
-
-  // Calculate monthly P/L with proper timezone handling
-  const monthlyPL = trades.reduce((sum, trade) => {
-    const tradeDate = new Date(trade.exit_time || trade.entry_time || trade.created_at);
-    // Use local date for comparison
-    if (tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === currentMonth) {
-      return sum + (trade.profit_loss || trade.pnl || 0);
-    }
-    return sum;
-  }, 0);
-
-  const handleYearChange = (year: number) => {
-    const newDate = new Date(currentDate)
-    newDate.setFullYear(year)
-    onDateChange(newDate)
-  }
-
-  const handleMonthChange = (month: number) => {
-    const newDate = new Date(currentDate)
-    newDate.setMonth(month)
-    onDateChange(newDate)
-  }
-
-  return (
-    <div className="flex items-center justify-between mb-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" onClick={() => handleMonthChange(currentMonth - 1)}>
-          <ChevronLeft className="h-4 w-4" />
-        </Button>
-        <div className="flex items-center gap-2">
-          <Select value={String(currentYear)} onValueChange={(val) => handleYearChange(Number(val))}>
-            <SelectTrigger className="w-24">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {years.map((year) => (
-                <SelectItem key={year} value={String(year)}>{year}年</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={String(currentMonth)} onValueChange={(val) => handleMonthChange(Number(val))}>
-            <SelectTrigger className="w-20">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthNames.map((name, idx) => (
-                <SelectItem key={idx} value={String(idx)}>{name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => handleMonthChange(currentMonth + 1)}>
-          <ChevronRight className="h-4 w-4" />
-        </Button>
-      </div>
-      <div className="flex items-center gap-4">
-        <Button variant="outline" onClick={onImportCSV}>
-          <Upload className="mr-2 h-4 w-4" />
-          CSV
-        </Button>
-        <div
-          className={`text-lg font-semibold ${
-            monthlyPL > 0
-              ? "text-green-600"
-              : monthlyPL < 0
-              ? "text-red-600"
-              : "text-gray-500"
-          }`}
-        >
-          月間損益: {monthlyPL > 0 ? "+" : ""}¥{monthlyPL.toLocaleString()}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate: Date; onDateClick: (date: string) => void; groupedTrades: Record<string, any[]> }) {
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const firstDay = new Date(year, month, 1);
-  const startDate = new Date(firstDay);
-  startDate.setDate(startDate.getDate() - firstDay.getDay());
-
-  const days = [];
-  const current = new Date(startDate);
-
-  for (let i = 0; i < 42; i++) {
-    days.push(new Date(current));
-    current.setDate(current.getDate() + 1);
-  }
-
-  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
-
-  // Calculate daily P/L
-  const getDailyPL = (date: string, groupedTrades: Record<string, any[]>): number => {
-    const trades = groupedTrades[date] || [];
-    return trades.reduce((sum: number, trade: any) => sum + (trade.profit_loss || 0), 0);
-  };
-
-  return (
-    <div className="bg-white rounded-lg border">
-      {/* Header */}
-      <div className="grid grid-cols-7 border-b">
-        {dayNames.map((day, index) => (
-          <div
-            key={day}
-            className={`p-3 text-center font-medium ${index === 0 ? "text-red-600" : index === 6 ? "text-blue-600" : "text-gray-700"}`}
-          >
-            {day}
-          </div>
-        ))}
-      </div>
-      {/* Calendar Days */}
-      <div className="grid grid-cols-7">
-        {days.map((day, index) => {
-          const dateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-          const isCurrentMonth = day.getMonth() === month;
-          const dailyPL = getDailyPL(dateStr, groupedTrades);
-          const tradeCount = (groupedTrades[dateStr] || []).length;
-          const colorClass = isCurrentMonth && tradeCount > 0 ? getPLColor(dailyPL) : "";
-
-          return (
-            <div
-              key={index}
-              className={`min-h-[80px] p-2 border-r border-b cursor-pointer hover:bg-gray-50 transition-colors ${!isCurrentMonth ? "text-gray-400 bg-gray-50" : ""} ${colorClass}`}
-              onClick={() => isCurrentMonth && onDateClick(dateStr)}
-            >
-              <div className="text-sm font-medium mb-1">{day.getDate()}</div>
-              {isCurrentMonth && tradeCount > 0 && (
-                <div className="text-xs space-y-1">
-                  <div className={`font-medium ${dailyPL > 0 ? "text-green-800" : "text-red-800"}`}>
-                    {dailyPL > 0 ? "+" : ""}¥{dailyPL.toLocaleString()}
-                  </div>
-                  <div className="text-gray-600">{tradeCount}件</div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function TradeCard({
-  trade,
-  onEdit,
-  onDelete,
-  displaySettings,
-}: { 
-  trade: any; 
-  onEdit: (trade: any) => void; 
-  onDelete: (id: number) => void;
-  displaySettings: Record<string, boolean>;
-}) {
-  const [tradeTags, setTradeTags] = useState<string[]>([]);
-  const [tradeEmotion, setTradeEmotion] = useState<string>("");
-  const [loadingData, setLoadingData] = useState(true);
-
-  // Ensure pnl is a number
-  const pnl = typeof trade.pnl === "number" ? trade.pnl : (typeof trade.profit_loss === "number" ? trade.profit_loss : 0);
-  
-  // Get symbol name from symbol ID
-  const symbolName = trade.symbol_name || trade.pair || trade.currency_pair || "Unknown";
-  
-  // Get long/short text
-  const getLongShortText = (type: string | number) => {
-    if (type === "買い" || type === 0) return "ロング";
-    if (type === "売り" || type === 1) return "ショート";
-    return type;
-  };
-
-  // Load trade tags and emotion
-  useEffect(() => {
-    const loadTradeData = async () => {
-      if (!trade.id) {
-        setLoadingData(false);
-        return;
-      }
-
-      try {
-        // Load tags
-        const { data: tagLinks, error: tagError } = await supabase
-          .from("trade_tag_links")
-          .select(`
-            tag_id,
-            trade_tags(tag_name)
-          `)
-          .eq("trade_id", trade.id);
-
-        if (tagError) {
-          console.error("Error loading trade tags:", tagError);
-        } else {
-          const tags = tagLinks?.map(link => (link.trade_tags as any)?.tag_name).filter(Boolean) || [];
-          setTradeTags(tags);
-        }
-
-        // Load emotion
-        const { data: emotionLinks, error: emotionError } = await supabase
-          .from("trade_emotion_links")
-          .select(`
-            emotion_id,
-            emotions(emotion)
-          `)
-          .eq("trade_id", trade.id);
-
-        if (emotionError) {
-          console.error("Error loading trade emotion:", emotionError);
-        } else if (emotionLinks && emotionLinks.length > 0) {
-          const emotionLink = emotionLinks[0];
-          setTradeEmotion((emotionLink.emotions as any)?.emotion || "");
-        }
-      } catch (error) {
-        console.error("Error loading trade data:", error);
-      } finally {
-        setLoadingData(false);
-      }
-    };
-
-    loadTradeData();
-  }, [trade.id]);
-
-  return (
-    <Card className="mb-3">
-      <CardContent className="p-4">
-        <div className="flex justify-between items-start mb-2">
-          <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <Badge variant={trade.status === "利確" ? "default" : "destructive"}>{trade.status}</Badge>
-              {displaySettings.show_symbol && (
-                <span className="font-medium">{symbolName}</span>
-              )}
-              {displaySettings.show_profit && (
-                <span className={`font-bold ${pnl > 0 ? "text-green-600" : "text-red-600"}`}>
-                  {pnl > 0 ? "+" : ""}¥{Number(pnl).toLocaleString()}
-                </span>
-              )}
-            </div>
-            {displaySettings.show_direction && (
-              <div className="font-medium text-sm">{getLongShortText(trade.type || trade.trade_type)}</div>
-            )}
-            {displaySettings.show_entry_time && (
-              <div className="font-medium text-sm">
-                エントリー: {trade.entry_time ? new Date(trade.entry_time).toLocaleString('ja-JP', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                }) : trade.time}
-              </div>
-            )}
-            {displaySettings.show_exit_time && (
-              <div className="font-medium text-sm">
-                エグジット: {trade.exit_time ? new Date(trade.exit_time).toLocaleString('ja-JP', {
-                  year: 'numeric',
-                  month: '2-digit',
-                  day: '2-digit',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit'
-                }) : ""}
-              </div>
-            )}
-          </div>
-          <div className="flex gap-1">
-            <Button variant="ghost" size="sm" onClick={() => onEdit(trade)}>
-              <Edit className="h-3 w-3" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => onDelete(trade.id)}>
-              <Trash2 className="h-3 w-3" />
-            </Button>
-          </div>
-        </div>
-
-        {displaySettings.show_entry_price && (
-          <div className="text-sm mb-1">
-            エントリー価格: {trade.entry || trade.entry_price}
-        </div>
-        )}
-
-        {displaySettings.show_exit_price && (
-          <div className="text-sm mb-1">
-            エグジット価格: {trade.exit || trade.exit_price}
-        </div>
-        )}
-
-        {displaySettings.show_lot && trade.lot_size && (
-          <div className="text-sm mb-1">
-            ロット: {trade.lot_size}
-          </div>
-        )}
-
-        {displaySettings.show_pips && trade.pips && (
-          <div className="text-sm mb-1">
-            pips: {trade.pips}
-          </div>
-        )}
-
-        {displaySettings.show_hold_time && trade.hold_time && (
-          <div className="text-sm mb-1">
-            保有時間: {formatHoldTime(trade.hold_time)}
-          </div>
-        )}
-
-        {displaySettings.show_emotion && tradeEmotion && !loadingData && (
-          <div className="text-sm mb-1">
-            感情: {tradeEmotion}
-          </div>
-        )}
-
-        {displaySettings.show_tag && tradeTags.length > 0 && !loadingData && (
-          <div className="flex flex-wrap gap-1 mb-1">
-            {tradeTags.map((tag: string, index: number) => (
-            <Badge key={index} variant="outline" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-        )}
-
-        {displaySettings.show_note && trade.trade_memo && (
-          <div className="text-sm text-gray-600">
-            メモ: {trade.trade_memo}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
 }
 
 function RightSidebar({
@@ -1325,7 +991,13 @@ export default function CalendarPage() {
         .from("trades")
         .select(`
           *,
-          symbols!inner(symbol)
+          symbols!inner(symbol),
+          trade_tag_links(
+            trade_tags(tag_name)
+          ),
+          trade_emotion_links(
+            emotions(emotion)
+          )
         `)
         .eq("user_id", user.id);
       
@@ -1333,10 +1005,12 @@ export default function CalendarPage() {
         setError(error.message);
         setTrades([]);
       } else {
-        // Transform data to include symbol_name
+        // Transform data to include symbol_name, tags, and emotions
         const transformedData = data?.map(trade => ({
           ...trade,
-          symbol_name: trade.symbols?.symbol
+          symbol_name: trade.symbols?.symbol,
+          tradeTags: trade.trade_tag_links?.map((link: any) => link.trade_tags?.tag_name).filter(Boolean) || [],
+          tradeEmotion: trade.trade_emotion_links?.[0]?.emotions?.emotion || ""
         })) || [];
         setTrades(transformedData);
       }
@@ -1362,44 +1036,9 @@ export default function CalendarPage() {
 
   const handleEditTrade = async (trade: any) => {
     try {
-      // Load trade tags
-      let tradeTags: string[] = [];
-      let tradeEmotion: string = "";
-      
-      if (trade.id) {
-        // Load tags
-        const { data: tagLinks, error: tagError } = await supabase
-          .from("trade_tag_links")
-          .select(`
-            tag_id,
-            trade_tags(tag_name)
-          `)
-          .eq("trade_id", trade.id);
-        
-        if (tagError) {
-          console.error("Error loading trade tags:", tagError);
-        } else {
-          tradeTags = tagLinks?.map(link => (link.trade_tags as any)?.tag_name).filter(Boolean) || [];
-          console.log("Loaded trade tags:", tradeTags);
-        }
-        
-        // Load emotion
-        const { data: emotionLinks, error: emotionError } = await supabase
-          .from("trade_emotion_links")
-          .select(`
-            emotion_id,
-            emotions(emotion)
-          `)
-          .eq("trade_id", trade.id);
-        
-        if (emotionError) {
-          console.error("Error loading trade emotion:", emotionError);
-        } else if (emotionLinks && emotionLinks.length > 0) {
-          const emotionLink = emotionLinks[0];
-          tradeEmotion = (emotionLink.emotions as any)?.emotion || "";
-          console.log("Loaded trade emotion:", tradeEmotion);
-        }
-      }
+      // Use pre-loaded trade data
+      const tradeTags = trade.tradeTags || [];
+      const tradeEmotion = trade.tradeEmotion || "";
 
       // Transform database trade data to form format
       const transformedTrade = {
