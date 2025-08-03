@@ -32,6 +32,15 @@ export interface UserPerformanceMetric {
 type PeriodType = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'yearly' | 'total';
 
 /**
+ * Cleans and validates a period value string
+ */
+function cleanPeriodValue(periodValue: string): string {
+  if (!periodValue) return periodValue;
+  // Remove any leading/trailing whitespace and normalize
+  return periodValue.trim();
+}
+
+/**
  * Extracts period values from exit_time for different time resolutions
  */
 function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string> {
@@ -59,7 +68,7 @@ function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string
 
   const weekNumber = getISOWeek(date);
 
-  return {
+  const periodValues = {
     hourly: `${year}-${month}-${day}T${hour}`,
     daily: `${year}-${month}-${day}`,
     weekly: `${year}-W${String(weekNumber).padStart(2, '0')}`,
@@ -67,6 +76,13 @@ function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string
     yearly: `${year}`,
     total: 'total'
   };
+
+  // Clean all period values to ensure consistency
+  Object.keys(periodValues).forEach(key => {
+    periodValues[key as PeriodType] = cleanPeriodValue(periodValues[key as PeriodType]);
+  });
+
+  return periodValues;
 }
 
 /**
@@ -85,6 +101,7 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
     // Process each period type
     const updatePromises = Object.entries(periodValues).map(async ([periodType, periodValue]) => {
       const typedPeriodType = periodType as PeriodType;
+      const cleanedPeriodValue = cleanPeriodValue(periodValue);
       
       // Get existing metric record
       const { data: existingMetric, error: fetchError } = await supabase
@@ -92,11 +109,12 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
         .select('*')
         .eq('user_id', trade.user_id)
         .eq('period_type', typedPeriodType)
-        .eq('period_value', periodValue)
+        .eq('period_value', cleanedPeriodValue)
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
-        throw new Error(`Error fetching existing metric: ${fetchError.message}`);
+        console.warn(`Error fetching existing metric for ${periodType}: ${fetchError.message}`);
+        // Continue with creating a new record instead of throwing
       }
 
       let updatedMetric: Partial<UserPerformanceMetric>;
@@ -165,7 +183,7 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
         .upsert({
           user_id: trade.user_id,
           period_type: typedPeriodType,
-          period_value: periodValue,
+          period_value: cleanedPeriodValue,
           ...updatedMetric
         }, {
           onConflict: 'user_id,period_type,period_value'
@@ -218,6 +236,7 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
     // Process each period type
     const updatePromises = Object.entries(periodValues).map(async ([periodType, periodValue]) => {
       const typedPeriodType = periodType as PeriodType;
+      const cleanedPeriodValue = cleanPeriodValue(periodValue);
       
       // Get existing metric record
       const { data: existingMetric, error: fetchError } = await supabase
@@ -225,11 +244,13 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         .select('*')
         .eq('user_id', trade.user_id)
         .eq('period_type', typedPeriodType)
-        .eq('period_value', periodValue)
+        .eq('period_value', cleanedPeriodValue)
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
-        throw new Error(`Error fetching existing metric: ${fetchError.message}`);
+        console.warn(`Error fetching existing metric for ${periodType}: ${fetchError.message}`);
+        // Continue without throwing error
+        return;
       }
 
       if (!existingMetric) {
@@ -275,7 +296,7 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         .update(updatedMetric)
         .eq('user_id', trade.user_id)
         .eq('period_type', typedPeriodType)
-        .eq('period_value', periodValue);
+        .eq('period_value', cleanedPeriodValue);
 
       if (updateError) {
         throw new Error(`Error updating metric for ${periodType}: ${updateError.message}`);
@@ -287,6 +308,59 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
 
   } catch (error) {
     console.error('Error removing trade from performance metrics:', error);
+    throw error;
+  }
+}
+
+/**
+ * Clean up any existing performance metrics with incorrect period_value formatting
+ * This function should be called once to fix any existing data issues
+ */
+export async function cleanupPerformanceMetricsData(): Promise<void> {
+  try {
+    console.log('Starting cleanup of performance metrics data...');
+    
+    // Get all performance metrics records
+    const { data: allMetrics, error: fetchError } = await supabase
+      .from('user_performance_metrics')
+      .select('*');
+    
+    if (fetchError) {
+      throw new Error(`Error fetching metrics: ${fetchError.message}`);
+    }
+    
+    if (!allMetrics || allMetrics.length === 0) {
+      console.log('No metrics found to clean up');
+      return;
+    }
+    
+    let cleanedCount = 0;
+    const updatePromises = allMetrics.map(async (metric) => {
+      const originalPeriodValue = metric.period_value;
+      const cleanedPeriodValue = cleanPeriodValue(originalPeriodValue);
+      
+      // Only update if the value needs cleaning
+      if (originalPeriodValue !== cleanedPeriodValue) {
+        const { error: updateError } = await supabase
+          .from('user_performance_metrics')
+          .update({ period_value: cleanedPeriodValue })
+          .eq('user_id', metric.user_id)
+          .eq('period_type', metric.period_type)
+          .eq('period_value', originalPeriodValue);
+        
+        if (updateError) {
+          console.error(`Error updating metric ${metric.user_id}-${metric.period_type}-${originalPeriodValue}:`, updateError);
+        } else {
+          cleanedCount++;
+        }
+      }
+    });
+    
+    await Promise.all(updatePromises);
+    console.log(`Cleanup completed. Updated ${cleanedCount} records.`);
+    
+  } catch (error) {
+    console.error('Error during cleanup:', error);
     throw error;
   }
 } 
