@@ -81,7 +81,7 @@ import { Trade } from "@/utils/types"
 import { isFieldEditable, validateCellValue, mapFieldToDatabase, getColumnValue, transformTradeData } from "@/utils/tableUtils"
 import { loadSymbols, loadEmotions, loadTags } from "@/utils/dataLoadingUtils"
 import { filterAndSortTrades } from "@/utils/tableFilterUtils"
-import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape } from "@/utils/cellEditingUtils"
+import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/cellEditingUtils"
 import { saveCellValue } from "@/utils/cellSaveUtils"
 
 import { cn } from "@/lib/utils"
@@ -448,48 +448,22 @@ export default function TablePage() {
     });
   }, [cellEditingState.editingValues, cellEditingState.originalValues, user]);
 
-
-
   const handleCellBlur = useCallback(() => {
-    console.log('handleCellBlur called, editingCell:', cellEditingState.editingCell);
-    if (cellEditingState.editingCell && !status.isSaving) {
-      const cellKey = `${cellEditingState.editingCell.id}-${cellEditingState.editingCell.field}`;
-      const currentValue = cellEditingState.editingValues[cellKey];
-      const originalValue = cellEditingState.originalValues[cellKey];
-      
-      console.log('Blur values:', { cellKey, currentValue, originalValue });
-      
-      // Check if values are equal (handle arrays properly)
-      let valuesEqual = false;
-      if (Array.isArray(currentValue) && Array.isArray(originalValue)) {
-        valuesEqual = currentValue.length === originalValue.length && 
-                     currentValue.every((item, index) => item === originalValue[index]);
-      } else {
-        valuesEqual = currentValue === originalValue;
-      }
-      
-      // Always exit editing mode first
-      setCellEditingState(prev => ({
-        ...prev,
-        editingCell: null,
-        editingValues: {
-          ...prev.editingValues,
-          [cellKey]: undefined // Clear the value from editingValues
-        },
-        originalValues: {
-          ...prev.originalValues,
-          [cellKey]: undefined // Clear the value from originalValues
-        }
-      }));
-      
-      // If changes were made, save them
-      if (!valuesEqual) {
-        console.log('Changes detected, calling handleCellSave');
-        setStatus({ ...status, isSaving: true });
-        handleCellSave(cellEditingState.editingCell.id, cellEditingState.editingCell.field);
-      }
+    const result = handleCellBlurLogic(cellEditingState, status.isSaving);
+    
+    // Apply the new editing state
+    setCellEditingState(prev => ({
+      ...prev,
+      ...result.newEditingState
+    }));
+    
+    // If changes were made, save them
+    if (result.shouldSave) {
+      console.log('Changes detected, calling handleCellSave');
+      setStatus({ ...status, isSaving: true });
+      handleCellSave(cellEditingState.editingCell!.id, cellEditingState.editingCell!.field);
     }
-  }, [cellEditingState.editingCell, cellEditingState.editingValues, cellEditingState.originalValues, handleCellSave, status]);
+  }, [cellEditingState, status.isSaving, handleCellSave, status]);
 
   // Global click handler for emotions and tags containers
   useEffect(() => {

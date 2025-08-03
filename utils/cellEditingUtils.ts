@@ -14,6 +14,11 @@ export interface CellClickResult {
   newEditingState: Partial<CellEditingState>
 }
 
+export interface CellBlurResult {
+  shouldSave: boolean
+  newEditingState: Partial<CellEditingState>
+}
+
 /**
  * Handles cell click logic and returns whether to open edit dialog and new editing state
  */
@@ -174,4 +179,55 @@ export const handleCellEscape = (
       [cellKey]: ""
     }
   }
+}
+
+/**
+ * Handles cell blur logic and determines if save is needed
+ */
+export const handleCellBlurLogic = (
+  currentEditingState: CellEditingState,
+  isSaving: boolean
+): CellBlurResult => {
+  console.log('handleCellBlurLogic called, editingCell:', currentEditingState.editingCell)
+  
+  if (!currentEditingState.editingCell || isSaving) {
+    return { shouldSave: false, newEditingState: {} }
+  }
+  
+  const cellKey = `${currentEditingState.editingCell.id}-${currentEditingState.editingCell.field}`
+  const currentValue = currentEditingState.editingValues[cellKey]
+  const originalValue = currentEditingState.originalValues[cellKey]
+  
+  console.log('Blur values:', { cellKey, currentValue, originalValue })
+  
+  // Check if values are equal (handle arrays properly)
+  let valuesEqual = false
+  if (Array.isArray(currentValue) && Array.isArray(originalValue)) {
+    valuesEqual = currentValue.length === originalValue.length && 
+                 currentValue.every((item, index) => item === originalValue[index])
+  } else {
+    valuesEqual = currentValue === originalValue
+  }
+  
+  // Always exit editing mode first
+  const newEditingState: Partial<CellEditingState> = {
+    editingCell: null,
+    editingValues: {
+      ...currentEditingState.editingValues,
+      [cellKey]: undefined // Clear the value from editingValues
+    },
+    originalValues: {
+      ...currentEditingState.originalValues,
+      [cellKey]: undefined // Clear the value from originalValues
+    }
+  }
+  
+  // If changes were made, save them
+  if (!valuesEqual) {
+    console.log('Changes detected, should save')
+    return { shouldSave: true, newEditingState }
+  }
+  
+  console.log('No changes detected')
+  return { shouldSave: false, newEditingState }
 } 
