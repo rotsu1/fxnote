@@ -43,6 +43,7 @@ function cleanPeriodValue(periodValue: string): string {
 
 /**
  * Extracts period values from exit_time for different time resolutions
+ * Assumes exit_time is already in UTC format
  */
 function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string> {
   const date = new Date(exitTime);
@@ -52,12 +53,20 @@ function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string
     throw new Error('Invalid exit_time provided');
   }
 
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  const hour = String(date.getHours()).padStart(2, '0');
+  // Since exit_time is already in UTC, use UTC methods for hourly precision
+  const utcYear = date.getUTCFullYear();
+  const utcMonth = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const utcDay = String(date.getUTCDate()).padStart(2, '0');
+  const utcHour = String(date.getUTCHours()).padStart(2, '0');
 
-  // Get ISO week number
+  // For daily, weekly, monthly, yearly - convert UTC to local time for calendar periods
+  // This ensures calendar periods are based on the user's local calendar
+  const localDate = new Date(date.getTime());
+  const localYear = localDate.getFullYear();
+  const localMonth = String(localDate.getMonth() + 1).padStart(2, '0');
+  const localDay = String(localDate.getDate()).padStart(2, '0');
+
+  // Get ISO week number (using local time for calendar consistency)
   const getISOWeek = (date: Date): number => {
     const d = new Date(date.getTime());
     d.setHours(0, 0, 0, 0);
@@ -67,14 +76,14 @@ function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string
     return weekNo;
   };
 
-  const weekNumber = getISOWeek(date);
+  const weekNumber = getISOWeek(localDate);
 
   const periodValues = {
-    hourly: `${year}-${month}-${day}-${hour}`,
-    daily: `${year}-${month}-${day}`,
-    weekly: `${year}-W${String(weekNumber).padStart(2, '0')}`,
-    monthly: `${year}-${month}`,
-    yearly: `${year}`,
+    hourly: `${utcYear}-${utcMonth}-${utcDay}-${utcHour}`, // Use UTC for hourly precision
+    daily: `${localYear}-${localMonth}-${localDay}`, // Use local time for calendar day
+    weekly: `${localYear}-W${String(weekNumber).padStart(2, '0')}`, // Use local time for calendar week
+    monthly: `${localYear}-${localMonth}`, // Use local time for calendar month
+    yearly: `${localYear}`, // Use local time for calendar year
     total: 'total'
   };
 
