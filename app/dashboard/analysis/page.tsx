@@ -405,14 +405,18 @@ function TimeAnalysis() {
               const periodValue = item.period_value;
               if (!periodValue) return false;
               
-              // Extract hour from period_value format "YYYY-MM-DDTHH"
-              const hourMatch = periodValue.match(/T(\d{2})$/);
+              // Extract hour from period_value format "YYYY-MM-DD-HH"
+              const hourMatch = periodValue.match(/-(\d{2})$/);
               if (!hourMatch) return false;
               
-              const hour = parseInt(hourMatch[1], 10);
+              const utcHour = parseInt(hourMatch[1], 10);
+              
+              // Convert UTC hour to local hour
+              const localHour = (utcHour - new Date().getTimezoneOffset() / 60) % 24;
+              const adjustedLocalHour = localHour < 0 ? localHour + 24 : localHour;
               
               // Check if this matches our specific hour
-              return hour === timeSlot.hour;
+              return Math.floor(adjustedLocalHour) === timeSlot.hour;
             });
             
             if (!hourData) {
