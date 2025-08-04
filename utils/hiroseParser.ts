@@ -72,10 +72,15 @@ function parseJapaneseDateTime(dateTimeStr: string): string {
     }
   }
   
-  // Create ISO string (assuming Japan timezone)
-  const isoString = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:${seconds.padStart(2, '0')}.000Z`;
+  // Convert Japan time (JST = UTC+9) to UTC
+  // Create a Date object with the Japan time values, but treat it as UTC
+  // Then subtract 9 hours to get the actual UTC time
+  const japanDate = new Date(Date.UTC(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds)));
   
-  return isoString;
+  // Convert to UTC by subtracting 9 hours (JST is UTC+9)
+  const utcDate = new Date(japanDate.getTime() - (9 * 60 * 60 * 1000));
+  
+  return utcDate.toISOString();
 }
 
 // Helper function to convert lot size (1000 currency per lot) to standard lot size (10000 currency per lot)
