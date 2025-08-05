@@ -417,42 +417,37 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
     );
   }
 
-  if (!performanceData) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>パフォーマンス指標</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-muted-foreground py-10">
-            パフォーマンスデータがありません
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+  // Use default values if no performance data is available
+  const defaultData = {
+    win_count: 0,
+    loss_count: 0,
+    win_profit: 0,
+    loss_loss: 0
+  };
+
+  const data = performanceData || defaultData;
 
   // Compute derived values
-  const winCount = performanceData.win_count || 0;
-  const lossCount = performanceData.loss_count || 0;
+  const winCount = data.win_count || 0;
+  const lossCount = data.loss_count || 0;
   const tradeCount = winCount + lossCount;
-  const winProfit = performanceData.win_profit || 0;
-  const lossLoss = performanceData.loss_loss || 0;
+  const winProfit = data.win_profit || 0;
+  const lossLoss = data.loss_loss || 0;
 
   const winRate = tradeCount > 0 
     ? `${Math.round((winCount / tradeCount) * 100)}%` 
-    : 'N/A';
+    : '0%';
 
   const averageProfitLoss = tradeCount > 0 
     ? new Intl.NumberFormat('ja-JP', { 
         style: 'currency', 
         currency: 'JPY' 
       }).format((winProfit + lossLoss) / tradeCount)
-    : 'N/A';
+    : '¥0';
 
   const tradeCountDisplay = tradeCount > 0 
     ? `${tradeCount}回` 
-    : 'N/A';
+    : '0回';
 
   const performanceMetrics = [
     { 
@@ -460,7 +455,7 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
       value: winRate, 
       description: tradeCount > 0 
         ? `${winCount}勝 / ${tradeCount}取引` 
-        : "データなし" 
+        : "0勝 / 0取引" 
     },
     { 
       title: "平均利益/損失", 
@@ -470,27 +465,11 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
     { 
       title: "取引回数", 
       value: tradeCountDisplay, 
-      description: "データなし" 
+      description: "取引履歴" 
     },
   ];
 
-  // If no data is available, show a message
-  const hasData = performanceMetrics.some(metric => metric.value !== "N/A");
-  
-  if (!hasData) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle>パフォーマンス指標</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center text-muted-foreground py-10">
-            パフォーマンスデータがありません。データが正しく設定されているか確認してください。
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
+
 
   return (
     <Card>
@@ -498,7 +477,7 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
         <CardTitle>パフォーマンス指標</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {performanceMetrics.map((metric, index) => (
             <div key={index} className="space-y-2">
               <div className="text-sm font-medium text-muted-foreground">{metric.title}</div>
