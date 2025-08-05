@@ -29,19 +29,13 @@ function PLSummaryCards() {
     // Daily: today's date
     const daily = now.toISOString().split('T')[0]; // YYYY-MM-DD
     
-    // Weekly: current ISO week
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
-    const weekNumber = Math.ceil((weekStart.getTime() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const weekly = `${weekStart.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
-    
     // Monthly: current month
     const monthly = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`;
     
     // Yearly: current year
     const yearly = now.getFullYear().toString();
     
-    return { daily, weekly, monthly, yearly };
+    return { daily, monthly, yearly };
   };
 
   useEffect(() => {
@@ -55,7 +49,7 @@ function PLSummaryCards() {
         const periods = getCurrentPeriods();
         
         // Fetch data for all periods - handle each query individually to avoid 406 errors
-        let dailyProfit = 0, weeklyProfit = 0, monthlyProfit = 0, totalProfit = 0;
+        let dailyProfit = 0, monthlyProfit = 0, yearlyProfit = 0, totalProfit = 0;
         
         // Daily data
         try {
@@ -72,23 +66,6 @@ function PLSummaryCards() {
           }
         } catch (dailyError) {
           console.log("No daily data found for period:", periods.daily);
-        }
-
-        // Weekly data
-        try {
-          const { data: weeklyData, error: weeklyError } = await supabase
-            .from("user_performance_metrics")
-            .select("win_profit, loss_loss")
-            .eq("user_id", user.id)
-            .eq("period_type", "weekly")
-            .eq("period_value", periods.weekly)
-            .maybeSingle(); // Use maybeSingle instead of single
-
-          if (weeklyData) {
-            weeklyProfit = (weeklyData.win_profit || 0) + (weeklyData.loss_loss || 0);
-          }
-        } catch (weeklyError) {
-          console.log("No weekly data found for period:", periods.weekly);
         }
 
         // Monthly data
@@ -108,27 +85,53 @@ function PLSummaryCards() {
           console.log("No monthly data found for period:", periods.monthly);
         }
 
-        // Total data
+        // Yearly data - sum all months in the current year
+        try {
+          const { data: yearlyData, error: yearlyError } = await supabase
+            .from("user_performance_metrics")
+            .select("win_profit, loss_loss")
+            .eq("user_id", user.id)
+            .eq("period_type", "monthly")
+            .like("period_value", `${periods.yearly}-%`);
+
+          if (yearlyData && yearlyData.length > 0) {
+            yearlyProfit = yearlyData.reduce((sum, month) => {
+              return sum + (month.win_profit || 0) + (month.loss_loss || 0);
+            }, 0);
+          }
+        } catch (yearlyError) {
+          console.log("No yearly data found for year:", periods.yearly);
+        }
+
+        // Total data - sum all months
         try {
           const { data: totalData, error: totalError } = await supabase
             .from("user_performance_metrics")
             .select("win_profit, loss_loss")
             .eq("user_id", user.id)
-            .eq("period_type", "total")
-            .eq("period_value", "total")
-            .maybeSingle(); // Use maybeSingle instead of single
+            .eq("period_type", "monthly");
 
-          if (totalData) {
-            totalProfit = (totalData.win_profit || 0) + (totalData.loss_loss || 0);
+          console.log("Total query result:", { totalData, totalError, count: totalData?.length });
+
+          if (totalData && totalData.length > 0) {
+            totalProfit = totalData.reduce((sum, month) => {
+              const monthProfit = (month.win_profit || 0) + (month.loss_loss || 0);
+              console.log("Month:", month, "Profit:", monthProfit);
+              return sum + monthProfit;
+            }, 0);
+            console.log("Final total profit:", totalProfit);
+          } else {
+            console.log("No monthly data found for total");
           }
         } catch (totalError) {
-          console.log("No total data found");
+          console.log("Error fetching total data:", totalError);
         }
 
+        console.log("Setting plSummary with values:", { dailyProfit, monthlyProfit, yearlyProfit, totalProfit });
         setPlSummary({
           daily_profit: dailyProfit,
-          weekly_profit: weeklyProfit,
           monthly_profit: monthlyProfit,
+          yearly_profit: yearlyProfit,
           total_profit: totalProfit
         });
 
@@ -178,28 +181,29 @@ function PLSummaryCards() {
     );
   }
 
+  console.log("plSummary values for display:", plSummary);
   const summaryData = [
     { 
       title: "今日の損益", 
-      value: plSummary.daily_profit !== 0 ? `¥${plSummary.daily_profit.toLocaleString()}` : "N/A", 
+      value: `¥${(plSummary.daily_profit || 0).toLocaleString()}`, 
       trend: plSummary.daily_profit > 0 ? "up" : plSummary.daily_profit < 0 ? "down" : "neutral", 
       color: plSummary.daily_profit > 0 ? "text-green-600" : plSummary.daily_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
     { 
-      title: "今週の損益", 
-      value: plSummary.weekly_profit !== 0 ? `¥${plSummary.weekly_profit.toLocaleString()}` : "N/A", 
-      trend: plSummary.weekly_profit > 0 ? "up" : plSummary.weekly_profit < 0 ? "down" : "neutral", 
-      color: plSummary.weekly_profit > 0 ? "text-green-600" : plSummary.weekly_profit < 0 ? "text-red-600" : "text-muted-foreground" 
-    },
-    { 
       title: "今月の損益", 
-      value: plSummary.monthly_profit !== 0 ? `¥${plSummary.monthly_profit.toLocaleString()}` : "N/A", 
+      value: `¥${(plSummary.monthly_profit || 0).toLocaleString()}`, 
       trend: plSummary.monthly_profit > 0 ? "up" : plSummary.monthly_profit < 0 ? "down" : "neutral", 
       color: plSummary.monthly_profit > 0 ? "text-green-600" : plSummary.monthly_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
     { 
+      title: "今年の損益", 
+      value: `¥${(plSummary.yearly_profit || 0).toLocaleString()}`, 
+      trend: plSummary.yearly_profit > 0 ? "up" : plSummary.yearly_profit < 0 ? "down" : "neutral", 
+      color: plSummary.yearly_profit > 0 ? "text-green-600" : plSummary.yearly_profit < 0 ? "text-red-600" : "text-muted-foreground" 
+    },
+    { 
       title: "総損益", 
-      value: plSummary.total_profit !== 0 ? `¥${plSummary.total_profit.toLocaleString()}` : "N/A", 
+      value: `¥${(plSummary.total_profit || 0).toLocaleString()}`, 
       trend: plSummary.total_profit > 0 ? "up" : plSummary.total_profit < 0 ? "down" : "neutral", 
       color: plSummary.total_profit > 0 ? "text-green-600" : plSummary.total_profit < 0 ? "text-red-600" : "text-muted-foreground" 
     },
@@ -244,25 +248,17 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
           period_type: 'daily',
           period_value: now.toISOString().split('T')[0] // YYYY-MM-DD
         };
-      case 1: // weekly
-        const weekStart = new Date(now);
-        weekStart.setDate(now.getDate() - now.getDay()); // Start of week (Sunday)
-        const weekNumber = Math.ceil((weekStart.getTime() - new Date(weekStart.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000));
-        return {
-          period_type: 'weekly',
-          period_value: `${weekStart.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`
-        };
-      case 2: // monthly
+      case 1: // monthly
         return {
           period_type: 'monthly',
           period_value: `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}`
         };
-      case 3: // yearly
+      case 2: // yearly
         return {
           period_type: 'yearly',
           period_value: now.getFullYear().toString()
         };
-      case 4: // total
+      case 3: // total
         return {
           period_type: 'total',
           period_value: 'total'
@@ -294,18 +290,77 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
           throw settingsError;
         }
 
-        // Default to monthly (2) if no settings found
-        const metricsPeriod = settingsData?.metrics_period ?? 2;
+        // Default to monthly (1) if no settings found
+        const metricsPeriod = settingsData?.metrics_period ?? 1;
         const period = getCurrentPeriod(metricsPeriod);
 
         // Fetch performance data with the computed period
-        const { data, error } = await supabase
-          .from("user_performance_metrics")
-          .select("*")
-          .eq("user_id", user.id)
-          .eq("period_type", period.period_type)
-          .eq("period_value", period.period_value)
-          .maybeSingle(); // Use maybeSingle instead of single
+        let data, error;
+        
+        if (period.period_type === 'yearly') {
+          // For yearly, sum all months in the current year
+          const { data: yearlyData, error: yearlyError } = await supabase
+            .from("user_performance_metrics")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("period_type", "monthly")
+            .like("period_value", `${period.period_value}-%`);
+          
+          data = yearlyData;
+          error = yearlyError;
+          
+          // Aggregate the data if we have multiple months
+          if (data && data.length > 0) {
+            const aggregatedData = data.reduce((acc, month) => {
+              return {
+                win_count: (acc.win_count || 0) + (month.win_count || 0),
+                loss_count: (acc.loss_count || 0) + (month.loss_count || 0),
+                win_profit: (acc.win_profit || 0) + (month.win_profit || 0),
+                loss_loss: (acc.loss_loss || 0) + (month.loss_loss || 0),
+                period_type: 'yearly',
+                period_value: period.period_value
+              };
+            }, {});
+            data = aggregatedData;
+          }
+        } else if (period.period_type === 'total') {
+          // For total, sum all months
+          const { data: totalData, error: totalError } = await supabase
+            .from("user_performance_metrics")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("period_type", "monthly");
+          
+          data = totalData;
+          error = totalError;
+          
+          // Aggregate the data if we have multiple months
+          if (data && data.length > 0) {
+            const aggregatedData = data.reduce((acc, month) => {
+              return {
+                win_count: (acc.win_count || 0) + (month.win_count || 0),
+                loss_count: (acc.loss_count || 0) + (month.loss_count || 0),
+                win_profit: (acc.win_profit || 0) + (month.win_profit || 0),
+                loss_loss: (acc.loss_loss || 0) + (month.loss_loss || 0),
+                period_type: 'total',
+                period_value: 'total'
+              };
+            }, {});
+            data = aggregatedData;
+          }
+        } else {
+          // For daily and monthly, fetch single record
+          const { data: singleData, error: singleError } = await supabase
+            .from("user_performance_metrics")
+            .select("*")
+            .eq("user_id", user.id)
+            .eq("period_type", period.period_type)
+            .eq("period_value", period.period_value)
+            .maybeSingle();
+          
+          data = singleData;
+          error = singleError;
+        }
 
         if (error) {
           console.error("Error fetching performance data:", error);
@@ -662,7 +717,7 @@ function RecentActivity() {
 
 function DashboardSettings({ onSettingsChange }: { onSettingsChange?: () => void }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [metricsPeriod, setMetricsPeriod] = useState<string>("2"); // Default to monthly (2)
+  const [metricsPeriod, setMetricsPeriod] = useState<string>("1"); // Default to monthly (1)
   const [loading, setLoading] = useState(false);
   const user = useAuth();
   const { toast } = useToast();
@@ -670,10 +725,9 @@ function DashboardSettings({ onSettingsChange }: { onSettingsChange?: () => void
   // Period options mapping
   const periodOptions = [
     { value: "0", label: "日次" },
-    { value: "1", label: "週次" },
-    { value: "2", label: "月次" },
-    { value: "3", label: "年次" },
-    { value: "4", label: "総計" },
+    { value: "1", label: "月次" },
+    { value: "2", label: "年次" },
+    { value: "3", label: "総計" },
   ];
 
   // Load current settings
@@ -694,7 +748,7 @@ function DashboardSettings({ onSettingsChange }: { onSettingsChange?: () => void
         }
 
         if (data) {
-          setMetricsPeriod(data.metrics_period?.toString() || "2");
+          setMetricsPeriod(data.metrics_period?.toString() || "1");
         }
       } catch (error) {
         console.error("Error loading settings:", error);
