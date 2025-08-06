@@ -224,10 +224,19 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       format: (value: number | string) => {
         if (typeof value === "string") return value;
         if (typeof value === "number" && !isNaN(value) && value > 0) {
-          // Convert seconds to hours and minutes
-          const hours = Math.floor(value / 3600);
+          // Convert seconds to days, hours, minutes, and seconds
+          const days = Math.floor(value / 86400);
+          const hours = Math.floor((value % 86400) / 3600);
           const minutes = Math.floor((value % 3600) / 60);
-          return `${hours}h ${minutes}m`;
+          const seconds = Math.floor(value % 60);
+          
+          const parts = [];
+          if (days > 0) parts.push(`${days}日`);
+          if (hours > 0 || days > 0) parts.push(`${hours}時間`);
+          if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
+          parts.push(`${seconds}秒`);
+          
+          return parts.join(' ');
         }
         return "データなし";
       },
@@ -244,10 +253,19 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       format: (value: number | string) => {
         if (typeof value === "string") return value;
         if (typeof value === "number" && !isNaN(value) && value > 0) {
-          // Convert seconds to hours and minutes
-          const hours = Math.floor(value / 3600);
+          // Convert seconds to days, hours, minutes, and seconds
+          const days = Math.floor(value / 86400);
+          const hours = Math.floor((value % 86400) / 3600);
           const minutes = Math.floor((value % 3600) / 60);
-          return `${hours}h ${minutes}m`;
+          const seconds = Math.floor(value % 60);
+          
+          const parts = [];
+          if (days > 0) parts.push(`${days}日`);
+          if (hours > 0 || days > 0) parts.push(`${hours}時間`);
+          if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
+          parts.push(`${seconds}秒`);
+          
+          return parts.join(' ');
         }
         return "データなし";
       },
@@ -521,9 +539,18 @@ function TimeAnalysis() {
   }, [user, selectedYear, selectedMonth]);
 
   const formatHoldingTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
+    const secs = Math.floor(seconds % 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days}日`);
+    if (hours > 0 || days > 0) parts.push(`${hours}時間`);
+    if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
+    parts.push(`${secs}秒`);
+    
+    return parts.join(' ');
   };
 
   if (loading) {
@@ -802,9 +829,18 @@ function MonthlyBreakdown() {
   };
 
   const formatHoldingTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}h ${minutes}m`;
+    const secs = Math.floor(seconds % 60);
+    
+    const parts = [];
+    if (days > 0) parts.push(`${days}日`);
+    if (hours > 0 || days > 0) parts.push(`${hours}時間`);
+    if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
+    parts.push(`${secs}秒`);
+    
+    return parts.join(' ');
   };
 
   if (loading) {
