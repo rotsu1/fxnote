@@ -24,6 +24,10 @@ export interface UserPerformanceMetric {
   loss_pips: number;
   win_holding_time: number; // Total holding time for wins in seconds
   loss_holding_time: number; // Total holding time for losses in seconds
+  win_pips_count: number; // Count of trades with pips for wins
+  loss_pips_count: number; // Count of trades with pips for losses
+  win_holding_count: number; // Count of trades with holding time for wins
+  loss_holding_count: number; // Count of trades with holding time for losses
   created_at?: string;
   updated_at?: string;
 }
@@ -149,6 +153,10 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
           loss_pips: isWin ? 0 : -tradePips, // Store loss pips as negative value
           win_holding_time: isWin ? trade.hold_time : 0,
           loss_holding_time: isWin ? 0 : trade.hold_time,
+          win_pips_count: isWin && tradePips > 0 ? 1 : 0,
+          loss_pips_count: !isWin && tradePips > 0 ? 1 : 0,
+          win_holding_count: isWin && (trade.entry_time && trade.exit_time) ? 1 : 0,
+          loss_holding_count: !isWin && (trade.entry_time && trade.exit_time) ? 1 : 0,
           updated_at: new Date().toISOString()
         };
       } else {
@@ -161,6 +169,10 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
         const currentLossPips = Number(existingMetric.loss_pips || 0);
         const currentWinHoldingTime = existingMetric.win_holding_time || 0;
         const currentLossHoldingTime = existingMetric.loss_holding_time || 0;
+        const currentWinPipsCount = existingMetric.win_pips_count || 0;
+        const currentLossPipsCount = existingMetric.loss_pips_count || 0;
+        const currentWinHoldingCount = existingMetric.win_holding_count || 0;
+        const currentLossHoldingCount = existingMetric.loss_holding_count || 0;
 
         if (isWin) {
           // Update win-related metrics
@@ -171,6 +183,8 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
           const newWinProfit = currentWinProfit + tradeProfit;
           const newWinPips = currentWinPips + tradePips;
           const newWinHoldingTime = currentWinHoldingTime + trade.hold_time;
+          const newWinPipsCount = currentWinPipsCount + (tradePips > 0 ? 1 : 0);
+          const newWinHoldingCount = currentWinHoldingCount + (trade.entry_time && trade.exit_time ? 1 : 0);
           
           console.log(`Adding win trade to ${periodType}:`, {
             currentWinProfit,
@@ -186,6 +200,8 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
             win_profit: newWinProfit,
             win_pips: newWinPips,
             win_holding_time: newWinHoldingTime,
+            win_pips_count: newWinPipsCount,
+            win_holding_count: newWinHoldingCount,
             updated_at: new Date().toISOString()
           };
         } else {
@@ -197,6 +213,8 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
           const newLossLoss = currentLossLoss - tradeLoss;
           const newLossPips = currentLossPips - tradePips;
           const newLossHoldingTime = currentLossHoldingTime + trade.hold_time;
+          const newLossPipsCount = currentLossPipsCount + (tradePips > 0 ? 1 : 0);
+          const newLossHoldingCount = currentLossHoldingCount + (trade.entry_time && trade.exit_time ? 1 : 0);
 
           console.log(`Adding loss trade to ${periodType}:`, {
             currentLossLoss,
@@ -212,6 +230,8 @@ export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<v
             loss_loss: newLossLoss,
             loss_pips: newLossPips,
             loss_holding_time: newLossHoldingTime,
+            loss_pips_count: newLossPipsCount,
+            loss_holding_count: newLossHoldingCount,
             updated_at: new Date().toISOString()
           };
         }
@@ -368,6 +388,8 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         const newWinProfit = Math.max(0, currentWinProfit - tradeProfit);
         const newWinPips = Math.max(0, currentWinPips - tradePips);
         const newWinHoldingTime = Math.max(0, (existingMetric.win_holding_time || 0) - trade.hold_time);
+        const newWinPipsCount = Math.max(0, (existingMetric.win_pips_count || 0) - (tradePips > 0 ? 1 : 0));
+        const newWinHoldingCount = Math.max(0, (existingMetric.win_holding_count || 0) - (trade.entry_time && trade.exit_time ? 1 : 0));
         
         console.log(`Removing win trade from ${periodType}:`, {
           currentWinProfit,
@@ -383,6 +405,8 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
           win_profit: newWinProfit,
           win_pips: newWinPips,
           win_holding_time: newWinHoldingTime,
+          win_pips_count: newWinPipsCount,
+          win_holding_count: newWinHoldingCount,
           updated_at: new Date().toISOString()
         };
       } else {
@@ -396,6 +420,8 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
         const newLossLoss = Math.min(0, currentLossLoss + tradeLoss);
         const newLossPips = Math.min(0, currentLossPips + tradePips);
         const newLossHoldingTime = Math.max(0, (existingMetric.loss_holding_time || 0) - trade.hold_time);
+        const newLossPipsCount = Math.max(0, (existingMetric.loss_pips_count || 0) - (tradePips > 0 ? 1 : 0));
+        const newLossHoldingCount = Math.max(0, (existingMetric.loss_holding_count || 0) - (trade.entry_time && trade.exit_time ? 1 : 0));
 
         console.log(`Removing loss trade from ${periodType}:`, {
           currentLossLoss,
@@ -411,6 +437,8 @@ export async function removeTradeFromPerformanceMetrics(trade: TradeInput): Prom
           loss_loss: newLossLoss,
           loss_pips: newLossPips,
           loss_holding_time: newLossHoldingTime,
+          loss_pips_count: newLossPipsCount,
+          loss_holding_count: newLossHoldingCount,
           updated_at: new Date().toISOString()
         };
       }
