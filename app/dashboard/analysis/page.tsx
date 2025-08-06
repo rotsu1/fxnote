@@ -52,24 +52,40 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
         // All three specified - daily
         periodType = "daily";
         periodValue = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-${selectedDay.toString().padStart(2, '0')}`;
+        query = query.eq("period_type", periodType).eq("period_value", periodValue);
       } else if (selectedMonth !== "指定しない") {
         // Year and month specified - monthly
         periodType = "monthly";
         periodValue = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
+        query = query.eq("period_type", periodType).eq("period_value", periodValue);
+      } else if (selectedDay !== "指定しない") {
+        // Year and day specified, but month is "指定しない" - get all daily records for that day across all months
+        periodType = "daily";
+        query = query.eq("period_type", periodType)
+                    .like("period_value", `${selectedYear}-%-${selectedDay.toString().padStart(2, '0')}`);
       } else {
         // Only year specified - yearly
         periodType = "yearly";
         periodValue = selectedYear.toString();
+        query = query.eq("period_type", periodType).eq("period_value", periodValue);
       }
-      
-      query = query.eq("period_type", periodType).eq("period_value", periodValue);
     } else {
       // Handle partial matches when some fields are "指定しない"
-      if (selectedMonth !== "指定しない") {
-        query = query.like("period_value", `%-${selectedMonth.toString().padStart(2, '0')}-%`);
-      }
-      if (selectedDay !== "指定しない") {
-        query = query.like("period_value", `%-${selectedDay.toString().padStart(2, '0')}`);
+      if (selectedMonth !== "指定しない" && selectedDay !== "指定しない") {
+        // Month and day specified, but year is "指定しない" - get all daily records for that month-day across all years
+        periodType = "daily";
+        query = query.eq("period_type", periodType)
+                    .like("period_value", `%-${selectedMonth.toString().padStart(2, '0')}-${selectedDay.toString().padStart(2, '0')}`);
+      } else if (selectedMonth !== "指定しない") {
+        // Only month specified - get all monthly records for that month across all years
+        periodType = "monthly";
+        query = query.eq("period_type", periodType)
+                    .like("period_value", `%-${selectedMonth.toString().padStart(2, '0')}`);
+      } else if (selectedDay !== "指定しない") {
+        // Only day specified - get all daily records for that day across all years and months
+        periodType = "daily";
+        query = query.eq("period_type", periodType)
+                    .like("period_value", `%-%-${selectedDay.toString().padStart(2, '0')}`);
       }
     }
     
