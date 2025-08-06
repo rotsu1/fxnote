@@ -192,13 +192,20 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
     );
   }
 
-  if (!keyStats) {
-    return (
-      <div className="text-center text-muted-foreground py-10">
-        統計データがありません
-      </div>
-    );
-  }
+  // Create default stats when no data is available
+  const defaultStats = {
+    win_rate: 0,
+    avg_win_trade_profit: 0,
+    avg_loss_trade_loss: 0,
+    avg_win_trade_pips: 0,
+    avg_loss_trade_pips: 0,
+    avg_win_holding_time: 0,
+    avg_loss_holding_time: 0,
+    payoff_ratio: 0
+  };
+
+  // Use default stats if no data is available
+  const statsToUse = keyStats || defaultStats;
 
   // Define the metrics with their Japanese titles and formatting
   const metrics: Metric[] = [
@@ -219,7 +226,7 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
     { 
       key: 'avg_loss_trade_loss', 
       title: '平均損失', 
-      format: (value: number | string) => typeof value === "number" ? `-${(Math.abs(value)).toLocaleString()}` : value,
+      format: (value: number | string) => typeof value === "number" ? `${(Math.abs(value)).toLocaleString()}` : value,
       color: (_value: number | string) => "text-red-600"
     },
     { 
@@ -318,19 +325,14 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       {/* Key Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {metrics.map((metric, index) => {
-        const value = keyStats?.[metric.key];
-        
-        // Show "データなし" if no data or value is 0/null/undefined
-        const displayValue = (value === null || value === undefined || value === 0) 
-          ? "データなし" 
-          : value;
+        const value = statsToUse[metric.key];
         
         // Determine color class
         let colorClass = "text-gray-900 dark:text-gray-100";
-        if (displayValue === "データなし") {
+        if (value === null || value === undefined || value === 0) {
           colorClass = "text-gray-400";
         } else {
-          colorClass = metric.color(displayValue);
+          colorClass = metric.color(value);
         }
         
         return (
@@ -342,7 +344,7 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
             </CardHeader>
             <CardContent>
               <div className={`text-2xl font-bold ${colorClass}`}>
-                {metric.format(displayValue)}
+                {metric.format(value)}
               </div>
             </CardContent>
           </Card>
