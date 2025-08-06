@@ -347,30 +347,49 @@ function TimeAnalysis() {
   ];
 
   useEffect(() => {
-    if (!user) return;
+    console.log('TimeAnalysis: useEffect triggered with user:', user?.id);
+    
+    if (!user) {
+      console.log('TimeAnalysis: No user, returning early');
+      return;
+    }
     
     setLoading(true);
     setError("");
     
-    // Fetch hourly data from user_performance_metrics for the selected year and month
-    const monthString = selectedMonth.toString().padStart(2, '0');
-    const yearMonth = `${selectedYear}-${monthString}`;
+    // Calculate date range for the selected year and month
+    const startDate = new Date(selectedYear, selectedMonth - 1, 1);
+    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
     
+    console.log('TimeAnalysis: Fetching trades for period:', {
+      selectedYear,
+      selectedMonth,
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      startDateLocal: startDate.toString(),
+      endDateLocal: endDate.toString()
+    });
+    
+    // Fetch all trades for the selected month
     supabase
-      .from("user_performance_metrics")
+      .from("trades")
       .select("*")
       .eq("user_id", user.id)
-      .eq("period_type", "hourly")
-      .like("period_value", `${yearMonth}-%`)
-      .order("period_value", { ascending: true })
+      .gte("entry_time", startDate.toISOString())
+      .lte("entry_time", endDate.toISOString())
       .then(({ data, error }) => {
+        console.log('TimeAnalysis: Supabase response:', { data, error, dataLength: data?.length });
+        
+        if (data && data.length > 0) {
+          console.log('TimeAnalysis: Sample trade structure:', data[0]);
+        }
+        
         if (error) {
+          console.error('TimeAnalysis: Error fetching trades:', error);
           setError(error.message);
           setTimeData([]);
         } else {
           // Define time slots (1-hour intervals)
-          // Each hour record (e.g., "2025-01-15T14") represents trades from that hour only
-          // We display each hour individually for detailed analysis
           const timeSlots = [
             { hour: 0, label: "00:00-01:00" },
             { hour: 1, label: "01:00-02:00" },
@@ -398,28 +417,23 @@ function TimeAnalysis() {
             { hour: 23, label: "23:00-00:00" }
           ];
           
-          // Process hourly data
+          // Process hourly data from trades
           const processedData = timeSlots.map(timeSlot => {
-            // Find data for this specific hour
-            const hourData = data?.find(item => {
-              const periodValue = item.period_value;
-              if (!periodValue) return false;
+            // Filter trades for this specific hour
+            const hourTrades = data?.filter(trade => {
+              if (!trade.entry_time) return false;
               
-              // Extract hour from period_value format "YYYY-MM-DD-HH"
-              const hourMatch = periodValue.match(/-(\d{2})$/);
-              if (!hourMatch) return false;
+              const entryTime = new Date(trade.entry_time);
+              const hour = entryTime.getHours();
               
-              const utcHour = parseInt(hourMatch[1], 10);
-              
-              // Convert UTC hour to local hour
-              const localHour = (utcHour - new Date().getTimezoneOffset() / 60) % 24;
-              const adjustedLocalHour = localHour < 0 ? localHour + 24 : localHour;
-              
-              // Check if this matches our specific hour
-              return Math.floor(adjustedLocalHour) === timeSlot.hour;
-            });
+              return hour === timeSlot.hour;
+            }) || [];
             
-            if (!hourData) {
+            if (hourTrades.length > 0) {
+              console.log(`TimeAnalysis: Found ${hourTrades.length} trades for hour ${timeSlot.hour}:`, hourTrades);
+            }
+            
+            if (hourTrades.length === 0) {
               return {
                 time: timeSlot.label,
                 wins: 0,
@@ -430,47 +444,87 @@ function TimeAnalysis() {
             }
             
             // Calculate metrics for this hour
-            const totalTrades = (hourData.win_count || 0) + (hourData.loss_count || 0);
-            const totalPips = (hourData.win_pips || 0) + (hourData.loss_pips || 0);
-            const avgPips = totalTrades > 0 ? totalPips / totalTrades : 0;
-            const performance = avgPips > 10 ? "strong" : avgPips < -10 ? "weak" : "neutral";
+            let wins = 0;
+            let losses = 0;
+            let totalPips = 0;
+            let totalProfit = 0;
+            let winProfit = 0;
+            let lossLoss = 0;
+            let winPips = 0;
+            let lossPips = 0;
+            let winHoldingTime = 0;
+            let lossHoldingTime = 0;
+            let winCountWithHoldingTime = 0;
+            let lossCountWithHoldingTime = 0;
+            let winCountWithPips = 0;
+            let lossCountWithPips = 0;
+            
+            hourTrades.forEach(trade => {
+              const profit = trade.profit_loss || 0;
+              const pips = trade.pips || 0;
+              const holdingTime = trade.hold_time || 0;
+              
+              totalProfit += profit;
+              
+              if (profit > 0) {
+                wins++;
+                winProfit += profit;
+                if (pips > 0) {
+                  winPips += pips;
+                  winCountWithPips++;
+                }
+                if (holdingTime > 0) {
+                  winHoldingTime += holdingTime;
+                  winCountWithHoldingTime++;
+                }
+              } else if (profit < 0) {
+                losses++;
+                lossLoss += profit; // This will be negative
+                if (pips > 0) {
+                  lossPips += pips;
+                  lossCountWithPips++;
+                }
+                if (holdingTime > 0) {
+                  lossHoldingTime += holdingTime;
+                  lossCountWithHoldingTime++;
+                }
+              }
+            });
+            
+            const totalTrades = wins + losses;
+            const avgWinProfit = wins > 0 ? winProfit / wins : 0;
+            const avgLossLoss = losses > 0 ? lossLoss / losses : 0;
+            const avgWinPips = winCountWithPips > 0 ? winPips / winCountWithPips : 0;
+            const avgLossPips = lossCountWithPips > 0 ? lossPips / lossCountWithPips : 0;
+            const avgWinHoldingTime = winCountWithHoldingTime > 0 ? winHoldingTime / winCountWithHoldingTime : 0;
+            const avgLossHoldingTime = lossCountWithHoldingTime > 0 ? lossHoldingTime / lossCountWithHoldingTime : 0;
             
             return {
               time: timeSlot.label,
-              wins: hourData.win_count || 0,
-              losses: hourData.loss_count || 0,
-              avgPips: avgPips,
-              performance: performance
+              wins: wins,
+              losses: losses,
+              totalProfit: totalProfit,
+              avgWinProfit: avgWinProfit,
+              avgLossLoss: avgLossLoss,
+              avgWinPips: avgWinPips,
+              avgLossPips: avgLossPips,
+              avgWinHoldingTime: avgWinHoldingTime,
+              avgLossHoldingTime: avgLossHoldingTime
             };
-                    });
+          });
           
+          console.log('TimeAnalysis: Processed data:', processedData);
           setTimeData(processedData);
         }
         setLoading(false);
       });
   }, [user, selectedYear, selectedMonth]);
 
-  const getPerformanceColor = (performance: string) => {
-    switch (performance) {
-      case "strong":
-        return "bg-green-500"
-      case "weak":
-        return "bg-red-500"
-      default:
-        return "bg-gray-400"
-    }
-  }
-
-  const getPerformanceText = (performance: string) => {
-    switch (performance) {
-      case "strong":
-        return "得意"
-      case "weak":
-        return "苦手"
-      default:
-        return "普通"
-    }
-  }
+  const formatHoldingTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${hours}h ${minutes}m`;
+  };
 
   if (loading) {
     return (
@@ -511,6 +565,27 @@ function TimeAnalysis() {
         <CardContent>
           <div className="text-center text-red-600 py-10">
             エラーが発生しました: {error}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  console.log('TimeAnalysis: Rendering with timeData:', timeData);
+
+  if (!timeData || timeData.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className="h-5 w-5 text-purple-600" />
+            時間帯別成績分析
+          </CardTitle>
+          <CardDescription>時間帯ごとのパフォーマンス分析</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="text-center text-muted-foreground py-10">
+            指定された期間のデータがありません
           </div>
         </CardContent>
       </Card>
@@ -563,33 +638,42 @@ function TimeAnalysis() {
               <div className="w-20 text-sm font-medium">{data.time}</div>
 
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="text-sm text-green-600">{data.wins}勝</div>
-                  <div className="text-sm text-red-600">{data.losses}敗</div>
-                  <Badge
-                    variant="outline"
-                    className={`text-xs ${
-                      data.performance === "strong"
-                        ? "border-green-500 text-green-700"
-                        : data.performance === "weak"
-                          ? "border-red-500 text-red-700"
-                          : "border-gray-500 text-gray-700"
-                    }`}
-                  >
-                    {getPerformanceText(data.performance)}
-                  </Badge>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-sm text-green-600">{data.wins || 0}勝</div>
+                  <div className="text-sm text-red-600">{data.losses || 0}敗</div>
+                  <div className={`text-sm font-medium ${(data.totalProfit || 0) > 0 ? "text-green-600" : "text-red-600"}`}>
+                    総損益: ¥{(data.totalProfit || 0).toLocaleString()}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <div className="flex-1 bg-gray-200 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full ${getPerformanceColor(data.performance)}`}
-                      style={{ width: `${Math.min(Math.abs(data.avgPips) * 2, 100)}%` }}
-                    />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">平均利益</div>
+                    <div className="font-medium text-green-600">¥{(data.avgWinProfit || 0).toLocaleString()}</div>
                   </div>
-                  <div className={`text-sm font-medium w-16 ${data.avgPips > 0 ? "text-green-600" : "text-red-600"}`}>
-                    {data.avgPips > 0 ? "+" : ""}
-                    {data.avgPips} pips
+                  <div>
+                    <div className="text-muted-foreground">平均損失</div>
+                    <div className="font-medium text-red-600">¥{(data.avgLossLoss || 0).toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均利益pips</div>
+                    <div className="font-medium text-green-600">{(data.avgWinPips || 0).toFixed(1)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均損失pips</div>
+                    <div className="font-medium text-red-600">{(data.avgLossPips || 0).toFixed(1)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均利益保有時間</div>
+                    <div className="font-medium text-blue-600">
+                      {(data.avgWinHoldingTime || 0) > 0 ? formatHoldingTime(data.avgWinHoldingTime || 0) : "データなし"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均損失保有時間</div>
+                    <div className="font-medium text-blue-600">
+                      {(data.avgLossHoldingTime || 0) > 0 ? formatHoldingTime(data.avgLossHoldingTime || 0) : "データなし"}
+                    </div>
                   </div>
                 </div>
               </div>
