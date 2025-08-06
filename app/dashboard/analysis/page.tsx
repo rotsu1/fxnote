@@ -746,7 +746,12 @@ function MonthlyBreakdown() {
           trades: 0,
           winRate: 0,
           profit: 0,
-          avgPips: 0
+          avgWinProfit: 0,
+          avgLossLoss: 0,
+          avgWinPips: 0,
+          avgLossPips: 0,
+          avgWinHoldingTime: 0,
+          avgLossHoldingTime: 0
         };
       }
 
@@ -756,15 +761,40 @@ function MonthlyBreakdown() {
         ? ((monthData.win_count || 0) / totalTrades) * 100 
         : 0;
       const profit = (monthData.win_profit || 0) + (monthData.loss_loss || 0);
-      const totalPips = (monthData.win_pips || 0) + (monthData.loss_pips || 0);
-      const avgPips = totalTrades > 0 ? totalPips / totalTrades : 0;
+      const avgWinProfit = (monthData.win_count || 0) > 0 
+        ? (monthData.win_profit || 0) / (monthData.win_count || 0) 
+        : 0;
+      const avgLossLoss = (monthData.loss_count || 0) > 0 
+        ? (monthData.loss_loss || 0) / (monthData.loss_count || 0) 
+        : 0;
+      
+      // Calculate average pips using the new count columns
+      const avgWinPips = (monthData.win_pips_count || 0) > 0 
+        ? (monthData.win_pips || 0) / (monthData.win_pips_count || 0) 
+        : 0;
+      const avgLossPips = (monthData.loss_pips_count || 0) > 0 
+        ? (monthData.loss_pips || 0) / (monthData.loss_pips_count || 0) 
+        : 0;
+      
+      // Calculate average holding time using the new count columns
+      const avgWinHoldingTime = (monthData.win_holding_count || 0) > 0 
+        ? (monthData.win_holding_time || 0) / (monthData.win_holding_count || 0) 
+        : 0;
+      const avgLossHoldingTime = (monthData.loss_holding_count || 0) > 0 
+        ? (monthData.loss_holding_time || 0) / (monthData.loss_holding_count || 0) 
+        : 0;
 
       return {
         month,
         trades: totalTrades,
         winRate: winRate,
         profit: profit,
-        avgPips: avgPips
+        avgWinProfit: avgWinProfit,
+        avgLossLoss: avgLossLoss,
+        avgWinPips: avgWinPips,
+        avgLossPips: avgLossPips,
+        avgWinHoldingTime: avgWinHoldingTime,
+        avgLossHoldingTime: avgLossHoldingTime
       };
     });
 
@@ -848,29 +878,45 @@ function MonthlyBreakdown() {
             <div key={index} className="flex items-center gap-4 p-3 rounded-lg border">
               <div className="w-12 font-medium">{month.month}</div>
 
-              <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <div className="text-muted-foreground">取引数</div>
-                  <div className="font-medium">{month.trades}件</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">勝率</div>
-                  <div className="font-medium">{month.winRate}%</div>
-                </div>
-                <div>
-                  <div className="text-muted-foreground">利益</div>
-                  <div className={`font-medium ${month.profit > 0 ? "text-green-600" : "text-red-600"}`}>
-                    ¥{month.profit.toLocaleString()}
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="text-sm text-muted-foreground">取引数: {month.trades || 0}件</div>
+                  <div className="text-sm text-muted-foreground">勝率: {(month.winRate || 0).toFixed(1)}%</div>
+                  <div className={`text-sm font-medium ${(month.profit || 0) > 0 ? "text-green-600" : "text-red-600"}`}>
+                    総損益: ¥{(month.profit || 0).toLocaleString()}
                   </div>
                 </div>
-                <div>
-                  <div className="text-muted-foreground">平均pips</div>
-                  <div className="font-medium">{month.avgPips} pips</div>
-                </div>
-              </div>
 
-              <div className="w-20">
-                <Progress value={month.winRate} className="h-2" />
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                  <div>
+                    <div className="text-muted-foreground">平均利益</div>
+                    <div className="font-medium text-green-600">¥{(month.avgWinProfit || 0).toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均損失</div>
+                    <div className="font-medium text-red-600">¥{(month.avgLossLoss || 0).toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均利益pips</div>
+                    <div className="font-medium text-green-600">{(month.avgWinPips || 0).toFixed(1)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均損失pips</div>
+                    <div className="font-medium text-red-600">{(month.avgLossPips || 0).toFixed(1)}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均利益保有時間</div>
+                    <div className="font-medium text-blue-600">
+                      {(month.avgWinHoldingTime || 0) > 0 ? formatHoldingTime(month.avgWinHoldingTime || 0) : "データなし"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">平均損失保有時間</div>
+                    <div className="font-medium text-blue-600">
+                      {(month.avgLossHoldingTime || 0) > 0 ? formatHoldingTime(month.avgLossHoldingTime || 0) : "データなし"}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           ))}
