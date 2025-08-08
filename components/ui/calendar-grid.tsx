@@ -45,11 +45,6 @@ export function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { curr
             const tradeCount = (groupedTrades[dateStr] || []).length;
             const colorClass = isCurrentMonth && tradeCount > 0 ? getPLColor(dailyPL) : "";
   
-            // Debug logging
-            if (isCurrentMonth && tradeCount > 0) {
-              console.log(`Date: ${dateStr}, P/L: ${dailyPL}, Color: ${colorClass}`);
-            }
-  
             return (
               <div
                 key={index}

@@ -69,25 +69,18 @@ export function TradeEditDialog({
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     
     // Create datetime strings from defaultDate for entry and exit times
-    const createDateTimeString = (dateStr: string, timeStr: string = "00:00") => {
-      return dateStr ? `${dateStr}T${timeStr}` : "";
+    const createDateTimeString = (dateStr: string) => {
+      return dateStr ? `${dateStr}T00:00` : "";
     };
     
     const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
-    const currentTime = new Date().toTimeString().slice(0, 5); // Get current time in HH:MM format
-    
-    console.log("=== TradeEditDialog Initial State Debug ===");
-    console.log("Initial trade:", trade);
-    console.log("Initial defaultDate:", defaultDate);
-    console.log("defaultDateStr:", defaultDateStr);
-    console.log("currentTime:", currentTime);
     
     const [formData, setFormData] = useState<Partial<Trade>>(
       trade || {
         date: defaultDateStr,
         time: "",
-        entryTime: createDateTimeString(defaultDateStr, currentTime),
-        exitTime: createDateTimeString(defaultDateStr, currentTime),
+        entryTime: createDateTimeString(defaultDateStr),
+        exitTime: createDateTimeString(defaultDateStr),
         pair: "",
         type: "買い",
         entry: undefined,
@@ -121,24 +114,13 @@ export function TradeEditDialog({
     const [loadingSymbols, setLoadingSymbols] = useState(false)
   
     useEffect(() => {
-      console.log("=== TradeEditDialog useEffect Debug ===");
-      console.log("trade:", trade);
-      console.log("defaultDate:", defaultDate);
-      console.log("isOpen:", isOpen);
-      
-      // Create datetime strings from defaultDate for entry and exit times
-      const createDateTimeString = (dateStr: string, timeStr: string = "00:00") => {
-        return dateStr ? `${dateStr}T${timeStr}` : "";
-      };
-      
       const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
-      const currentTime = new Date().toTimeString().slice(0, 5); // Get current time in HH:MM format
       
       const newFormData = trade || {
         date: defaultDateStr,
         time: "",
-        entryTime: createDateTimeString(defaultDateStr, currentTime),
-        exitTime: createDateTimeString(defaultDateStr, currentTime),
+        entryTime: createDateTimeString(defaultDateStr),
+        exitTime: createDateTimeString(defaultDateStr),
         pair: "",
         type: "買い",
         entry: undefined,
@@ -154,11 +136,6 @@ export function TradeEditDialog({
         notes: "",
         tags: [],
       };
-      
-      console.log("Setting formData with date:", newFormData.date);
-      console.log("Setting entryTime:", newFormData.entryTime);
-      console.log("Setting exitTime:", newFormData.exitTime);
-      console.log("Full newFormData:", newFormData);
       
       setFormData(newFormData);
       setHasUnsavedChanges(false);
@@ -303,7 +280,6 @@ export function TradeEditDialog({
         setAvailableTagsList(prev => [...prev, trimmedTagName])
         setNewTag("")
         
-        console.log(`Added new tag to database: ${trimmedTagName}`)
       } catch (error) {
         console.error("Error adding tag to database:", error)
         setTagError("タグの追加に失敗しました")
@@ -333,7 +309,6 @@ export function TradeEditDialog({
         // Remove from local state
         setAvailableTagsList(prev => prev.filter(tag => tag !== tagToDelete))
         
-        console.log(`Deleted tag from database: ${tagToDelete}`)
         setTagToDelete(null)
       } catch (error) {
         console.error("Error deleting tag from database:", error)
@@ -381,7 +356,6 @@ export function TradeEditDialog({
         setAvailableEmotions(prev => [...prev, trimmedEmotionName])
         setNewEmotion("")
         
-        console.log(`Added new emotion to database: ${trimmedEmotionName}`)
       } catch (error) {
         console.error("Error adding emotion to database:", error)
         setEmotionError("感情の追加に失敗しました")
@@ -411,7 +385,6 @@ export function TradeEditDialog({
         // Remove from local state
         setAvailableEmotions(prev => prev.filter(emotion => emotion !== emotionToDelete))
         
-        console.log(`Deleted emotion from database: ${emotionToDelete}`)
         setEmotionToDelete(null)
       } catch (error) {
         console.error("Error deleting emotion from database:", error)
@@ -435,18 +408,13 @@ export function TradeEditDialog({
       // Clear previous validation errors
       setValidationError("")
       
-      console.log("=== TradeEditDialog handleSave Debug ===");
-      console.log("Form data:", formData);
-      
       // Validation: Check if required fields are filled
       if (!formData.pair || !formData.pair.trim()) {
-        console.log("Validation failed: Missing symbol");
         setValidationError("シンボルを選択してください")
         return
       }
       
       if (formData.profit === undefined || formData.profit === null) {
-        console.log("Validation failed: Missing profit");
         setValidationError("損益を入力してください")
         return
       }
@@ -454,7 +422,6 @@ export function TradeEditDialog({
       // Additional validation: Check if profit is a valid number
       const profitValue = Number.parseFloat(String(formData.profit));
       if (isNaN(profitValue)) {
-        console.log("Validation failed: Invalid profit value");
         setValidationError("損益は有効な数値を入力してください")
         return
       }
@@ -465,14 +432,6 @@ export function TradeEditDialog({
       const parsedLot = formData.lot !== undefined && formData.lot !== null ? Number.parseFloat(String(formData.lot)) : 0
       const parsedPips = formData.pips !== undefined && formData.pips !== null ? Number.parseFloat(String(formData.pips)) : 0
       const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
-  
-      console.log("Parsed values:", {
-        entry: parsedEntry,
-        exit: parsedExit,
-        lot: parsedLot,
-        pips: parsedPips,
-        profit: parsedProfit
-      });
   
       // Calculate holding time in seconds from actual entry and exit times
       let holdingTimeInSeconds = 0;
@@ -498,8 +457,6 @@ export function TradeEditDialog({
                               (formData.holdingMinutes || 0) * 60
       }
   
-      console.log("Holding time in seconds:", holdingTimeInSeconds);
-  
       const tradeDataToSave = {
         ...formData,
         entry: parsedEntry,
@@ -509,9 +466,6 @@ export function TradeEditDialog({
         profit: parsedProfit,
         holdingTime: holdingTimeInSeconds,
       };
-  
-      console.log("Trade data to save:", tradeDataToSave);
-      console.log("=== End TradeEditDialog handleSave Debug ===");
   
       onSave(tradeDataToSave)
       setHasUnsavedChanges(false);
@@ -720,7 +674,7 @@ export function TradeEditDialog({
   
             <div>
               <Label>保有時間</Label>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-4 gap-4">
                 <div>
                   <Label htmlFor="holdingDays" className="text-sm text-muted-foreground">日</Label>
                                     <Input
@@ -759,6 +713,20 @@ export function TradeEditDialog({
                     value={formData.holdingMinutes || ""}
                     onChange={(e) => handleFormChange({ 
                       holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
+                    })}
+                    placeholder="0"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="holdingMinutes" className="text-sm text-muted-foreground">秒</Label>
+                  <Input
+                    id="holdingSeconds"
+                    type="number"
+                    min="0"
+                    max="59"
+                    value={formData.holdingSeconds || ""}
+                    onChange={(e) => handleFormChange({ 
+                      holdingSeconds: e.target.value ? parseInt(e.target.value) : undefined 
                     })}
                     placeholder="0"
                   />
