@@ -121,7 +121,7 @@ export function groupTradesByDate(trades: any[]): Record<string, any[]> {
       if (!hasExit) return acc;
       
       // Combine to local date string YYYY-MM-DD
-      const exitDate = new Date(`${trade.exit_date}T${trade.exit_time || '00:00:00'}`);
+      const exitDate = new Date(`${trade.exit_date}T${trade.exit_time || '00:00:00'}Z`);
       const localDate = exitDate.toLocaleDateString('en-CA');
       
       if (!acc[localDate]) acc[localDate] = [];

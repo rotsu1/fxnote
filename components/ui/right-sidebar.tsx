@@ -29,8 +29,8 @@ export function RightSidebar({
   const dailyPL = trades.reduce((sum, trade) => sum + (trade.profit_loss || 0), 0)
 
   const combine = (t: any) => {
-    if (t?.exit_date && t?.exit_time) return new Date(`${t.exit_date}T${t.exit_time}`);
-    if (t?.entry_date && t?.entry_time) return new Date(`${t.entry_date}T${t.entry_time}`);
+    if (t?.exit_date && t?.exit_time) return new Date(`${t.exit_date}T${t.exit_time}Z`);
+    if (t?.entry_date && t?.entry_time) return new Date(`${t.entry_date}T${t.entry_time}Z`);
     if (t?.exit_time) return new Date(t.exit_time);
     if (t?.entry_time) return new Date(t.entry_time);
     if (t?.created_at) return new Date(t.created_at);

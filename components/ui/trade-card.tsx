@@ -34,7 +34,7 @@ export function TradeCard({
 
     const toDisplayDateTime = (d?: string, t?: string) => {
       if (!d || !t) return "";
-      const date = new Date(`${d}T${t}`);
+      const date = new Date(`${d}T${t}Z`);
       return date.toLocaleString('ja-JP', {
         year: 'numeric',
         month: '2-digit',

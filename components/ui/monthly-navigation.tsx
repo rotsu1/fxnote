@@ -9,8 +9,8 @@ export function MonthlyNavigation({ currentDate, onDateChange, trades, onImportC
   const years = Array.from({ length: 21 }, (_, i) => currentYear - 10 + i) // 10 years before and after
 
   const combine = (t: any) => {
-    if (t?.exit_date && t?.exit_time) return new Date(`${t.exit_date}T${t.exit_time}`);
-    if (t?.entry_date && t?.entry_time) return new Date(`${t.entry_date}T${t.entry_time}`);
+    if (t?.exit_date && t?.exit_time) return new Date(`${t.exit_date}T${t.exit_time}Z`);
+    if (t?.entry_date && t?.entry_time) return new Date(`${t.entry_date}T${t.entry_time}Z`);
     if (t?.exit_time) return new Date(t.exit_time);
     if (t?.entry_time) return new Date(t.entry_time);
     if (t?.created_at) return new Date(t.created_at);

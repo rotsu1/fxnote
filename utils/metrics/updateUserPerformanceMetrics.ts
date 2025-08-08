@@ -82,7 +82,7 @@ function extractPeriodValues(exitTime: string | Date): Record<PeriodType, string
  * @param trade - The trade object containing user_id, exit_time, profit_loss, pips, and hold_time
  * @returns Promise<void>
  */
-export async function updateUserPerformanceMetrics(trade: TradeInput): Promise<void> {
+export async function updates(trade: TradeInput): Promise<void> {
   try {
     // Extract period values from exit_time
     const periodValues = extractPeriodValues(trade.exit_time);

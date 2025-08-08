@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { localDateTimeToUTC } from "./timeUtils";
-import { updateUserPerformanceMetrics, updateExistingTradePerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
+import { updates as updateUserPerformanceMetrics, updateExistingTradePerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 interface Trade {
     id: number
@@ -43,6 +43,20 @@ const combineToISO = (dateStr?: string | null, timeStr?: string | null): string 
   return localDateTimeToUTC(local);
 };
 
+const toUTCDateAndTime = (localDateTime?: string): { date: string | null; time: string | null } => {
+  const { date, time } = splitDateTime(localDateTime || "");
+  if (!date || !time) return { date: null, time: null };
+  const utcIso = combineToISO(date, time); // UTC ISO string
+  const d = new Date(utcIso);
+  const yyyy = String(d.getUTCFullYear());
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const HH = String(d.getUTCHours()).padStart(2, '0');
+  const MM = String(d.getUTCMinutes()).padStart(2, '0');
+  const SS = String(d.getUTCSeconds()).padStart(2, '0');
+  return { date: `${yyyy}-${mm}-${dd}`, time: `${HH}:${MM}:${SS}` };
+};
+
 export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, user: any) => {
     if (!user) return;
     
@@ -78,8 +92,8 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         }
       }
 
-      const { date: entry_date, time: entry_time } = splitDateTime(tradeData.entryTime);
-      const { date: exit_date, time: exit_time } = splitDateTime(tradeData.exitTime);
+      const entryUtc = toUTCDateAndTime(tradeData.entryTime);
+      const exitUtc = toUTCDateAndTime(tradeData.exitTime);
 
       if (editingTrade?.id) {
         // Update existing trade
@@ -94,10 +108,10 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
-            entry_date: entry_date,
-            entry_time: entry_time,
-            exit_date: exit_date,
-            exit_time: exit_time,
+            entry_date: entryUtc.date,
+            entry_time: entryUtc.time,
+            exit_date: exitUtc.date,
+            exit_time: exitUtc.time,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingTrade.id)
@@ -184,7 +198,7 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
               }
               emotionId = newEmotion.id;
             } else if (emotionError) {
-              console.error("Error finding emotion:", emotionError);
+              console.error("Error finding emotion:", error);
               continue;
             } else if (emotionData) {
               emotionId = emotionData.id;
@@ -202,22 +216,22 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         // Update performance metrics for the updated trade
         const oldTradeInput: TradeInput = {
           user_id: user.id,
-          exit_time: localDateTimeToUTC(editingTrade.exitTime || ""),
+          exit_time: combineToISO(splitDateTime(editingTrade.exitTime).date, splitDateTime(editingTrade.exitTime).time),
           profit_loss: editingTrade.profit,
           pips: editingTrade.pips,
           hold_time: editingTrade.holdingTime,
           trade_type: editingTrade.type === "買い" ? 0 : 1,
-          entry_time: localDateTimeToUTC(editingTrade.entryTime || ""),
+          entry_time: combineToISO(splitDateTime(editingTrade.entryTime).date, splitDateTime(editingTrade.entryTime).time),
         };
 
         const newTradeInput: TradeInput = {
           user_id: user.id,
-          exit_time: combineToISO(exit_date, exit_time),
+          exit_time: combineToISO(exitUtc.date, exitUtc.time),
           profit_loss: tradeData.profit || 0,
           pips: tradeData.pips || 0,
           hold_time: tradeData.holdingTime || 0,
           trade_type: tradeData.type === "買い" ? 0 : 1,
-          entry_time: combineToISO(entry_date, entry_time),
+          entry_time: combineToISO(entryUtc.date, entryUtc.time),
         };
 
         try {
@@ -245,10 +259,10 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
-            entry_date: entry_date,
-            entry_time: entry_time,
-            exit_date: exit_date,
-            exit_time: exit_time,
+            entry_date: entryUtc.date,
+            entry_time: entryUtc.time,
+            exit_date: exitUtc.date,
+            exit_time: exitUtc.time,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
@@ -324,7 +338,7 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
                 }
                 emotionId = newEmotion.id;
               } else if (emotionError) {
-                console.error("Error finding emotion:", emotionError);
+                console.error("Error finding emotion:", error);
                 continue;
               } else if (emotionData) {
                 emotionId = emotionData.id;
@@ -342,12 +356,12 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
           // Update performance metrics for the new trade
           const tradeInput: TradeInput = {
             user_id: user.id,
-            exit_time: combineToISO(exit_date, exit_time),
+            exit_time: combineToISO(exitUtc.date, exitUtc.time),
             profit_loss: tradeData.profit || 0,
             pips: tradeData.pips || 0,
             hold_time: tradeData.holdingTime || 0,
             trade_type: tradeData.type === "買い" ? 0 : 1,
-            entry_time: combineToISO(entry_date, entry_time),
+            entry_time: combineToISO(entryUtc.date, entryUtc.time),
           };
 
           try {

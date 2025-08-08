@@ -184,19 +184,19 @@ export const COLUMN_MAPPINGS: Record<string, string> = {
 
 export const toLocalDateString = (trade: any): string => {
   if (trade.exit_date && trade.exit_time) {
-    const d = new Date(`${trade.exit_date}T${trade.exit_time}`);
+    const d = new Date(`${trade.exit_date}T${trade.exit_time}Z`);
     return d.toLocaleDateString('en-CA');
   }
   if (trade.entry_date && trade.entry_time) {
-    const d = new Date(`${trade.entry_date}T${trade.entry_time}`);
+    const d = new Date(`${trade.entry_date}T${trade.entry_time}Z`);
     return d.toLocaleDateString('en-CA');
   }
   return '';
 };
 
 export const toComparableDate = (trade: any): number => {
-  if (trade.exit_date && trade.exit_time) return new Date(`${trade.exit_date}T${trade.exit_time}`).getTime();
-  if (trade.entry_date && trade.entry_time) return new Date(`${trade.entry_date}T${trade.entry_time}`).getTime();
+  if (trade.exit_date && trade.exit_time) return new Date(`${trade.exit_date}T${trade.exit_time}Z`).getTime();
+  if (trade.entry_date && trade.entry_time) return new Date(`${trade.entry_date}T${trade.entry_time}Z`).getTime();
   return 0;
 };
 
