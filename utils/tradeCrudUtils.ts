@@ -3,29 +3,7 @@ import { utcToLocalDateTime } from "./timeUtils";
 import { Trade } from "./types";
 import { removeTradeFromPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
-export interface TransformedTrade {
-  id: number;
-  date: string;
-  time: string;
-  entryTime: string;
-  exitTime: string;
-  pair: string;
-  type: "買い" | "売り";
-  entry: number;
-  exit: number;
-  lot: number;
-  pips: number;
-  profit: number;
-  emotion: string[];
-  holdingTime: number;
-  holdingDays: number;
-  holdingHours: number;
-  holdingMinutes: number;
-  notes: string;
-  tags: string[];
-}
-
-export const transformTradeForEditing = (trade: any): TransformedTrade => {
+export const transformTradeForEditing = (trade: any): Trade => {
   const tradeTags = trade.tradeTags || [];
   const tradeEmotions = trade.tradeEmotions || [];
 
@@ -47,6 +25,7 @@ export const transformTradeForEditing = (trade: any): TransformedTrade => {
     holdingDays: trade.hold_time ? Math.floor(trade.hold_time / (24 * 60 * 60)) : 0,
     holdingHours: trade.hold_time ? Math.floor((trade.hold_time % (24 * 60 * 60)) / (60 * 60)) : 0,
     holdingMinutes: trade.hold_time ? Math.floor((trade.hold_time % (60 * 60)) / 60) : 0,
+    holdingSeconds: trade.hold_time ? Math.floor(trade.hold_time % 60) : 0,
     notes: trade.trade_memo || "",
     tags: tradeTags,
   };

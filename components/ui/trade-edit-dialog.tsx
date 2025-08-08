@@ -25,29 +25,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Trade } from "@/utils/types"
 
-interface Trade {
-    id: number
-    date: string
-    time: string
-    entryTime: string
-    exitTime: string
-    pair: string
-    type: "買い" | "売り"
-    lot: number
-    entry: number
-    exit: number
-    pips: number
-    profit: number
-    emotion: string[]
-    holdingTime: number
-    holdingDays?: number
-    holdingHours?: number
-    holdingMinutes?: number
-    holdingSeconds?: number
-    notes?: string
-    tags: string[]
-  }
+
 
 export function TradeEditDialog({
     trade,
@@ -69,8 +49,8 @@ export function TradeEditDialog({
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     
     // Create datetime strings from defaultDate for entry and exit times
-    const createDateTimeString = (dateStr: string) => {
-      return dateStr ? `${dateStr}T00:00` : "";
+    const createDateTimeString = (dateStr: string, timeStr: string = "00:00:00") => {
+      return dateStr ? `${dateStr}T${timeStr}` : "";
     };
     
     const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
@@ -119,8 +99,8 @@ export function TradeEditDialog({
       const newFormData = trade || {
         date: defaultDateStr,
         time: "",
-        entryTime: createDateTimeString(defaultDateStr),
-        exitTime: createDateTimeString(defaultDateStr),
+        entryTime: createDateTimeString(defaultDateStr, "00:00:00"),
+        exitTime: createDateTimeString(defaultDateStr, "00:00:00"),
         pair: "",
         type: "買い",
         entry: undefined,
@@ -133,9 +113,12 @@ export function TradeEditDialog({
         holdingDays: 0,
         holdingHours: 0,
         holdingMinutes: 0,
+        holdingSeconds: 0,
         notes: "",
         tags: [],
       };
+
+      console.log("holdingTime:", newFormData.holdingTime);
       
       setFormData(newFormData);
       setHasUnsavedChanges(false);
@@ -237,12 +220,14 @@ export function TradeEditDialog({
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+        const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
         
         setFormData(prev => ({
           ...prev,
           holdingDays: diffDays,
           holdingHours: diffHours,
-          holdingMinutes: diffMinutes
+          holdingMinutes: diffMinutes,
+          holdingSeconds: diffSeconds
         }));
       }
     }, [formData.entryTime, formData.exitTime])
@@ -451,10 +436,11 @@ export function TradeEditDialog({
           }
         }
       } else {
-        // Fallback to manual calculation if datetime fields are not available
-        holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
-                              (formData.holdingHours || 0) * 60 * 60 + 
-                              (formData.holdingMinutes || 0) * 60
+              // Fallback to manual calculation if datetime fields are not available
+      holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
+                            (formData.holdingHours || 0) * 60 * 60 + 
+                            (formData.holdingMinutes || 0) * 60 +
+                            (formData.holdingSeconds || 0)
       }
   
       const tradeDataToSave = {
