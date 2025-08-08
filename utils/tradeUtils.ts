@@ -24,6 +24,25 @@ interface Trade {
     tags: string[]
 }
 
+const ensureTimeWithSeconds = (t: string): string => {
+  if (!t) return "00:00:00";
+  const [hh = "00", mm = "00", ss] = t.split(":");
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String((ss ?? "00")).padStart(2, "0")}`;
+};
+
+const splitDateTime = (localDateTime?: string): { date: string | null; time: string | null } => {
+  if (!localDateTime) return { date: null, time: null };
+  const [datePart, timePartRaw] = localDateTime.split("T");
+  const timePart = ensureTimeWithSeconds(timePartRaw || "00:00:00");
+  return { date: datePart || null, time: timePart || null };
+};
+
+const combineToISO = (dateStr?: string | null, timeStr?: string | null): string => {
+  if (!dateStr || !timeStr) return new Date().toISOString();
+  const local = `${dateStr}T${ensureTimeWithSeconds(timeStr)}`;
+  return localDateTimeToUTC(local);
+};
+
 export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, user: any) => {
     if (!user) return;
     
@@ -59,6 +78,9 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         }
       }
 
+      const { date: entry_date, time: entry_time } = splitDateTime(tradeData.entryTime);
+      const { date: exit_date, time: exit_time } = splitDateTime(tradeData.exitTime);
+
       if (editingTrade?.id) {
         // Update existing trade
         const { error } = await supabase
@@ -72,16 +94,10 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
-            entry_time: (() => {
-              const result = localDateTimeToUTC(tradeData.entryTime || "");
-              console.log("Update - Entry time conversion:", { input: tradeData.entryTime, output: result });
-              return result;
-            })(),
-            exit_time: (() => {
-              const result = localDateTimeToUTC(tradeData.exitTime || "");
-              console.log("Update - Exit time conversion:", { input: tradeData.exitTime, output: result });
-              return result;
-            })(),
+            entry_date: entry_date,
+            entry_time: entry_time,
+            exit_date: exit_date,
+            exit_time: exit_time,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingTrade.id)
@@ -186,22 +202,22 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         // Update performance metrics for the updated trade
         const oldTradeInput: TradeInput = {
           user_id: user.id,
-          exit_time: editingTrade.exitTime || "",
+          exit_time: localDateTimeToUTC(editingTrade.exitTime || ""),
           profit_loss: editingTrade.profit,
           pips: editingTrade.pips,
           hold_time: editingTrade.holdingTime,
           trade_type: editingTrade.type === "買い" ? 0 : 1,
-          entry_time: editingTrade.entryTime || "",
+          entry_time: localDateTimeToUTC(editingTrade.entryTime || ""),
         };
 
         const newTradeInput: TradeInput = {
           user_id: user.id,
-          exit_time: localDateTimeToUTC(tradeData.exitTime || ""),
+          exit_time: combineToISO(exit_date, exit_time),
           profit_loss: tradeData.profit || 0,
           pips: tradeData.pips || 0,
           hold_time: tradeData.holdingTime || 0,
           trade_type: tradeData.type === "買い" ? 0 : 1,
-          entry_time: localDateTimeToUTC(tradeData.entryTime || ""),
+          entry_time: combineToISO(entry_date, entry_time),
         };
 
         try {
@@ -229,16 +245,10 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
             pips: tradeData.pips,
             profit_loss: tradeData.profit,
             trade_memo: tradeData.notes,
-            entry_time: (() => {
-              const result = localDateTimeToUTC(tradeData.entryTime || "");
-              console.log("Insert - Entry time conversion:", { input: tradeData.entryTime, output: result });
-              return result;
-            })(),
-            exit_time: (() => {
-              const result = localDateTimeToUTC(tradeData.exitTime || "");
-              console.log("Insert - Exit time conversion:", { input: tradeData.exitTime, output: result });
-              return result;
-            })(),
+            entry_date: entry_date,
+            entry_time: entry_time,
+            exit_date: exit_date,
+            exit_time: exit_time,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
@@ -332,12 +342,12 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
           // Update performance metrics for the new trade
           const tradeInput: TradeInput = {
             user_id: user.id,
-            exit_time: localDateTimeToUTC(tradeData.exitTime || ""),
+            exit_time: combineToISO(exit_date, exit_time),
             profit_loss: tradeData.profit || 0,
             pips: tradeData.pips || 0,
             hold_time: tradeData.holdingTime || 0,
             trade_type: tradeData.type === "買い" ? 0 : 1,
-            entry_time: localDateTimeToUTC(tradeData.entryTime || ""),
+            entry_time: combineToISO(entry_date, entry_time),
           };
 
           try {

@@ -31,6 +31,19 @@ export function TradeCard({
     // Use pre-loaded trade data
     const tradeTags = trade.tradeTags || [];
     const tradeEmotions = trade.tradeEmotions || [];
+
+    const toDisplayDateTime = (d?: string, t?: string) => {
+      if (!d || !t) return "";
+      const date = new Date(`${d}T${t}`);
+      return date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    };
   
     return (
       <Card className="mb-3">
@@ -53,26 +66,12 @@ export function TradeCard({
               )}
               {displaySettings.show_entry_time && (
                 <div className="font-medium text-sm">
-                  エントリー: {trade.entry_time ? new Date(trade.entry_time).toLocaleString('ja-JP', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                  }) : trade.time}
+                  エントリー: {toDisplayDateTime(trade.entry_date, trade.entry_time)}
                 </div>
               )}
               {displaySettings.show_exit_time && (
                 <div className="font-medium text-sm">
-                  エグジット: {trade.exit_time ? new Date(trade.exit_time).toLocaleString('ja-JP', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit'
-                  }) : ""}
+                  エグジット: {toDisplayDateTime(trade.exit_date, trade.exit_time)}
                 </div>
               )}
             </div>

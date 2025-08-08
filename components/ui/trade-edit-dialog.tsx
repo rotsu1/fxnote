@@ -55,6 +55,20 @@ export function TradeEditDialog({
     
     const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
     
+    const getDatePart = (dt?: string) => (dt ? dt.split("T")[0] : "");
+    const getTimePart = (dt?: string) => {
+      if (!dt) return "";
+      const part = dt.split("T")[1] || "";
+      if (!part) return "";
+      const [hh = "00", mm = "00", ss = "00"] = part.split(":");
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
+    };
+    const ensureTimeWithSeconds = (t: string) => {
+      if (!t) return "";
+      const [hh = "00", mm = "00", ss] = t.split(":");
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String((ss ?? "00")).padStart(2, "0")}`;
+    };
+    
     const [formData, setFormData] = useState<Partial<Trade>>(
       trade || {
         date: defaultDateStr,
@@ -483,24 +497,56 @@ export function TradeEditDialog({
           <div className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="entryTime">エントリー日時</Label>
-                  <Input
-                    id="entryTime"
-                    type="datetime-local"
-                    step="1"
-                    value={formData.entryTime}
-                    onChange={(e) => handleFormChange({ entryTime: e.target.value })}
-                  />
+                  <Label>エントリー日時</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      id="entryDate"
+                      type="date"
+                      value={getDatePart(formData.entryTime) || ""}
+                      onChange={(e) => {
+                        const date = e.target.value;
+                        const time = ensureTimeWithSeconds(getTimePart(formData.entryTime));
+                        handleFormChange({ entryTime: date ? `${date}T${time}` : "" });
+                      }}
+                    />
+                    <Input
+                      id="entryTime"
+                      type="time"
+                      step="1"
+                      value={getTimePart(formData.entryTime) || ""}
+                      onChange={(e) => {
+                        const time = ensureTimeWithSeconds(e.target.value);
+                        const date = getDatePart(formData.entryTime) || defaultDateStr;
+                        handleFormChange({ entryTime: date ? `${date}T${time}` : "" });
+                      }}
+                    />
+                  </div>
                 </div>
                 <div>
-                  <Label htmlFor="exitTime">エグジット日時</Label>
-                  <Input
-                    id="exitTime"
-                    type="datetime-local"
-                    step="1"
-                    value={formData.exitTime}
-                    onChange={(e) => handleFormChange({ exitTime: e.target.value })}
-                  />
+                  <Label>エグジット日時</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      id="exitDate"
+                      type="date"
+                      value={getDatePart(formData.exitTime) || ""}
+                      onChange={(e) => {
+                        const date = e.target.value;
+                        const time = ensureTimeWithSeconds(getTimePart(formData.exitTime));
+                        handleFormChange({ exitTime: date ? `${date}T${time}` : "" });
+                      }}
+                    />
+                    <Input
+                      id="exitTime"
+                      type="time"
+                      step="1"
+                      value={getTimePart(formData.exitTime) || ""}
+                      onChange={(e) => {
+                        const time = ensureTimeWithSeconds(e.target.value);
+                        const date = getDatePart(formData.exitTime) || defaultDateStr;
+                        handleFormChange({ exitTime: date ? `${date}T${time}` : "" });
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
   

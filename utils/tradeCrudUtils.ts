@@ -7,12 +7,24 @@ export const transformTradeForEditing = (trade: any): Trade => {
   const tradeTags = trade.tradeTags || [];
   const tradeEmotions = trade.tradeEmotions || [];
 
+  // Combine separate date/time into ISO-like local strings for UI
+  const toLocalDateTime = (dateStr?: string, timeStr?: string): string => {
+    if (!dateStr || !timeStr) return "";
+    const ensure = (t: string) => {
+      const [hh = "00", mm = "00", ss] = (t || "00:00:00").split(":");
+      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss ?? "00").padStart(2, "0")}`;
+    };
+    const local = `${dateStr}T${ensure(timeStr)}`;
+    // Store as local string for datetime-local/time inputs
+    return local;
+  };
+
   return {
     id: trade.id,
-    date: trade.entry_time?.split("T")[0] || "",
-    time: trade.entry_time?.split("T")[1]?.slice(0, 5) || "",
-    entryTime: utcToLocalDateTime(trade.entry_time),
-    exitTime: utcToLocalDateTime(trade.exit_time),
+    date: trade.entry_date || "",
+    time: (trade.entry_time || "").slice(0, 5) || "",
+    entryTime: toLocalDateTime(trade.entry_date, trade.entry_time),
+    exitTime: toLocalDateTime(trade.exit_date, trade.exit_time),
     pair: trade.symbol_name || "",
     type: trade.trade_type === 0 ? "買い" : "売り",
     entry: trade.entry_price,
@@ -28,7 +40,7 @@ export const transformTradeForEditing = (trade: any): Trade => {
     holdingSeconds: trade.hold_time ? Math.floor(trade.hold_time % 60) : 0,
     notes: trade.trade_memo || "",
     tags: tradeTags,
-  };
+  } as Trade;
 };
 
 export const deleteTrade = async (tradeId: number, userId: string): Promise<{ success: boolean; error?: string }> => {
@@ -86,12 +98,12 @@ export const deleteTrade = async (tradeId: number, userId: string): Promise<{ su
     if (tradeData) {
       const tradeInput: TradeInput = {
         user_id: tradeData.user_id,
-        exit_time: tradeData.exit_time,
+        exit_time: `${tradeData.exit_date}T${(tradeData.exit_time || "00:00:00")}`,
         profit_loss: tradeData.profit_loss,
         pips: tradeData.pips,
         hold_time: tradeData.hold_time || 0,
         trade_type: tradeData.trade_type,
-        entry_time: tradeData.entry_time,
+        entry_time: `${tradeData.entry_date}T${(tradeData.entry_time || "00:00:00")}`,
       };
 
       try {

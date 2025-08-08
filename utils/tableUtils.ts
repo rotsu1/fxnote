@@ -164,3 +164,44 @@ export function transformTradeData(trade: any, tagsByTradeId: Record<number, str
 
 // Import time formatting functions
 import { formatLocalTime, formatDateTime } from "./timeUtils"; 
+
+export const COLUMN_MAPPINGS: Record<string, string> = {
+  id: 'id',
+  date: 'entry_date',
+  time: 'entry_time',
+  entryTime: 'entry_time',
+  exitTime: 'exit_time',
+  pair: 'symbol',
+  type: 'trade_type',
+  lot: 'lot_size',
+  entry: 'entry_price',
+  exit: 'exit_price',
+  pips: 'pips',
+  profit: 'profit_loss',
+  emotion: 'emotions',
+  notes: 'trade_memo',
+};
+
+export const toLocalDateString = (trade: any): string => {
+  if (trade.exit_date && trade.exit_time) {
+    const d = new Date(`${trade.exit_date}T${trade.exit_time}`);
+    return d.toLocaleDateString('en-CA');
+  }
+  if (trade.entry_date && trade.entry_time) {
+    const d = new Date(`${trade.entry_date}T${trade.entry_time}`);
+    return d.toLocaleDateString('en-CA');
+  }
+  return '';
+};
+
+export const toComparableDate = (trade: any): number => {
+  if (trade.exit_date && trade.exit_time) return new Date(`${trade.exit_date}T${trade.exit_time}`).getTime();
+  if (trade.entry_date && trade.entry_time) return new Date(`${trade.entry_date}T${trade.entry_time}`).getTime();
+  return 0;
+};
+
+export const formatDateTimeForCell = (dateStr?: string, timeStr?: string): string => {
+  if (!dateStr || !timeStr) return '';
+  const d = new Date(`${dateStr}T${timeStr}`);
+  return d.toLocaleString('ja-JP', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}; 

@@ -28,6 +28,15 @@ export function RightSidebar({
 
   const dailyPL = trades.reduce((sum, trade) => sum + (trade.profit_loss || 0), 0)
 
+  const combine = (t: any) => {
+    if (t?.exit_date && t?.exit_time) return new Date(`${t.exit_date}T${t.exit_time}`);
+    if (t?.entry_date && t?.entry_time) return new Date(`${t.entry_date}T${t.entry_time}`);
+    if (t?.exit_time) return new Date(t.exit_time);
+    if (t?.entry_time) return new Date(t.entry_time);
+    if (t?.created_at) return new Date(t.created_at);
+    return new Date(0);
+  };
+
   return (
     <>
       {/* Overlay */}
@@ -75,12 +84,7 @@ export function RightSidebar({
         <div className="p-4">
           <h4 className="font-medium mb-3">取引履歴</h4>
           {trades
-            .sort((a, b) => {
-              // Sort by exit_time (earliest first), then by entry_time, then by created_at
-              const aTime = a.exit_time || a.entry_time || a.created_at;
-              const bTime = b.exit_time || b.entry_time || b.created_at;
-              return new Date(aTime).getTime() - new Date(bTime).getTime();
-            })
+            .sort((a, b) => combine(a).getTime() - combine(b).getTime())
             .map((trade) => (
               <TradeCard key={trade.id} trade={trade} onEdit={onEditTrade} onDelete={onDeleteTrade} displaySettings={displaySettings} />
             ))}
