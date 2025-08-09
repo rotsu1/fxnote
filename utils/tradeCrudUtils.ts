@@ -95,7 +95,6 @@ export const deleteTrade = async (tradeId: number, userId: string): Promise<{ su
       // no-op
     }
 
-    console.log("Trade deleted successfully");
     return { success: true };
   } catch (error) {
     console.error("Error deleting trade:", error);

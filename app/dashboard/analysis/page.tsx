@@ -379,10 +379,7 @@ function TimeAnalysis() {
   ];
 
   useEffect(() => {
-    console.log('TimeAnalysis: useEffect triggered with user:', user?.id);
-    
     if (!user) {
-      console.log('TimeAnalysis: No user, returning early');
       return;
     }
     
@@ -403,15 +400,6 @@ function TimeAnalysis() {
     const startFetchYmd = toYmd(startFetch);
     const endFetchYmd = toYmd(endFetch);
     
-    console.log('TimeAnalysis: Fetching trades for period:', {
-      selectedYear,
-      selectedMonth,
-      fetchStartDate: startFetchYmd,
-      fetchEndDate: endFetchYmd,
-      localStart: startDate.toString(),
-      localEnd: endDate.toString()
-    });
-    
     // Fetch trades around the selected month using entry_date
     supabase
       .from("trades")
@@ -420,7 +408,6 @@ function TimeAnalysis() {
       .gte("entry_date", startFetchYmd)
       .lte("entry_date", endFetchYmd)
       .then(({ data, error }) => {
-        console.log('TimeAnalysis: Supabase response:', { data, error, dataLength: data?.length });
         
         if (error) {
           console.error('TimeAnalysis: Error fetching trades:', error);
@@ -560,7 +547,6 @@ function TimeAnalysis() {
           };
         });
         
-        console.log('TimeAnalysis: Processed data:', processedData);
         setTimeData(processedData);
         setLoading(false);
       });
@@ -610,8 +596,6 @@ function TimeAnalysis() {
       </Card>
     );
   }
-
-  console.log('TimeAnalysis: Rendering with timeData:', timeData);
 
   if (!timeData || timeData.length === 0) {
     return (

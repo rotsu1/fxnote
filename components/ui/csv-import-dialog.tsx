@@ -40,12 +40,7 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
       try {
         // Here you would typically send this data to your backend
         // For now, we'll just simulate a submission
-        console.log("Custom broker request:", {
-          brokerName: customBrokerName,
-          email: customBrokerEmail,
-          csvFile: customBrokerCSV.name
-        });
-  
+        
         // Reset form
         setCustomBrokerName("");
         setCustomBrokerEmail("");

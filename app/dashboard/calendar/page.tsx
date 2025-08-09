@@ -142,7 +142,6 @@ export default function CalendarPage() {
     try {
       const transformedTrade = transformTradeForEditing(trade);
       
-      console.log("Transformed trade for editing:", transformedTrade);
       setTradeData(prev => ({ ...prev, editingTrade: transformedTrade }));
       setDialogs(prev => ({ ...prev, isTradeDialogOpen: true }));
     } catch (error) {
@@ -190,7 +189,6 @@ export default function CalendarPage() {
       if (result.success) {
         // Refresh the trades data
         await loadTrades();
-        console.log("Trade deleted successfully");
       } else {
         setStatus(prev => ({ ...prev, error: result.error || "取引の削除中にエラーが発生しました" }));
       }
@@ -211,7 +209,6 @@ export default function CalendarPage() {
       if (success) {
         // Update local state
         setDisplaySettings(settings);
-        console.log("Display settings saved successfully");
       }
     } catch (error) {
       console.error("Error saving display settings:", error);

@@ -355,10 +355,7 @@ export default function TablePage() {
     const value = cellEditingState.editingValues[cellKey];
     const originalValue = cellEditingState.originalValues[cellKey];
     
-    console.log('handleCellSave called:', { id, field, value, cellKey });
-    
     if (value === undefined) {
-      console.log('Value is undefined, returning early');
       return;
     }
     
@@ -428,7 +425,6 @@ export default function TablePage() {
     
     // If changes were made, save them
     if (result.shouldSave) {
-      console.log('Changes detected, calling handleCellSave');
       setStatus({ ...status, isSaving: true });
       handleCellSave(cellEditingState.editingCell!.id, cellEditingState.editingCell!.field);
     }
@@ -451,7 +447,6 @@ export default function TablePage() {
         const container = document.querySelector(containerSelector);
         
         if (container && !container.contains(target)) {
-          console.log(`Global click detected outside ${cellEditingState.editingCell.field} container`);
           // Clear any existing timeout
           if (timeoutId) {
             clearTimeout(timeoutId);

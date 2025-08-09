@@ -1,11 +1,8 @@
 // Helper to convert local datetime string to UTC ISO string
 export function localDateTimeToUTC(localDateTimeString: string): string {
     if (!localDateTimeString || localDateTimeString.trim() === "") {
-      console.log("localDateTimeToUTC: Empty input, using current time");
       return new Date().toISOString();
     }
-    
-    console.log("localDateTimeToUTC: Input:", localDateTimeString);
     
     // Create a date object from the local datetime string
     const date = new Date(localDateTimeString);
@@ -17,7 +14,6 @@ export function localDateTimeToUTC(localDateTimeString: string): string {
     }
     
     const result = date.toISOString();
-    console.log("localDateTimeToUTC: Output:", result);
     return result;
 }
 

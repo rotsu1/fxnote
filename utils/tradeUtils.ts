@@ -134,6 +134,7 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         entry_time: entryTimeVal,
         exit_date: exitDateVal,
         exit_time: exitTimeVal,
+        hold_time: tradeData.holdingTime,
       } as const;
 
       if (editingTrade?.id) {

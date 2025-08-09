@@ -145,16 +145,12 @@ async function getOrCreateSymbol(symbolName: string): Promise<string> {
 
 // Main execution function for File object (for use in browser)
 export async function importHiroseTradesFromFile(file: File, userId: string): Promise<{ successCount: number; errorCount: number }> {
-  console.log('=== Hirose Trade Import Tool (Browser) ===');
-  console.log(`CSV File: ${file.name}`);
-  console.log(`User ID: ${userId}`);
   
   try {
     let text = await file.text();
     
     // Try to handle potential encoding issues
     if (text.includes('') || text.includes('')) {
-      console.log('Detected encoding issues, trying to fix...');
       
       // Try reading as ArrayBuffer and decode with different encodings
       const arrayBuffer = await file.arrayBuffer();
@@ -163,29 +159,21 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
       try {
         const decoder = new TextDecoder('shift-jis');
         text = decoder.decode(arrayBuffer);
-        console.log('Successfully decoded with Shift_JIS');
       } catch (e) {
-        console.log('Shift_JIS failed, trying UTF-8...');
         try {
           const decoder = new TextDecoder('utf-8');
           text = decoder.decode(arrayBuffer);
-          console.log('Successfully decoded with UTF-8');
         } catch (e2) {
-          console.log('UTF-8 failed, using original text');
         }
       }
     }
     
     const lines = text.split('\n');
     
-    console.log('CSV file content preview:');
-    console.log('First 5 lines:', lines.slice(0, 5));
-    console.log('Total lines:', lines.length);
     
     // Find the header row (skip any metadata rows)
     let headerIndex = -1;
     for (let i = 0; i < Math.min(lines.length, 10); i++) {
-      console.log(`Line ${i}: "${lines[i]}"`);
       
       // Try multiple ways to detect the header
       const line = lines[i];
@@ -196,7 +184,6 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
         (line.includes(',') && line.split(',').length >= 17) // Look for row with many columns
       ) {
         headerIndex = i;
-        console.log(`Found header at line ${i}`);
         break;
       }
     }
@@ -210,12 +197,10 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
     }
     
     const headers = lines[headerIndex].split(',').map(h => h.trim());
-    console.log(`Found headers at line ${headerIndex + 1}:`, headers);
     
     // Skip header row and empty lines
     const dataRows = lines.slice(headerIndex + 1).filter(line => line.trim());
     
-    console.log(`Processing ${dataRows.length} trade records...`);
     
     let successCount = 0;
     let errorCount = 0;
@@ -254,7 +239,6 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
         
         // Skip rows with empty essential data
         if (!trade.通貨ペア || !trade.売買損益 || !trade.新規約定日時 || !trade.決済約定日時) {
-          console.log(`Skipping row ${i + 1}: Missing essential data`);
           continue;
         }
         
@@ -320,7 +304,7 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
           });
           
           if (successCount % 10 === 0) {
-            console.log(`Processed ${successCount} trades successfully...`);
+            // noop milestone log removed
           }
         }
         
@@ -333,10 +317,6 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
     // Update performance metrics for all imported trades
     // performance metrics removed
     
-    console.log(`\n=== Parsing Complete ===`);
-    console.log(`Successfully processed: ${successCount} trades`);
-    console.log(`Errors: ${errorCount} trades`);
-    console.log(`Total rows processed: ${dataRows.length}`);
     
     return { successCount, errorCount };
     

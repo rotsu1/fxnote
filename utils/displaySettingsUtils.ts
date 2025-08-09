@@ -132,7 +132,6 @@ export const saveDisplaySettings = async (userId: string, settings: DisplaySetti
       }
     }
     
-    console.log("Display settings saved successfully");
     return true;
   } catch (error) {
     console.error("Error saving display settings:", error);

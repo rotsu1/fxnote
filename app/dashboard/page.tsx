@@ -160,8 +160,6 @@ function PLSummaryCards() {
       </div>
     );
   }
-
-  console.log("plSummary values for display:", plSummary);
   const summaryData = [
     { 
       title: "今日の損益", 

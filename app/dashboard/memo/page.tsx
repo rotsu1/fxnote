@@ -331,8 +331,7 @@ export default function MemoPage() {
           ...note,
           note_date: note.note_date ? new Date(note.note_date) : null
         })) || [];
-
-        console.log("Notes:", processedNotes);
+ 
         setMemos(processedNotes);
       } catch (error: any) {
         console.error("Error fetching notes:", error);

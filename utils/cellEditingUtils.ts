@@ -191,7 +191,6 @@ export const handleCellBlurLogic = (
   currentEditingState: CellEditingState,
   isSaving: boolean
 ): CellBlurResult => {
-  console.log('handleCellBlurLogic called, editingCell:', currentEditingState.editingCell)
   
   if (!currentEditingState.editingCell || isSaving) {
     return { shouldSave: false, newEditingState: {} }
@@ -200,8 +199,6 @@ export const handleCellBlurLogic = (
   const cellKey = `${currentEditingState.editingCell.id}-${currentEditingState.editingCell.field}`
   const currentValue = currentEditingState.editingValues[cellKey]
   const originalValue = currentEditingState.originalValues[cellKey]
-  
-  console.log('Blur values:', { cellKey, currentValue, originalValue })
   
   // Check if values are equal (handle arrays properly)
   let valuesEqual = false
@@ -227,10 +224,8 @@ export const handleCellBlurLogic = (
   
   // If changes were made, save them
   if (!valuesEqual) {
-    console.log('Changes detected, should save')
     return { shouldSave: true, newEditingState }
   }
   
-  console.log('No changes detected')
   return { shouldSave: false, newEditingState }
 } 

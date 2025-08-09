@@ -23,10 +23,7 @@ export interface CellSaveOptions {
 export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveResult> => {
   const { id, field, value, originalValue, user } = options
   
-  console.log('saveCellValue called:', { id, field, value })
-  
   if (value === undefined) {
-    console.log('Value is undefined, returning early')
     return { success: false, error: 'Value is undefined' }
   }
   
@@ -48,19 +45,13 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     valuesEqual = processedValue === originalValue
   }
   
-  console.log('Value comparison:', { processedValue, originalValue, valuesEqual })
-  
   if (valuesEqual) {
-    console.log('No changes detected')
     return { success: true }
   }
-  
-  console.log('Starting database save for field:', field)
   
   try {
     // Handle special cases that need complex updates
     if (field === 'tags' || field === 'emotion') {
-      console.log('Calling handleSpecialFieldUpdate for:', field, 'with value:', processedValue)
       await handleSpecialFieldUpdate(id, field, processedValue, user)
       return { success: true, displayValue: value }
     } else if (field === 'pair') {
@@ -143,7 +134,6 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
  * Handles special field updates for tags and emotions
  */
 const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: any, user: any) => {
-  console.log('handleSpecialFieldUpdate called:', { id, field, value })
   
   if (field === 'tags') {
     // Delete existing tags
@@ -191,10 +181,7 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
       }
     }
   } else if (field === 'emotion') {
-    console.log('Processing emotion field with value:', value)
-    
     // Delete existing emotions
-    console.log('Deleting existing emotion links for trade_id:', id)
     const { error: deleteError } = await supabase
       .from("trade_emotion_links")
       .delete()
@@ -204,13 +191,10 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
       console.error('Error deleting existing emotions:', deleteError)
       throw deleteError
     }
-    console.log('Successfully deleted existing emotion links')
     
     // Add new emotions
     if (Array.isArray(value) && value.length > 0) {
-      console.log('Adding new emotions:', value)
       for (const emotionName of value) {
-        console.log('Processing emotion:', emotionName)
         
         // Get or create emotion
         let { data: emotionData, error: emotionError } = await supabase
@@ -222,7 +206,6 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
         
         let emotionId = null
         if (emotionError && emotionError.code === 'PGRST116') {
-          console.log('Emotion not found, creating new emotion:', emotionName)
           // Emotion doesn't exist, create it
           const { data: newEmotion, error: createEmotionError } = await supabase
             .from("emotions")
@@ -235,17 +218,14 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
             continue
           }
           emotionId = newEmotion.id
-          console.log('Created new emotion with ID:', emotionId)
         } else if (emotionError) {
           console.error("Error finding emotion:", emotionError)
           continue
         } else if (emotionData) {
           emotionId = emotionData.id
-          console.log('Found existing emotion with ID:', emotionId)
         }
         
         if (emotionId) {
-          console.log('Creating emotion link for trade_id:', id, 'emotion_id:', emotionId)
           // Create link
           const { error: linkError } = await supabase
             .from("trade_emotion_links")
@@ -255,7 +235,6 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
             console.error('Error creating emotion link:', linkError)
             throw linkError
           }
-          console.log('Successfully created emotion link')
         }
       }
     }

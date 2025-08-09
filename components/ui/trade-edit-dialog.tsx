@@ -88,10 +88,10 @@ export function TradeEditDialog({
             pips: undefined,
             profit: undefined,
             emotion: [],
-            holdingTime: 0,
-            holdingDays: 0,
-            holdingHours: 0,
-            holdingMinutes: 0,
+            holdingTime: undefined,
+            holdingDays: undefined,
+            holdingHours: undefined,
+            holdingMinutes: undefined,
             notes: "",
             tags: [],
           },
@@ -138,11 +138,11 @@ export function TradeEditDialog({
             pips: undefined,
             profit: undefined,
             emotion: [],
-            holdingTime: 0,
-            holdingDays: 0,
-            holdingHours: 0,
-            holdingMinutes: 0,
-            holdingSeconds: 0,
+            holdingTime: undefined,
+            holdingDays: undefined,
+            holdingHours: undefined,
+            holdingMinutes: undefined,
+            holdingSeconds: undefined,
             notes: "",
             tags: [],
           };
@@ -451,37 +451,39 @@ export function TradeEditDialog({
       const parsedLot = parseNullableNumber(formData.lot)
       const parsedPips = parseNullableNumber(formData.pips)
       const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
-  
-      // Calculate holding time in seconds from actual entry and exit times
-      let holdingTimeInSeconds = 0;
-      
+ 
+      // Build combined datetime strings once so they are available for both save and calculations
       const entryCombined = formData.entryDate && formData.entryTime
         ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
         : "";
       const exitCombined = formData.exitDate && formData.exitTime
         ? `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`
         : "";
-      
-      if (entryCombined && exitCombined) {
-        const entryDate = new Date(entryCombined);
-        const exitDate = new Date(exitCombined);
-        
-        // Check if dates are valid
-        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
-          const timeDiff = exitDate.getTime() - entryDate.getTime();
-          holdingTimeInSeconds = Math.floor(timeDiff / 1000); // Convert milliseconds to seconds
-          
-          // Ensure positive value
-          if (holdingTimeInSeconds < 0) {
-            holdingTimeInSeconds = 0;
+
+      // Calculate holding time in seconds. If any manual holding input is provided, use it. Otherwise, use entry/exit datetime difference if available.
+      let holdingTimeInSeconds = 0;
+      const hasManualHoldingInput = (
+        formData.holdingDays !== undefined ||
+        formData.holdingHours !== undefined ||
+        formData.holdingMinutes !== undefined ||
+        formData.holdingSeconds !== undefined
+      );
+
+      if (hasManualHoldingInput) {
+        const d = formData.holdingDays ?? 0;
+        const h = formData.holdingHours ?? 0;
+        const m = formData.holdingMinutes ?? 0;
+        const s = formData.holdingSeconds ?? 0;
+        holdingTimeInSeconds = d * 24 * 60 * 60 + h * 60 * 60 + m * 60 + s;
+      } else {
+        if (entryCombined && exitCombined) {
+          const entryDate = new Date(entryCombined);
+          const exitDate = new Date(exitCombined);
+          if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
+            const timeDiff = exitDate.getTime() - entryDate.getTime();
+            holdingTimeInSeconds = Math.max(0, Math.floor(timeDiff / 1000));
           }
         }
-      } else {
-        // Fallback to manual calculation if datetime fields are not available
-        holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
-                              (formData.holdingHours || 0) * 60 * 60 + 
-                              (formData.holdingMinutes || 0) * 60 +
-                              (formData.holdingSeconds || 0)
       }
   
       const tradeDataToSave: any = {
@@ -627,7 +629,13 @@ export function TradeEditDialog({
                   type="number"
                     step="0.0001"
                   value={formData.entry ?? ""}
-                    onChange={(e) => handleFormChange({ entry: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ entry: undefined }); return }
+                      const n = Number.parseFloat(v)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ entry: n })
+                    }}
                     className="no-spinner"
                 />
               </div>
@@ -638,7 +646,13 @@ export function TradeEditDialog({
                   type="number"
                     step="0.0001"
                   value={formData.exit ?? ""}
-                    onChange={(e) => handleFormChange({ exit: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ exit: undefined }); return }
+                      const n = Number.parseFloat(v)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ exit: n })
+                    }}
                     className="no-spinner"
                 />
               </div>
@@ -652,7 +666,13 @@ export function TradeEditDialog({
                   type="number"
                   step="0.01"
                   value={formData.lot ?? ""}
-                  onChange={(e) => handleFormChange({ lot: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === "") { handleFormChange({ lot: undefined }); return }
+                    const n = Number.parseFloat(v)
+                    if (Number.isNaN(n)) return
+                    handleFormChange({ lot: n })
+                  }}
                   placeholder="0.01"
                   className="no-spinner"
                 />
@@ -664,7 +684,13 @@ export function TradeEditDialog({
                   type="number"
                   step="0.1"
                   value={formData.pips ?? ""}
-                  onChange={(e) => handleFormChange({ pips: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    if (v === "") { handleFormChange({ pips: undefined }); return }
+                    const n = Number.parseFloat(v)
+                    if (Number.isNaN(n)) return
+                    handleFormChange({ pips: n })
+                  }}
                   className="no-spinner"
                 />
               </div>
@@ -677,7 +703,13 @@ export function TradeEditDialog({
                     id="profit"
                     type="number"
                     value={formData.profit ?? ""}
-                    onChange={(e) => handleFormChange({ profit: Number.parseFloat(e.target.value) })}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ profit: undefined }); return }
+                      const n = Number.parseFloat(v)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ profit: n })
+                    }}
                     className="no-spinner"
                 />
               </div>
@@ -741,10 +773,14 @@ export function TradeEditDialog({
                     type="number"
                     min="0"
                     max="365"
-                    value={formData.holdingDays || ""}
-                    onChange={(e) => handleFormChange({ 
-                      holdingDays: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
+                    value={formData.holdingDays ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ holdingDays: undefined }); return }
+                      const n = Number.parseInt(v, 10)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ holdingDays: n })
+                    }}
                     placeholder="0"
                   />
                 </div>
@@ -755,10 +791,14 @@ export function TradeEditDialog({
                     type="number"
                     min="0"
                     max="23"
-                    value={formData.holdingHours || ""}
-                    onChange={(e) => handleFormChange({ 
-                      holdingHours: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
+                    value={formData.holdingHours ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ holdingHours: undefined }); return }
+                      const n = Number.parseInt(v, 10)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ holdingHours: n })
+                    }}
                     placeholder="0"
                   />
                 </div>
@@ -769,10 +809,14 @@ export function TradeEditDialog({
                     type="number"
                     min="0"
                     max="59"
-                    value={formData.holdingMinutes || ""}
-                    onChange={(e) => handleFormChange({ 
-                      holdingMinutes: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
+                    value={formData.holdingMinutes ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ holdingMinutes: undefined }); return }
+                      const n = Number.parseInt(v, 10)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ holdingMinutes: n })
+                    }}
                     placeholder="0"
                   />
                 </div>
@@ -783,10 +827,14 @@ export function TradeEditDialog({
                     type="number"
                     min="0"
                     max="59"
-                    value={formData.holdingSeconds || ""}
-                    onChange={(e) => handleFormChange({ 
-                      holdingSeconds: e.target.value ? parseInt(e.target.value) : undefined 
-                    })}
+                    value={formData.holdingSeconds ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value
+                      if (v === "") { handleFormChange({ holdingSeconds: undefined }); return }
+                      const n = Number.parseInt(v, 10)
+                      if (Number.isNaN(n)) return
+                      handleFormChange({ holdingSeconds: n })
+                    }}
                     placeholder="0"
                   />
                 </div>
