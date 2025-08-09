@@ -1,6 +1,7 @@
 import { Trade } from "./types"
 import { validateCellValue, mapFieldToDatabase } from "./tableUtils"
 import { supabase } from "@/lib/supabaseClient"
+import { localDateTimeToUTC } from "./timeUtils"
 
 export interface CellSaveResult {
   success: boolean
@@ -29,7 +30,7 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     return { success: false, error: 'Value is undefined' }
   }
   
-  // For datetime-local fields, keep as-is (YYYY-MM-DDTHH:MM:SS)
+  // For datetime-local fields, keep as-is (YYYY-MM-DDTHH:MM:SS) or date-only
   let processedValue = value
   
   // Validate the value
@@ -66,19 +67,39 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
       await handleSymbolUpdate(id, processedValue, user)
       return { success: true, displayValue: value }
     } else if (field === 'entryTime' || field === 'exitTime') {
-      // Split datetime-local into date and time parts
+      // Split datetime-local into date and time parts (allow date-only)
       const str = String(processedValue)
-      const [datePart, timePartRaw] = str.includes('T') ? str.split('T') : [str.split(' ')[0], str.split(' ')[1]]
+      const hasT = str.includes('T')
+      const [datePartRaw, timePartRawMaybe] = hasT ? str.split('T') : [str, '']
+      const datePart = datePartRaw && datePartRaw.includes('-') ? datePartRaw : ''
+      const timePartRaw = (hasT ? timePartRawMaybe : '') || ''
       const timePart = timePartRaw?.length === 5 ? `${timePartRaw}:00` : (timePartRaw || null)
 
-      // Require both parts to be present
-      if (!datePart || !timePart) {
-        return { success: false, error: '日付と時間を両方入力してください' }
+      // Require date; time may be null
+      if (!datePart) {
+        return { success: false, error: '日付を入力してください' }
+      }
+
+      // Convert to UTC date/time parts if time is provided; else set UTC time null and keep date as-is
+      let utcDate = datePart
+      let utcTime: string | null = null
+      if (timePart) {
+        const localCombined = `${datePart}T${timePart}`
+        const utcIso = localDateTimeToUTC(localCombined)
+        const d = new Date(utcIso)
+        const yyyy = String(d.getUTCFullYear())
+        const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+        const dd = String(d.getUTCDate()).padStart(2, '0')
+        const HH = String(d.getUTCHours()).padStart(2, '0')
+        const MM = String(d.getUTCMinutes()).padStart(2, '0')
+        const SS = String(d.getUTCSeconds()).padStart(2, '0')
+        utcDate = `${yyyy}-${mm}-${dd}`
+        utcTime = `${HH}:${MM}:${SS}`
       }
 
       const updatePayload: Record<string, any> = field === 'entryTime'
-        ? { entry_date: datePart, entry_time: timePart }
-        : { exit_date: datePart, exit_time: timePart }
+        ? { entry_date: utcDate, entry_time: utcTime }
+        : { exit_date: utcDate, exit_time: utcTime }
 
       const { error } = await supabase
         .from("trades")
@@ -88,7 +109,8 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
       
       if (error) throw error
 
-      const displayValue = `${datePart} ${timePart ? timePart.substring(0,8) : ''}`
+      // For display: return local formatted string (date and optional time)
+      const displayValue = timePart ? `${datePart} ${timePart.substring(0,8)}` : `${datePart}`
       return { success: true, displayValue }
     } else {
       // Handle regular field updates

@@ -919,10 +919,11 @@ export default function TablePage() {
                                             {(() => {
                                               const strVal = String(value || "");
                                               const hasT = strVal.includes("T");
-                                              const datePart = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
+                                              const rawDate = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
                                               let timePart = hasT ? strVal.split("T")[1] : (strVal.split(" ")[1] || "");
-                                              // Normalize time to HH:MM:SS
+                                              // Normalize time to HH:MM:SS only if present
                                               if (timePart && timePart.length === 5) timePart = `${timePart}:00`;
+                                              const datePart = rawDate || trade.date || "";
                                               return (
                                                 <>
                                                   <Input
@@ -930,7 +931,8 @@ export default function TablePage() {
                                                     value={datePart}
                                                     onChange={(e) => {
                                                       const newDate = e.target.value;
-                                                      const combined = newDate ? `${newDate}T${timePart || "00:00:00"}` : '';
+                                                      // If time missing, keep date-only; do not force 00:00:00
+                                                      const combined = newDate ? (timePart ? `${newDate}T${timePart}` : `${newDate}`) : '';
                                                       handleCellChange(trade.id, column.id as keyof Trade, combined);
                                                     }}
                                                     onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
@@ -942,10 +944,12 @@ export default function TablePage() {
                                                     type="time"
                                                     step="1"
                                                     value={timePart || ""}
+                                                    placeholder="--:--:--"
                                                     onChange={(e) => {
                                                       let newTime = e.target.value;
                                                       if (newTime && newTime.length === 5) newTime = `${newTime}:00`;
-                                                      const combined = datePart ? `${datePart}T${newTime || "00:00:00"}` : `T${newTime || "00:00:00"}`;
+                                                      const usedDate = datePart || trade.date || "";
+                                                      const combined = usedDate ? `${usedDate}T${newTime || ""}` : '';
                                                       handleCellChange(trade.id, column.id as keyof Trade, combined);
                                                     }}
                                                     onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
@@ -1163,9 +1167,10 @@ export default function TablePage() {
                                             (() => {
                                               const strVal = String(trade[column.id as keyof Trade] || "");
                                               const hasT = strVal.includes("T");
-                                              const datePart = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
+                                              const rawDate = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
                                               let timePart = hasT ? strVal.split("T")[1] : (strVal.split(" ")[1] || "");
                                               if (timePart && timePart.length === 5) timePart = `${timePart}:00`;
+                                              const datePart = rawDate || trade.date || "";
                                               return (
                                                 <span className="block min-h-[24px] py-1 flex-1 truncate">
                                                   {datePart}{timePart ? ` ${timePart.substring(0,8)}` : ''}
