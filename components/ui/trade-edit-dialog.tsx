@@ -1048,15 +1048,15 @@ export function TradeEditDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>タグを削除しますか？</AlertDialogTitle>
               <AlertDialogDescription>
-                <p className="mb-2">
+                <span className="mb-2 block">
                   <strong>「{tagToDelete}」</strong> タグを削除しようとしています。
-                </p>
-                <p className="text-red-600">
+                </span>
+                <span className="text-red-600 block">
                   ⚠️ このタグは、このタグを使用しているすべての取引から削除されます。
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
+                </span>
+                <span className="text-sm text-muted-foreground mt-2 block">
                   この操作は取り消すことができません。
-                </p>
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1077,15 +1077,15 @@ export function TradeEditDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>感情を削除しますか？</AlertDialogTitle>
               <AlertDialogDescription>
-                <p className="mb-2">
+                <span className="mb-2 block">
                   <strong>「{emotionToDelete}」</strong> 感情を削除しようとしています。
-                </p>
-                <p className="text-red-600">
+                </span>
+                <span className="text-red-600 block">
                   ⚠️ この感情は、この感情を使用しているすべての取引から削除されます。
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
+                </span>
+                <span className="text-sm text-muted-foreground mt-2 block">
                   この操作は取り消すことができません。
-                </p>
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1106,15 +1106,15 @@ export function TradeEditDialog({
             <AlertDialogHeader>
               <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
               <AlertDialogDescription>
-                <p className="mb-2">
+                <span className="mb-2 block">
                   保存されていない変更があります。
-                </p>
-                <p className="text-red-600">
+                </span>
+                <span className="text-red-600 block">
                   ⚠️ 現在入力されているデータは破棄されます。
-                </p>
-                <p className="text-sm text-muted-foreground mt-2">
+                </span>
+                <span className="text-sm text-muted-foreground mt-2 block">
                   この操作は取り消すことができません。
-                </p>
+                </span>
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
