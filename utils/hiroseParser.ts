@@ -34,8 +34,10 @@ interface DatabaseTrade {
   exit_price: number;
   lot_size: number;
   trade_type: number; // 0 for buy, 1 for sell
-  entry_time: string;
-  exit_time: string;
+  entry_date: string; // UTC YYYY-MM-DD
+  entry_time: string; // UTC HH:MM:SS
+  exit_date: string;  // UTC YYYY-MM-DD
+  exit_time: string;  // UTC HH:MM:SS
   profit_loss: number;
   pips: number;
   trade_memo: string;
@@ -72,15 +74,23 @@ function parseJapaneseDateTime(dateTimeStr: string): string {
     }
   }
   
-  // Convert Japan time (JST = UTC+9) to UTC
-  // Create a Date object with the Japan time values, but treat it as UTC
-  // Then subtract 9 hours to get the actual UTC time
+  // Convert Japan time (JST = UTC+9) to UTC ISO
   const japanDate = new Date(Date.UTC(year, month - 1, day, parseInt(hours), parseInt(minutes), parseInt(seconds)));
-  
-  // Convert to UTC by subtracting 9 hours (JST is UTC+9)
   const utcDate = new Date(japanDate.getTime() - (9 * 60 * 60 * 1000));
-  
   return utcDate.toISOString();
+}
+
+// Split ISO to UTC date/time parts
+function isoToUTCDateAndTime(iso: string): { date: string; time: string } {
+  // iso like 2025-06-13T00:15:37.000Z
+  const d = new Date(iso);
+  const yyyy = String(d.getUTCFullYear());
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
+  const HH = String(d.getUTCHours()).padStart(2, '0');
+  const MM = String(d.getUTCMinutes()).padStart(2, '0');
+  const SS = String(d.getUTCSeconds()).padStart(2, '0');
+  return { date: `${yyyy}-${mm}-${dd}`, time: `${HH}:${MM}:${SS}` };
 }
 
 // Helper function to convert lot size (1000 currency per lot) to standard lot size (10000 currency per lot)
@@ -248,21 +258,25 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
         }
         
         // Parse and validate data
-        const entryTime = parseJapaneseDateTime(trade.新規約定日時);
-        const exitTime = parseJapaneseDateTime(trade.決済約定日時);
+        const entryIso = parseJapaneseDateTime(trade.新規約定日時);
+        const exitIso = parseJapaneseDateTime(trade.決済約定日時);
         const lotSize = convertLotSize(trade.Lot数);
         const tradeType = convertTradeType(trade.売買);
         const profitLoss = parseFloat(trade.売買損益);
         const entryPrice = parseFloat(trade.新規約定値);
         const exitPrice = parseFloat(trade.決済約定値);
         const pips = (parseFloat(trade.pip損益) || 0) / 10; // Divide by 10 for Hirose
-        const holdTime = calculateHoldTime(entryTime, exitTime);
+        const holdTime = calculateHoldTime(entryIso, exitIso);
         
         // Get or create symbol
         const symbolId = await getOrCreateSymbol(trade.通貨ペア);
         
         // Trade memo should be empty
         const tradeMemo = "";
+        
+        // Convert to UTC date/time parts for DB
+        const { date: entry_date, time: entry_time } = isoToUTCDateAndTime(entryIso);
+        const { date: exit_date, time: exit_time } = isoToUTCDateAndTime(exitIso);
         
         // Prepare database record
         const dbTrade: DatabaseTrade = {
@@ -272,8 +286,10 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
           exit_price: exitPrice,
           lot_size: lotSize,
           trade_type: tradeType,
-          entry_time: entryTime,
-          exit_time: exitTime,
+          entry_date,
+          entry_time,
+          exit_date,
+          exit_time,
           profit_loss: profitLoss,
           pips: pips,
           trade_memo: tradeMemo,
@@ -291,15 +307,15 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
         } else {
           successCount++;
           
-          // Add to metrics batch
+          // Add to metrics batch (use ISO timestamps)
           tradesForMetrics.push({
             user_id: userId,
-            exit_time: exitTime,
+            exit_time: exitIso,
             profit_loss: profitLoss,
             pips: pips,
             hold_time: holdTime,
             trade_type: tradeType,
-            entry_time: entryTime,
+            entry_time: entryIso,
           });
           
           if (successCount % 10 === 0) {
