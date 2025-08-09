@@ -33,7 +33,12 @@ export function TradeCard({
     const tradeEmotions = trade.tradeEmotions || [];
 
     const toDisplayDateTime = (d?: string, t?: string) => {
-      if (!d || !t) return "";
+      if (!d) return "";
+      if (!t) {
+        // date only
+        const dateOnly = new Date(`${d}T00:00:00Z`);
+        return dateOnly.toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+      }
       const date = new Date(`${d}T${t}Z`);
       return date.toLocaleString('ja-JP', {
         year: 'numeric',
