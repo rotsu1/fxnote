@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient';
-import { updateUserPerformanceMetricsBatch, TradeInput } from './metrics/updateUserPerformanceMetrics';
+// performance metrics removed
 
 // Interface for parsed trade data
 interface HiroseTrade {
@@ -219,7 +219,8 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
     
     let successCount = 0;
     let errorCount = 0;
-    const tradesForMetrics: TradeInput[] = [];
+    // performance metrics removed
+    const tradesForMetrics: any[] = [];
     
     for (let i = 0; i < dataRows.length; i++) {
       try {
@@ -330,15 +331,7 @@ export async function importHiroseTradesFromFile(file: File, userId: string): Pr
     }
     
     // Update performance metrics for all imported trades
-    if (tradesForMetrics.length > 0) {
-      try {
-        await updateUserPerformanceMetricsBatch(tradesForMetrics);
-        console.log(`Updated performance metrics for ${tradesForMetrics.length} trades`);
-      } catch (metricsError) {
-        console.error("Error updating performance metrics for batch import:", metricsError);
-        // Don't fail the import if metrics update fails
-      }
-    }
+    // performance metrics removed
     
     console.log(`\n=== Parsing Complete ===`);
     console.log(`Successfully processed: ${successCount} trades`);

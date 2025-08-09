@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import { utcToLocalDateTime } from "./timeUtils";
 import { Trade } from "./types";
-import { removeTradeFromPerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
+// performance metrics removed
 
 export const transformTradeForEditing = (trade: any): Trade => {
   const tradeTags = trade.tradeTags || [];
@@ -90,24 +90,9 @@ export const deleteTrade = async (tradeId: number, userId: string): Promise<{ su
       return { success: false, error: "取引の削除中にエラーが発生しました" };
     }
 
-    // Update performance metrics by removing the trade
+    // Performance metrics removed; no update needed
     if (tradeData) {
-      const tradeInput: TradeInput = {
-        user_id: tradeData.user_id,
-        exit_time: `${tradeData.exit_date}T${(tradeData.exit_time || "00:00:00")}`,
-        profit_loss: tradeData.profit_loss,
-        pips: tradeData.pips,
-        hold_time: tradeData.hold_time || 0,
-        trade_type: tradeData.trade_type,
-        entry_time: `${tradeData.entry_date}T${(tradeData.entry_time || "00:00:00")}`,
-      };
-
-      try {
-        await removeTradeFromPerformanceMetrics(tradeInput);
-      } catch (metricsError) {
-        console.error("Error updating performance metrics after trade deletion:", metricsError);
-        // Don't fail the deletion if metrics update fails
-      }
+      // no-op
     }
 
     console.log("Trade deleted successfully");

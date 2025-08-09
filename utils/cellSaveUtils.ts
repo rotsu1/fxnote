@@ -2,7 +2,6 @@ import { Trade } from "./types"
 import { localDateTimeToUTC } from "./timeUtils"
 import { validateCellValue, mapFieldToDatabase } from "./tableUtils"
 import { supabase } from "@/lib/supabaseClient"
-import { updateUserPerformanceMetrics, updateExistingTradePerformanceMetrics, TradeInput } from "./metrics/updateUserPerformanceMetrics";
 
 export interface CellSaveResult {
   success: boolean
@@ -73,74 +72,13 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     } else {
       // Handle regular field updates
       const { field: dbField, value: dbValue } = mapFieldToDatabase(field, processedValue)
+      const { error } = await supabase
+        .from("trades")
+        .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", user.id)
       
-      // Update performance metrics if the field affects metrics
-      if (field === 'profit' || field === 'pips' || field === 'exitTime' || field === 'entryTime') {
-        try {
-          console.log('Updating performance metrics for field:', field, 'with value:', processedValue);
-          
-          // First, get the original trade data before the update
-          const { data: originalTradeData, error: originalFetchError } = await supabase
-            .from("trades")
-            .select("*")
-            .eq("id", id)
-            .eq("user_id", user.id)
-            .single();
-          
-          if (!originalFetchError && originalTradeData) {
-            // Create the old trade input
-            const oldTradeInput: TradeInput = {
-              user_id: originalTradeData.user_id,
-              exit_time: originalTradeData.exit_time,
-              profit_loss: originalTradeData.profit_loss,
-              pips: originalTradeData.pips,
-              hold_time: originalTradeData.hold_time || 0,
-              trade_type: originalTradeData.trade_type,
-              entry_time: originalTradeData.entry_time,
-            };
-            
-            // Create the new trade input with the updated value
-            const newTradeInput: TradeInput = {
-              user_id: originalTradeData.user_id,
-              exit_time: field === 'exitTime' ? processedValue : originalTradeData.exit_time,
-              profit_loss: field === 'profit' ? Number(processedValue) : originalTradeData.profit_loss,
-              pips: field === 'pips' ? Number(processedValue) : originalTradeData.pips,
-              hold_time: originalTradeData.hold_time || 0,
-              trade_type: originalTradeData.trade_type,
-              entry_time: field === 'entryTime' ? processedValue : originalTradeData.entry_time,
-            };
-            
-            console.log('Trade inputs for metrics update:', {
-              oldTrade: oldTradeInput,
-              newTrade: newTradeInput
-            });
-            
-            // Update the trade in the database first
-            const { error: updateError } = await supabase
-              .from("trades")
-              .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
-              .eq("id", id)
-              .eq("user_id", user.id)
-            
-            if (updateError) throw updateError;
-            
-            // Then update performance metrics
-            await updateExistingTradePerformanceMetrics(oldTradeInput, newTradeInput);
-          }
-        } catch (metricsError) {
-          console.error("Error updating performance metrics after cell update:", metricsError);
-          // Don't fail the cell update if metrics update fails
-        }
-      } else {
-        // For non-metrics fields, just update the database
-        const { error } = await supabase
-          .from("trades")
-          .update({ [dbField]: dbValue, updated_at: new Date().toISOString() })
-          .eq("id", id)
-          .eq("user_id", user.id)
-        
-        if (error) throw error;
-      }
+      if (error) throw error;
     }
     
     // Convert back to display format for datetime fields
