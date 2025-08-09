@@ -1,5 +1,4 @@
 import { Trade } from "./types"
-import { localDateTimeToUTC } from "./timeUtils"
 import { validateCellValue, mapFieldToDatabase } from "./tableUtils"
 import { supabase } from "@/lib/supabaseClient"
 
@@ -30,11 +29,8 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     return { success: false, error: 'Value is undefined' }
   }
   
-  // Convert datetime-local format back to ISO string for datetime fields
+  // For datetime-local fields, keep as-is (YYYY-MM-DDTHH:MM:SS)
   let processedValue = value
-  if (field === 'entryTime' || field === 'exitTime') {
-    processedValue = localDateTimeToUTC(value as string)
-  }
   
   // Validate the value
   const validation = validateCellValue(field, processedValue)
@@ -69,6 +65,31 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     } else if (field === 'pair') {
       await handleSymbolUpdate(id, processedValue, user)
       return { success: true, displayValue: value }
+    } else if (field === 'entryTime' || field === 'exitTime') {
+      // Split datetime-local into date and time parts
+      const str = String(processedValue)
+      const [datePart, timePartRaw] = str.includes('T') ? str.split('T') : [str.split(' ')[0], str.split(' ')[1]]
+      const timePart = timePartRaw?.length === 5 ? `${timePartRaw}:00` : (timePartRaw || null)
+
+      // Require both parts to be present
+      if (!datePart || !timePart) {
+        return { success: false, error: '日付と時間を両方入力してください' }
+      }
+
+      const updatePayload: Record<string, any> = field === 'entryTime'
+        ? { entry_date: datePart, entry_time: timePart }
+        : { exit_date: datePart, exit_time: timePart }
+
+      const { error } = await supabase
+        .from("trades")
+        .update({ ...updatePayload, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .eq("user_id", user.id)
+      
+      if (error) throw error
+
+      const displayValue = `${datePart} ${timePart ? timePart.substring(0,8) : ''}`
+      return { success: true, displayValue }
     } else {
       // Handle regular field updates
       const { field: dbField, value: dbValue } = mapFieldToDatabase(field, processedValue)
@@ -81,19 +102,9 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
       if (error) throw error;
     }
     
-    // Convert back to display format for datetime fields
+    // Convert back to display format for certain fields
     let displayValue = processedValue
-    if (field === 'entryTime' || field === 'exitTime') {
-      // Format the datetime for display
-      const date = new Date(processedValue as string)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      const seconds = String(date.getSeconds()).padStart(2, '0')
-      displayValue = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-    } else if (field === 'profit' || field === 'pips') {
+    if (field === 'profit' || field === 'pips') {
       // For profit and pips, store the numeric value so getColumnValue can format it
       displayValue = Number(processedValue)
     }

@@ -1,5 +1,4 @@
 import { Trade } from "./types"
-import { utcToLocalDateTime } from "./timeUtils"
 
 export interface CellEditingState {
   editingCell: { id: number; field: keyof Trade } | null
@@ -47,10 +46,12 @@ export const handleCellClickLogic = (
     [cellKey]: trade[field]
   }
   
-  // Initialize editing value - convert datetime fields to datetime-local format
-  let editingValue = trade[field]
+  // Initialize editing value - keep datetime-local format
+  let editingValue: any = trade[field]
   if (field === 'entryTime' || field === 'exitTime') {
-    editingValue = utcToLocalDateTime(trade[field] as string)
+    if (typeof editingValue === 'string') {
+      editingValue = editingValue.includes('T') ? editingValue : editingValue.replace(' ', 'T')
+    }
   }
   
   let newEditingValues = { ...currentEditingState.editingValues }
@@ -141,9 +142,11 @@ export const handleCellEscape = (
   const cellKey = `${id}-${field}`
   let originalValue = currentEditingState.originalValues[cellKey]
   
-  // Convert datetime fields back to datetime-local format for display
+  // Normalize datetime format back to datetime-local if needed
   if (field === 'entryTime' || field === 'exitTime') {
-    originalValue = utcToLocalDateTime(originalValue as string)
+    if (typeof originalValue === 'string') {
+      originalValue = originalValue.includes('T') ? originalValue : originalValue.replace(' ', 'T')
+    }
   }
   
   let newEditingValues = { ...currentEditingState.editingValues }

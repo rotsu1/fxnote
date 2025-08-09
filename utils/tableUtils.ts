@@ -3,7 +3,7 @@ import { Trade } from "./types";
 // Field mapping from frontend to database
 const FIELD_MAPPING: Record<keyof Trade, string> = {
   id: 'id',
-  date: 'entry_time',
+  date: 'entry_date',
   time: 'entry_time',
   entryTime: 'entry_time',
   exitTime: 'exit_time',
@@ -75,7 +75,7 @@ export function mapFieldToDatabase(field: keyof Trade, value: any) {
   }
   
   if (field === 'entryTime' || field === 'exitTime') {
-    // For datetime fields, value should already be in ISO format
+    // Handled specially in save; keep mapping for reference
     return { field: dbField, value };
   }
   
@@ -95,6 +95,11 @@ export function getColumnValue(trade: Trade, columnId: string, allColumns: any[]
   if (!column) return "";
 
   const value = trade[column.id as keyof Trade];
+
+  // Display datetime-local values with a space for readability
+  if ((column.id === "entryTime" || column.id === "exitTime") && typeof value === "string") {
+    return value.replace('T', ' ');
+  }
 
   if (column.id === "profit" && typeof value === "number") {
     return `¥${value.toLocaleString()}`;
@@ -130,24 +135,34 @@ export function getColumnValue(trade: Trade, columnId: string, allColumns: any[]
  * Transform database trade data to frontend Trade interface
  */
 export function transformTradeData(trade: any, tagsByTradeId: Record<number, string[]>, emotionsByTradeId: Record<number, string[]>): Trade {
-  const entryTime = new Date(trade.entry_time);
-  const exitTime = new Date(trade.exit_time);
-  
-  // Convert UTC to local timezone
-  const convertToLocalTime = (date: Date) => {
-    // The Date object automatically handles timezone conversion when created from UTC
-    return date;
+  // Build Date objects from separate date and time stored in DB (treating as UTC)
+  const toLocalDateFromParts = (dateStr?: string, timeStr?: string): Date | undefined => {
+    if (!dateStr || !timeStr) return undefined;
+    // Interpret DB parts as UTC and let Date convert to local when formatting
+    return new Date(`${dateStr}T${timeStr}Z`);
   };
-  
-  const localEntryTime = convertToLocalTime(entryTime);
-  const localExitTime = convertToLocalTime(exitTime);
+
+  const localEntry = toLocalDateFromParts(trade.entry_date, trade.entry_time);
+  const localExit = toLocalDateFromParts(trade.exit_date, trade.exit_time);
+
+  // Format to datetime-local string for inputs (YYYY-MM-DDTHH:MM:SS)
+  const toLocalInputString = (d?: Date): string => {
+    if (!d) return "";
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const seconds = String(d.getSeconds()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  };
 
   return {
     id: trade.id,
-    date: localEntryTime.toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
-    time: formatLocalTime(localEntryTime),
-    entryTime: formatDateTime(localEntryTime),
-    exitTime: formatDateTime(localExitTime),
+    date: localEntry ? localEntry.toLocaleDateString('en-CA') : "",
+    time: localEntry ? formatLocalTime(localEntry) : "",
+    entryTime: toLocalInputString(localEntry),
+    exitTime: toLocalInputString(localExit),
     pair: trade.symbols?.symbol || "",
     type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
     lot: trade.lot_size || 0,
@@ -163,7 +178,7 @@ export function transformTradeData(trade: any, tagsByTradeId: Record<number, str
 }
 
 // Import time formatting functions
-import { formatLocalTime, formatDateTime } from "./timeUtils"; 
+import { formatLocalTime } from "./timeUtils"; 
 
 export const COLUMN_MAPPINGS: Record<string, string> = {
   id: 'id',

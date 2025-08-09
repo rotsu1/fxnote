@@ -211,6 +211,7 @@ export default function TablePage() {
             symbols!inner(symbol)
           `)
           .eq("user_id", user.id)
+          .order("entry_date", { ascending: true })
           .order("entry_time", { ascending: true });
 
         if (tradesError) {
@@ -909,19 +910,52 @@ export default function TablePage() {
                                             className="min-w-[150px]"
                                           />
                                         ) : column.id === "entryTime" || column.id === "exitTime" ? (
-                                          <Input
-                                            type="datetime-local"
-                                            step="1"
-                                            value={String(value)}
-                                            onChange={(e) =>
-                                              handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
+                                          <div className="flex gap-2" onBlur={(e) => {
+                                            // Only blur if clicking outside the entire datetime container
+                                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                              handleCellBlur();
                                             }
-                                            onBlur={handleCellBlur}
-                                            onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                            autoFocus
-                                            className="h-8"
-                                            disabled={status.isSaving}
-                                          />
+                                          }}>
+                                            {(() => {
+                                              const strVal = String(value || "");
+                                              const hasT = strVal.includes("T");
+                                              const datePart = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
+                                              let timePart = hasT ? strVal.split("T")[1] : (strVal.split(" ")[1] || "");
+                                              // Normalize time to HH:MM:SS
+                                              if (timePart && timePart.length === 5) timePart = `${timePart}:00`;
+                                              return (
+                                                <>
+                                                  <Input
+                                                    type="date"
+                                                    value={datePart}
+                                                    onChange={(e) => {
+                                                      const newDate = e.target.value;
+                                                      const combined = newDate ? `${newDate}T${timePart || "00:00:00"}` : '';
+                                                      handleCellChange(trade.id, column.id as keyof Trade, combined);
+                                                    }}
+                                                    onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                                    autoFocus
+                                                    className="h-8"
+                                                    disabled={status.isSaving}
+                                                  />
+                                                  <Input
+                                                    type="time"
+                                                    step="1"
+                                                    value={timePart || ""}
+                                                    onChange={(e) => {
+                                                      let newTime = e.target.value;
+                                                      if (newTime && newTime.length === 5) newTime = `${newTime}:00`;
+                                                      const combined = datePart ? `${datePart}T${newTime || "00:00:00"}` : `T${newTime || "00:00:00"}`;
+                                                      handleCellChange(trade.id, column.id as keyof Trade, combined);
+                                                    }}
+                                                    onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
+                                                    className="h-8"
+                                                    disabled={status.isSaving}
+                                                  />
+                                                </>
+                                              );
+                                            })()}
+                                          </div>
                                         ) : column.id === "holdingTime" ? (
                                           <div className="flex gap-1" onBlur={(e) => {
                                             // Only blur if clicking outside the entire holding time container
@@ -1125,25 +1159,40 @@ export default function TablePage() {
                                       </div>
                                     ) : (
                                         <div className="flex items-center gap-2">
-                                          <span
-                                            className={cn(
-                                              column.id === "profit" &&
-                                                (trade.profit && trade.profit > 0
-                                                  ? "text-green-600"
-                                                  : trade.profit && trade.profit < 0
-                                                    ? "text-red-600"
-                                                    : ""),
-                                              column.id === "pips" &&
-                                                (trade.pips && trade.pips > 0
-                                                  ? "text-green-600"
-                                                  : trade.pips && trade.pips < 0
-                                                    ? "text-red-600"
-                                                    : ""),
-                                              "block min-h-[24px] py-1 flex-1",
-                                            )}
-                                          >
-                                            {getColumnDisplayValue(trade, column.id)}
-                                          </span>
+                                          {(['entryTime','exitTime'].includes(column.id)) ? (
+                                            (() => {
+                                              const strVal = String(trade[column.id as keyof Trade] || "");
+                                              const hasT = strVal.includes("T");
+                                              const datePart = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
+                                              let timePart = hasT ? strVal.split("T")[1] : (strVal.split(" ")[1] || "");
+                                              if (timePart && timePart.length === 5) timePart = `${timePart}:00`;
+                                              return (
+                                                <span className="block min-h-[24px] py-1 flex-1 truncate">
+                                                  {datePart}{timePart ? ` ${timePart.substring(0,8)}` : ''}
+                                                </span>
+                                              );
+                                            })()
+                                          ) : (
+                                            <span
+                                              className={cn(
+                                                column.id === "profit" &&
+                                                  (trade.profit && trade.profit > 0
+                                                    ? "text-green-600"
+                                                    : trade.profit && trade.profit < 0
+                                                      ? "text-red-600"
+                                                      : ""),
+                                                column.id === "pips" &&
+                                                  (trade.pips && trade.pips > 0
+                                                    ? "text-green-600"
+                                                    : trade.pips && trade.pips < 0
+                                                      ? "text-red-600"
+                                                      : ""),
+                                                "block min-h-[24px] py-1 flex-1",
+                                              )}
+                                            >
+                                              {getColumnDisplayValue(trade, column.id)}
+                                            </span>
+                                          )}
                                           {!isFieldEditable(column.id as keyof Trade) && column.id !== "tags" && (
                                             <TooltipProvider>
                                               <Tooltip>
