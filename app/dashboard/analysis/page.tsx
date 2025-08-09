@@ -12,6 +12,20 @@ import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/com
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
+// Add top-level helper so all components can use it
+function formatHoldingTime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days}日`);
+  if (hours > 0 || days > 0) parts.push(`${hours}時間`);
+  if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
+  parts.push(`${secs}秒`);
+  return parts.join(" ");
+}
+
 interface Metric {
   key: string;
   title: string;
@@ -36,72 +50,71 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
     
     setLoading(true);
     setError("");
-    
-    // Build query based on selected date filters
+
+    // Build optional year range to reduce result size
     let query = supabase
-      .from("user_performance_metrics")
-      .select("*")
+      .from("trades")
+      .select("profit_loss,pips,hold_time,entry_date,entry_time")
       .eq("user_id", user.id);
-    
-    // Determine period type and value based on selected filters
-    let periodType = "yearly";
-    let periodValue = "";
-    
+
+    // Fetch a broad range by year if specified to include timezone edge cases
     if (selectedYear !== "指定しない") {
-      if (selectedMonth !== "指定しない" && selectedDay !== "指定しない") {
-        // All three specified - daily
-        periodType = "daily";
-        periodValue = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}-${selectedDay.toString().padStart(2, '0')}`;
-        query = query.eq("period_type", periodType).eq("period_value", periodValue);
-      } else if (selectedMonth !== "指定しない") {
-        // Year and month specified - monthly
-        periodType = "monthly";
-        periodValue = `${selectedYear}-${selectedMonth.toString().padStart(2, '0')}`;
-        query = query.eq("period_type", periodType).eq("period_value", periodValue);
-      } else if (selectedDay !== "指定しない") {
-        // Year and day specified, but month is "指定しない" - get all daily records for that day across all months
-        periodType = "daily";
-        query = query.eq("period_type", periodType)
-                    .like("period_value", `${selectedYear}-%-${selectedDay.toString().padStart(2, '0')}`);
-      } else {
-        // Only year specified - yearly
-        periodType = "yearly";
-        periodValue = selectedYear.toString();
-        query = query.eq("period_type", periodType).eq("period_value", periodValue);
-      }
-    } else {
-      // Handle partial matches when some fields are "指定しない"
-      if (selectedMonth !== "指定しない" && selectedDay !== "指定しない") {
-        // Month and day specified, but year is "指定しない" - get all daily records for that month-day across all years
-        periodType = "daily";
-        query = query.eq("period_type", periodType)
-                    .like("period_value", `%-${selectedMonth.toString().padStart(2, '0')}-${selectedDay.toString().padStart(2, '0')}`);
-      } else if (selectedMonth !== "指定しない") {
-        // Only month specified - get all monthly records for that month across all years
-        periodType = "monthly";
-        query = query.eq("period_type", periodType)
-                    .like("period_value", `%-${selectedMonth.toString().padStart(2, '0')}`);
-      } else if (selectedDay !== "指定しない") {
-        // Only day specified - get all daily records for that day across all years and months
-        periodType = "daily";
-        query = query.eq("period_type", periodType)
-                    .like("period_value", `%-%-${selectedDay.toString().padStart(2, '0')}`);
-      }
+      const y = selectedYear as number;
+      query = query.gte("entry_date", `${y}-01-01`).lte("entry_date", `${y}-12-31`);
     }
-    
+
     query.then(({ data, error }) => {
       if (error) {
         setError(error.message);
         setKeyStats(null);
-      } else {
-        // Aggregate data if multiple rows returned
-        if (data && data.length > 0) {
-          const aggregatedStats = aggregateMetrics(data);
-          setKeyStats(aggregatedStats);
-        } else {
-          setKeyStats(null);
-        }
+        setLoading(false);
+        return;
       }
+
+      const trades = (data || []).filter((t: any) => {
+        if (!t.entry_date) return false;
+        const dt = new Date(`${t.entry_date}T${(t.entry_time || '00:00:00')}Z`);
+        if (isNaN(dt.getTime())) return false;
+        const ty = dt.getFullYear();
+        const tm = dt.getMonth() + 1;
+        const td = dt.getDate();
+        if (selectedYear !== "指定しない" && ty !== selectedYear) return false;
+        if (selectedMonth !== "指定しない" && tm !== selectedMonth) return false;
+        if (selectedDay !== "指定しない" && td !== selectedDay) return false;
+        return true;
+      });
+
+      const wins = trades.filter((t: any) => (t.profit_loss || 0) > 0);
+      const losses = trades.filter((t: any) => (t.profit_loss || 0) < 0);
+
+      const winCount = wins.length;
+      const lossCount = losses.length;
+      const totalCount = winCount + lossCount;
+
+      const winProfitSum = wins.reduce((s: number, t: any) => s + (t.profit_loss || 0), 0);
+      const lossLossSum = losses.reduce((s: number, t: any) => s + (t.profit_loss || 0), 0); // negative sum
+
+      const winPipsAvg = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.pips || 0), 0) / winCount : 0;
+      const lossPipsAvg = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.pips || 0), 0) / lossCount : 0;
+
+      const winHoldAvg = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / winCount : 0;
+      const lossHoldAvg = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / lossCount : 0;
+
+      const winRate = totalCount > 0 ? (winCount / totalCount) * 100 : 0;
+      const avgWinProfit = winCount > 0 ? winProfitSum / winCount : 0;
+      const avgLossLoss = lossCount > 0 ? lossLossSum / lossCount : 0;
+      const payoffRatio = lossCount > 0 && Math.abs(avgLossLoss) > 0 ? avgWinProfit / Math.abs(avgLossLoss) : 0;
+
+      setKeyStats({
+        win_rate: winRate,
+        avg_win_trade_profit: avgWinProfit,
+        avg_loss_trade_loss: avgLossLoss,
+        avg_win_trade_pips: winPipsAvg,
+        avg_loss_trade_pips: lossPipsAvg,
+        avg_win_holding_time: winHoldAvg,
+        avg_loss_holding_time: lossHoldAvg,
+        payoff_ratio: payoffRatio,
+      });
       setLoading(false);
     });
   }, [user, selectedYear, selectedMonth, selectedDay]);
@@ -321,36 +334,19 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
   ];
 
   return (
-    <div className="space-y-4">
-      {/* Key Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {metrics.map((metric, index) => {
-        const value = statsToUse[metric.key];
-        
-        // Determine color class
-        let colorClass = "text-gray-900 dark:text-gray-100";
-        if (value === null || value === undefined || value === 0) {
-          colorClass = "text-gray-400";
-        } else {
-          colorClass = metric.color(value);
-        }
-        
-        return (
-          <Card key={index}>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {metric.title}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className={`text-2xl font-bold ${colorClass}`}>
-                {metric.format(value)}
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-      </div>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {metrics.map((metric) => (
+        <Card key={metric.key}>
+          <CardHeader className="pb-2">
+            <CardTitle className={`text-sm ${metric.color(statsToUse[metric.key])}`}>{metric.title}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${metric.color(statsToUse[metric.key])}`}>
+              {metric.format(statsToUse[metric.key])}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   )
 }
@@ -393,183 +389,182 @@ function TimeAnalysis() {
     setLoading(true);
     setError("");
     
-    // Calculate date range for the selected year and month
+    // Calculate date range for the selected year and month (local)
     const startDate = new Date(selectedYear, selectedMonth - 1, 1);
-    const endDate = new Date(selectedYear, selectedMonth, 0, 23, 59, 59, 999);
+    const endDate = new Date(selectedYear, selectedMonth, 0);
+    const toYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    // Widen UTC fetch range by +/- 1 day to include timezone edge cases
+    const startFetch = new Date(startDate);
+    startFetch.setDate(startFetch.getDate() - 1);
+    const endFetch = new Date(endDate);
+    endFetch.setDate(endFetch.getDate() + 1);
+
+    const startFetchYmd = toYmd(startFetch);
+    const endFetchYmd = toYmd(endFetch);
     
     console.log('TimeAnalysis: Fetching trades for period:', {
       selectedYear,
       selectedMonth,
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      startDateLocal: startDate.toString(),
-      endDateLocal: endDate.toString()
+      fetchStartDate: startFetchYmd,
+      fetchEndDate: endFetchYmd,
+      localStart: startDate.toString(),
+      localEnd: endDate.toString()
     });
     
-    // Fetch all trades for the selected month
+    // Fetch trades around the selected month using entry_date
     supabase
       .from("trades")
       .select("*")
       .eq("user_id", user.id)
-      .gte("entry_time", startDate.toISOString())
-      .lte("entry_time", endDate.toISOString())
+      .gte("entry_date", startFetchYmd)
+      .lte("entry_date", endFetchYmd)
       .then(({ data, error }) => {
         console.log('TimeAnalysis: Supabase response:', { data, error, dataLength: data?.length });
-        
-        if (data && data.length > 0) {
-          console.log('TimeAnalysis: Sample trade structure:', data[0]);
-        }
         
         if (error) {
           console.error('TimeAnalysis: Error fetching trades:', error);
           setError(error.message);
           setTimeData([]);
-        } else {
-          // Define time slots (1-hour intervals)
-          const timeSlots = [
-            { hour: 0, label: "00:00-01:00" },
-            { hour: 1, label: "01:00-02:00" },
-            { hour: 2, label: "02:00-03:00" },
-            { hour: 3, label: "03:00-04:00" },
-            { hour: 4, label: "04:00-05:00" },
-            { hour: 5, label: "05:00-06:00" },
-            { hour: 6, label: "06:00-07:00" },
-            { hour: 7, label: "07:00-08:00" },
-            { hour: 8, label: "08:00-09:00" },
-            { hour: 9, label: "09:00-10:00" },
-            { hour: 10, label: "10:00-11:00" },
-            { hour: 11, label: "11:00-12:00" },
-            { hour: 12, label: "12:00-13:00" },
-            { hour: 13, label: "13:00-14:00" },
-            { hour: 14, label: "14:00-15:00" },
-            { hour: 15, label: "15:00-16:00" },
-            { hour: 16, label: "16:00-17:00" },
-            { hour: 17, label: "17:00-18:00" },
-            { hour: 18, label: "18:00-19:00" },
-            { hour: 19, label: "19:00-20:00" },
-            { hour: 20, label: "20:00-21:00" },
-            { hour: 21, label: "21:00-22:00" },
-            { hour: 22, label: "22:00-23:00" },
-            { hour: 23, label: "23:00-00:00" }
-          ];
-          
-          // Process hourly data from trades
-          const processedData = timeSlots.map(timeSlot => {
-            // Filter trades for this specific hour
-            const hourTrades = data?.filter(trade => {
-              if (!trade.entry_time) return false;
-              
-              const entryTime = new Date(trade.entry_time);
-              const hour = entryTime.getHours();
-              
-              return hour === timeSlot.hour;
-            }) || [];
-            
-            if (hourTrades.length > 0) {
-              console.log(`TimeAnalysis: Found ${hourTrades.length} trades for hour ${timeSlot.hour}:`, hourTrades);
-            }
-            
-            if (hourTrades.length === 0) {
-              return {
-                time: timeSlot.label,
-                wins: 0,
-                losses: 0,
-                avgPips: 0,
-                performance: "neutral"
-              };
-            }
-            
-            // Calculate metrics for this hour
-            let wins = 0;
-            let losses = 0;
-            let totalPips = 0;
-            let totalProfit = 0;
-            let winProfit = 0;
-            let lossLoss = 0;
-            let winPips = 0;
-            let lossPips = 0;
-            let winHoldingTime = 0;
-            let lossHoldingTime = 0;
-            let winCountWithHoldingTime = 0;
-            let lossCountWithHoldingTime = 0;
-            let winCountWithPips = 0;
-            let lossCountWithPips = 0;
-            
-            hourTrades.forEach(trade => {
-              const profit = trade.profit_loss || 0;
-              const pips = trade.pips || 0;
-              const holdingTime = trade.hold_time || 0;
-              
-              totalProfit += profit;
-              
-              if (profit > 0) {
-                wins++;
-                winProfit += profit;
-                if (pips > 0) {
-                  winPips += pips;
-                  winCountWithPips++;
-                }
-                if (holdingTime > 0) {
-                  winHoldingTime += holdingTime;
-                  winCountWithHoldingTime++;
-                }
-              } else if (profit < 0) {
-                losses++;
-                lossLoss += profit; // This will be negative
-                if (pips > 0) {
-                  lossPips += pips;
-                  lossCountWithPips++;
-                }
-                if (holdingTime > 0) {
-                  lossHoldingTime += holdingTime;
-                  lossCountWithHoldingTime++;
-                }
+          setLoading(false);
+          return;
+        }
+
+        const dataInMonth = (data || []).filter((trade: any) => {
+          if (!trade.entry_date) return false;
+          const dt = new Date(`${trade.entry_date}T${(trade.entry_time || '00:00:00')}Z`);
+          if (isNaN(dt.getTime())) return false;
+          return dt.getFullYear() === selectedYear && (dt.getMonth() + 1) === selectedMonth;
+        });
+
+        // Define time slots (1-hour intervals)
+        const timeSlots = [
+          { hour: 0, label: "00:00-01:00" },
+          { hour: 1, label: "01:00-02:00" },
+          { hour: 2, label: "02:00-03:00" },
+          { hour: 3, label: "03:00-04:00" },
+          { hour: 4, label: "04:00-05:00" },
+          { hour: 5, label: "05:00-06:00" },
+          { hour: 6, label: "06:00-07:00" },
+          { hour: 7, label: "07:00-08:00" },
+          { hour: 8, label: "08:00-09:00" },
+          { hour: 9, label: "09:00-10:00" },
+          { hour: 10, label: "10:00-11:00" },
+          { hour: 11, label: "11:00-12:00" },
+          { hour: 12, label: "12:00-13:00" },
+          { hour: 13, label: "13:00-14:00" },
+          { hour: 14, label: "14:00-15:00" },
+          { hour: 15, label: "15:00-16:00" },
+          { hour: 16, label: "16:00-17:00" },
+          { hour: 17, label: "17:00-18:00" },
+          { hour: 18, label: "18:00-19:00" },
+          { hour: 19, label: "19:00-20:00" },
+          { hour: 20, label: "20:00-21:00" },
+          { hour: 21, label: "21:00-22:00" },
+          { hour: 22, label: "22:00-23:00" },
+          { hour: 23, label: "23:00-00:00" }
+        ];
+        
+        // Process hourly data from trades
+        const processedData = timeSlots.map(timeSlot => {
+          const hourTrades = dataInMonth.filter(trade => {
+            if (!trade.entry_time) return false;
+            let hour: number | null = null;
+            const dt = new Date(`${trade.entry_date}T${trade.entry_time}Z`);
+            if (!isNaN(dt.getTime())) hour = dt.getHours();
+            if (hour === null) {
+              const parts = String(trade.entry_time).split(":");
+              if (parts.length >= 1) {
+                const parsed = parseInt(parts[0], 10);
+                if (!isNaN(parsed)) hour = parsed;
               }
-            });
-            
-            const totalTrades = wins + losses;
-            const avgWinProfit = wins > 0 ? winProfit / wins : 0;
-            const avgLossLoss = losses > 0 ? lossLoss / losses : 0;
-            const avgWinPips = winCountWithPips > 0 ? winPips / winCountWithPips : 0;
-            const avgLossPips = lossCountWithPips > 0 ? lossPips / lossCountWithPips : 0;
-            const avgWinHoldingTime = winCountWithHoldingTime > 0 ? winHoldingTime / winCountWithHoldingTime : 0;
-            const avgLossHoldingTime = lossCountWithHoldingTime > 0 ? lossHoldingTime / lossCountWithHoldingTime : 0;
-            
-            return {
-              time: timeSlot.label,
-              wins: wins,
-              losses: losses,
-              totalProfit: totalProfit,
-              avgWinProfit: avgWinProfit,
-              avgLossLoss: avgLossLoss,
-              avgWinPips: avgWinPips,
-              avgLossPips: avgLossPips,
-              avgWinHoldingTime: avgWinHoldingTime,
-              avgLossHoldingTime: avgLossHoldingTime
-            };
+            }
+            if (hour === null) return false;
+            return hour === timeSlot.hour;
           });
           
-          console.log('TimeAnalysis: Processed data:', processedData);
-          setTimeData(processedData);
-        }
+          if (hourTrades.length === 0) {
+            return {
+              time: timeSlot.label,
+              wins: 0,
+              losses: 0,
+              avgPips: 0,
+              performance: "neutral"
+            };
+          }
+          
+          let wins = 0;
+          let losses = 0;
+          let totalProfit = 0;
+          let winProfit = 0;
+          let lossLoss = 0;
+          let winPips = 0;
+          let lossPips = 0;
+          let winHoldingTime = 0;
+          let lossHoldingTime = 0;
+          let winCountWithHoldingTime = 0;
+          let lossCountWithHoldingTime = 0;
+          let winCountWithPips = 0;
+          let lossCountWithPips = 0;
+          
+          hourTrades.forEach(trade => {
+            const profit = trade.profit_loss || 0;
+            const pips = trade.pips || 0;
+            const holdingTime = trade.hold_time || 0;
+            
+            totalProfit += profit;
+            
+            if (profit > 0) {
+              wins++;
+              winProfit += profit;
+              if (pips > 0) {
+                winPips += pips;
+                winCountWithPips++;
+              }
+              if (holdingTime > 0) {
+                winHoldingTime += holdingTime;
+                winCountWithHoldingTime++;
+              }
+            } else if (profit < 0) {
+              losses++;
+              lossLoss += profit; // negative
+              if (pips > 0) {
+                lossPips += pips;
+                lossCountWithPips++;
+              }
+              if (holdingTime > 0) {
+                lossHoldingTime += holdingTime;
+                lossCountWithHoldingTime++;
+              }
+            }
+          });
+          
+          const avgWinProfit = wins > 0 ? winProfit / wins : 0;
+          const avgLossLoss = losses > 0 ? lossLoss / losses : 0;
+          const avgWinPips = winCountWithPips > 0 ? winPips / winCountWithPips : 0;
+          const avgLossPips = lossCountWithPips > 0 ? lossPips / lossCountWithPips : 0;
+          const avgWinHoldingTime = winCountWithHoldingTime > 0 ? winHoldingTime / winCountWithHoldingTime : 0;
+          const avgLossHoldingTime = lossCountWithHoldingTime > 0 ? lossHoldingTime / lossCountWithHoldingTime : 0;
+          
+          return {
+            time: timeSlot.label,
+            wins,
+            losses,
+            totalProfit,
+            avgWinProfit,
+            avgLossLoss,
+            avgWinPips,
+            avgLossPips,
+            avgWinHoldingTime,
+            avgLossHoldingTime
+          };
+        });
+        
+        console.log('TimeAnalysis: Processed data:', processedData);
+        setTimeData(processedData);
         setLoading(false);
       });
   }, [user, selectedYear, selectedMonth]);
-
-  const formatHoldingTime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    const parts = [];
-    if (days > 0) parts.push(`${days}日`);
-    if (hours > 0 || days > 0) parts.push(`${hours}時間`);
-    if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
-    parts.push(`${secs}秒`);
-    
-    return parts.join(' ');
-  };
 
   if (loading) {
     return (
@@ -746,22 +741,86 @@ function MonthlyBreakdown() {
     setLoading(true);
     setError("");
     
-    // Fetch monthly performance data from user_performance_metrics for the selected year
+    // Fetch trades within the selected year and compute monthly metrics
+    const y = selectedYear;
     supabase
-      .from("user_performance_metrics")
-      .select("*")
+      .from("trades")
+      .select("profit_loss,pips,hold_time,entry_date,entry_time")
       .eq("user_id", user.id)
-      .eq("period_type", "monthly")
-      .like("period_value", `${selectedYear}-%`)
-      .order("period_value", { ascending: true })
+      .gte("entry_date", `${y}-01-01`)
+      .lte("entry_date", `${y}-12-31`)
       .then(({ data, error }) => {
-        
         if (error) {
           setError(error.message);
           setMonthlyData([]);
         } else {
-          // Process the data to create monthly breakdown with default values for missing months
-          const monthlyStats = processMonthlyData(data || []);
+          const months = [
+            "1月", "2月", "3月", "4月", "5月", "6月",
+            "7月", "8月", "9月", "10月", "11月", "12月"
+          ];
+
+          const monthlyStats = months.map((month, index) => {
+            const m = index + 1;
+            const monthTrades = (data || []).filter((t: any) => {
+              if (!t.entry_date) return false;
+              const dt = new Date(`${t.entry_date}T${(t.entry_time || '00:00:00')}Z`);
+              if (isNaN(dt.getTime())) return false;
+              const ty = dt.getFullYear();
+              const tm = dt.getMonth() + 1;
+              return ty === y && tm === m;
+            });
+
+            if (monthTrades.length === 0) {
+              return {
+                month,
+                trades: 0,
+                winRate: 0,
+                profit: 0,
+                avgWinProfit: 0,
+                avgLossLoss: 0,
+                avgWinPips: 0,
+                avgLossPips: 0,
+                avgWinHoldingTime: 0,
+                avgLossHoldingTime: 0
+              };
+            }
+
+            const wins = monthTrades.filter((t: any) => (t.profit_loss || 0) > 0);
+            const losses = monthTrades.filter((t: any) => (t.profit_loss || 0) < 0);
+
+            const winCount = wins.length;
+            const lossCount = losses.length;
+            const total = winCount + lossCount;
+
+            const profitSum = monthTrades.reduce((s: number, t: any) => s + (t.profit_loss || 0), 0);
+            const winProfitSum = wins.reduce((s: number, t: any) => s + (t.profit_loss || 0), 0);
+            const lossLossSum = losses.reduce((s: number, t: any) => s + (t.profit_loss || 0), 0);
+
+            const avgWinProfit = winCount > 0 ? winProfitSum / winCount : 0;
+            const avgLossLoss = lossCount > 0 ? lossLossSum / lossCount : 0;
+
+            const avgWinPips = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.pips || 0), 0) / winCount : 0;
+            const avgLossPips = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.pips || 0), 0) / lossCount : 0;
+
+            const avgWinHoldingTime = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / winCount : 0;
+            const avgLossHoldingTime = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / lossCount : 0;
+
+            const winRate = total > 0 ? (winCount / total) * 100 : 0;
+
+            return {
+              month,
+              trades: total,
+              winRate,
+              profit: profitSum,
+              avgWinProfit,
+              avgLossLoss,
+              avgWinPips,
+              avgLossPips,
+              avgWinHoldingTime,
+              avgLossHoldingTime
+            };
+          });
+
           setMonthlyData(monthlyStats);
         }
         setLoading(false);
@@ -820,66 +879,46 @@ function MonthlyBreakdown() {
       const avgLossPips = (monthData.loss_pips_count || 0) > 0 
         ? (monthData.loss_pips || 0) / (monthData.loss_pips_count || 0) 
         : 0;
-      
-      // Calculate average holding time using the new count columns
-      const avgWinHoldingTime = (monthData.win_holding_count || 0) > 0 
-        ? (monthData.win_holding_time || 0) / (monthData.win_holding_count || 0) 
+
+      const avgWinHoldingTime = (monthData.win_count || 0) > 0 
+        ? (monthData.win_holding_time || 0) / (monthData.win_count || 0) 
         : 0;
-      const avgLossHoldingTime = (monthData.loss_holding_count || 0) > 0 
-        ? (monthData.loss_holding_time || 0) / (monthData.loss_holding_count || 0) 
+      const avgLossHoldingTime = (monthData.loss_count || 0) > 0 
+        ? (monthData.loss_holding_time || 0) / (monthData.loss_count || 0) 
         : 0;
 
       return {
         month,
         trades: totalTrades,
-        winRate: winRate,
-        profit: profit,
-        avgWinProfit: avgWinProfit,
-        avgLossLoss: avgLossLoss,
-        avgWinPips: avgWinPips,
-        avgLossPips: avgLossPips,
-        avgWinHoldingTime: avgWinHoldingTime,
-        avgLossHoldingTime: avgLossHoldingTime
+        winRate,
+        profit,
+        avgWinProfit,
+        avgLossLoss,
+        avgWinPips,
+        avgLossPips,
+        avgWinHoldingTime,
+        avgLossHoldingTime
       };
     });
-
+    
     return monthlyStats;
-  };
-
-  const formatHoldingTime = (seconds: number) => {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    const parts = [];
-    if (days > 0) parts.push(`${days}日`);
-    if (hours > 0 || days > 0) parts.push(`${hours}時間`);
-    if (minutes > 0 || hours > 0 || days > 0) parts.push(`${minutes}分`);
-    parts.push(`${secs}秒`);
-    
-    return parts.join(' ');
   };
 
   if (loading) {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-green-600" />
-            月別分析
-          </CardTitle>
-          <CardDescription>月ごとの取引統計</CardDescription>
+          <CardTitle>月別成績</CardTitle>
+          <CardDescription>選択した年の月ごとのパフォーマンス</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {[...Array(12)].map((_, index) => (
               <div key={index} className="flex items-center gap-4 p-3 rounded-lg border">
-                <div className="h-4 bg-gray-200 rounded animate-pulse w-12"></div>
-                <div className="flex-1 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {[...Array(4)].map((_, i) => (
-                    <div key={i} className="h-4 bg-gray-200 rounded animate-pulse"></div>
-                  ))}
+                <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+                <div className="flex-1">
+                  <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
+                  <div className="h-2 bg-gray-200 rounded animate-pulse"></div>
                 </div>
               </div>
             ))}
@@ -893,10 +932,7 @@ function MonthlyBreakdown() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-green-600" />
-            月別分析
-          </CardTitle>
+          <CardTitle>月別成績</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-center text-red-600 py-10">

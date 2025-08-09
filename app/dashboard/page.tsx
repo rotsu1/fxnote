@@ -38,6 +38,26 @@ function PLSummaryCards() {
     return { daily, monthly, yearly };
   };
 
+  // Helper to build period date ranges (YYYY-MM-DD strings)
+  const getPeriodRange = (type: 'daily' | 'monthly' | 'yearly') => {
+    const now = new Date();
+    const toYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (type === 'daily') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { startDate: toYmd(start), endDate: toYmd(end) };
+    }
+    if (type === 'monthly') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { startDate: toYmd(start), endDate: toYmd(end) };
+    }
+    // yearly
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear(), 11, 31);
+    return { startDate: toYmd(start), endDate: toYmd(end) };
+  };
+
   useEffect(() => {
     if (!user) return;
     
@@ -46,88 +66,48 @@ function PLSummaryCards() {
       setError("");
       
       try {
-        const periods = getCurrentPeriods();
-        
-        // Fetch data for all periods - handle each query individually to avoid 406 errors
+        // Compute profits by querying trades within periods
         let dailyProfit = 0, monthlyProfit = 0, yearlyProfit = 0, totalProfit = 0;
-        
-        // Daily data
-        try {
-          const { data: dailyData, error: dailyError } = await supabase
-            .from("user_performance_metrics")
-            .select("win_profit, loss_loss")
+
+        const { startDate: dailyStart, endDate: dailyEnd } = getPeriodRange('daily');
+        const { startDate: monthlyStart, endDate: monthlyEnd } = getPeriodRange('monthly');
+        const { startDate: yearlyStart, endDate: yearlyEnd } = getPeriodRange('yearly');
+
+        const [dailyRes, monthlyRes, yearlyRes, totalRes] = await Promise.all([
+          supabase
+            .from("trades")
+            .select("profit_loss")
             .eq("user_id", user.id)
-            .eq("period_type", "daily")
-            .eq("period_value", periods.daily)
-            .maybeSingle(); // Use maybeSingle instead of single
-
-          if (dailyData) {
-            dailyProfit = (dailyData.win_profit || 0) + (dailyData.loss_loss || 0);
-          }
-        } catch (dailyError) {
-          console.log("No daily data found for period:", periods.daily);
-        }
-
-        // Monthly data
-        try {
-          const { data: monthlyData, error: monthlyError } = await supabase
-            .from("user_performance_metrics")
-            .select("win_profit, loss_loss")
+            .gte("entry_date", dailyStart)
+            .lte("entry_date", dailyEnd),
+          supabase
+            .from("trades")
+            .select("profit_loss")
             .eq("user_id", user.id)
-            .eq("period_type", "monthly")
-            .eq("period_value", periods.monthly)
-            .maybeSingle(); // Use maybeSingle instead of single
-
-          if (monthlyData) {
-            monthlyProfit = (monthlyData.win_profit || 0) + (monthlyData.loss_loss || 0);
-          }
-        } catch (monthlyError) {
-          console.log("No monthly data found for period:", periods.monthly);
-        }
-
-        // Yearly data - sum all months in the current year
-        try {
-          const { data: yearlyData, error: yearlyError } = await supabase
-            .from("user_performance_metrics")
-            .select("win_profit, loss_loss")
+            .gte("entry_date", monthlyStart)
+            .lte("entry_date", monthlyEnd),
+          supabase
+            .from("trades")
+            .select("profit_loss")
             .eq("user_id", user.id)
-            .eq("period_type", "monthly")
-            .like("period_value", `${periods.yearly}-%`);
-
-          if (yearlyData && yearlyData.length > 0) {
-            yearlyProfit = yearlyData.reduce((sum, month) => {
-              return sum + (month.win_profit || 0) + (month.loss_loss || 0);
-            }, 0);
-          }
-        } catch (yearlyError) {
-          console.log("No yearly data found for year:", periods.yearly);
-        }
-
-        // Total data - sum all months
-        try {
-          const { data: totalData, error: totalError } = await supabase
-            .from("user_performance_metrics")
-            .select("win_profit, loss_loss")
+            .gte("entry_date", yearlyStart)
+            .lte("entry_date", yearlyEnd),
+          supabase
+            .from("trades")
+            .select("profit_loss")
             .eq("user_id", user.id)
-            .eq("period_type", "monthly");
+        ]);
 
-          console.log("Total query result:", { totalData, totalError, count: totalData?.length });
+        if (dailyRes.error) throw dailyRes.error;
+        if (monthlyRes.error) throw monthlyRes.error;
+        if (yearlyRes.error) throw yearlyRes.error;
+        if (totalRes.error) throw totalRes.error;
 
-          if (totalData && totalData.length > 0) {
-            totalProfit = totalData.reduce((sum, month) => {
-              const monthProfit = (month.win_profit || 0) + (month.loss_loss || 0);
-              console.log("Month:", month, "Profit:", monthProfit);
-              return sum + monthProfit;
-            }, 0);
-            console.log("Final total profit:", totalProfit);
-          } else {
-            console.log("No monthly data found for total");
-          }
-        } catch (totalError) {
-          console.log("Error fetching total data:", totalError);
-        }
+        dailyProfit = (dailyRes.data || []).reduce((sum: number, t: any) => sum + (t.profit_loss || 0), 0);
+        monthlyProfit = (monthlyRes.data || []).reduce((sum: number, t: any) => sum + (t.profit_loss || 0), 0);
+        yearlyProfit = (yearlyRes.data || []).reduce((sum: number, t: any) => sum + (t.profit_loss || 0), 0);
+        totalProfit = (totalRes.data || []).reduce((sum: number, t: any) => sum + (t.profit_loss || 0), 0);
 
-        console.log("Setting plSummary with values:", { dailyProfit, monthlyProfit, yearlyProfit, totalProfit });
         setPlSummary({
           daily_profit: dailyProfit,
           monthly_profit: monthlyProfit,
@@ -271,6 +251,24 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
     }
   };
 
+  const getRangeForPeriod = (periodType: 'daily' | 'monthly' | 'yearly') => {
+    const now = new Date();
+    const toYmd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (periodType === 'daily') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      return { startDate: toYmd(start), endDate: toYmd(end) };
+    }
+    if (periodType === 'monthly') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      return { startDate: toYmd(start), endDate: toYmd(end) };
+    }
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now.getFullYear(), 11, 31);
+    return { startDate: toYmd(start), endDate: toYmd(end) };
+  };
+
   useEffect(() => {
     if (!user) return;
     
@@ -294,81 +292,45 @@ function PerformanceMetrics({ settingsVersion }: { settingsVersion: number }) {
         const metricsPeriod = settingsData?.metrics_period ?? 1;
         const period = getCurrentPeriod(metricsPeriod);
 
-        // Fetch performance data with the computed period
-        let data, error;
-        
-        if (period.period_type === 'yearly') {
-          // For yearly, sum all months in the current year
-          const { data: yearlyData, error: yearlyError } = await supabase
-            .from("user_performance_metrics")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("period_type", "monthly")
-            .like("period_value", `${period.period_value}-%`);
-          
-          data = yearlyData;
-          error = yearlyError;
-          
-          // Aggregate the data if we have multiple months
-          if (data && data.length > 0) {
-            const aggregatedData = data.reduce((acc, month) => {
-              return {
-                win_count: (acc.win_count || 0) + (month.win_count || 0),
-                loss_count: (acc.loss_count || 0) + (month.loss_count || 0),
-                win_profit: (acc.win_profit || 0) + (month.win_profit || 0),
-                loss_loss: (acc.loss_loss || 0) + (month.loss_loss || 0),
-                period_type: 'yearly',
-                period_value: period.period_value
-              };
-            }, {});
-            data = aggregatedData;
-          }
-        } else if (period.period_type === 'total') {
-          // For total, sum all months
-          const { data: totalData, error: totalError } = await supabase
-            .from("user_performance_metrics")
-            .select("*")
-            .eq("user_id", user.id)
-            .eq("period_type", "monthly");
-          
-          data = totalData;
-          error = totalError;
-          
-          // Aggregate the data if we have multiple months
-          if (data && data.length > 0) {
-            const aggregatedData = data.reduce((acc, month) => {
-              return {
-                win_count: (acc.win_count || 0) + (month.win_count || 0),
-                loss_count: (acc.loss_count || 0) + (month.loss_count || 0),
-                win_profit: (acc.win_profit || 0) + (month.win_profit || 0),
-                loss_loss: (acc.loss_loss || 0) + (month.loss_loss || 0),
-                period_type: 'total',
-                period_value: 'total'
-              };
-            }, {});
-            data = aggregatedData;
-          }
+        // Query trades within the appropriate range and aggregate
+        let trades: any[] = [];
+        if (period.period_type === 'total') {
+          const { data: allTrades, error: allError } = await supabase
+            .from("trades")
+            .select("profit_loss")
+            .eq("user_id", user.id);
+          if (allError) throw allError;
+          trades = allTrades || [];
         } else {
-          // For daily and monthly, fetch single record
-          const { data: singleData, error: singleError } = await supabase
-            .from("user_performance_metrics")
-            .select("*")
+          const { startDate, endDate } = getRangeForPeriod(period.period_type as 'daily' | 'monthly' | 'yearly');
+          const { data: rangedTrades, error: rangeError } = await supabase
+            .from("trades")
+            .select("profit_loss")
             .eq("user_id", user.id)
-            .eq("period_type", period.period_type)
-            .eq("period_value", period.period_value)
-            .maybeSingle();
-          
-          data = singleData;
-          error = singleError;
+            .gte("entry_date", startDate)
+            .lte("entry_date", endDate);
+          if (rangeError) throw rangeError;
+          trades = rangedTrades || [];
         }
 
-        if (error) {
-          console.error("Error fetching performance data:", error);
-          // Don't throw error if no data found, just set to null
-          setPerformanceData(null);
-        } else {
-          setPerformanceData(data || null);
-        }
+        // Aggregate performance metrics
+        const aggregated = trades.reduce((acc, t) => {
+          const profit = t.profit_loss || 0;
+          if (profit > 0) {
+            acc.win_count += 1;
+            acc.win_profit += profit;
+          } else if (profit < 0) {
+            acc.loss_count += 1;
+            acc.loss_loss += profit; // negative
+          }
+          return acc;
+        }, { win_count: 0, loss_count: 0, win_profit: 0, loss_loss: 0 });
+
+        setPerformanceData({
+          ...aggregated,
+          period_type: period.period_type,
+          period_value: period.period_value,
+        });
       } catch (error: any) {
         console.error("Error fetching performance data:", error);
         setError(error.message || "データの取得に失敗しました");
@@ -509,6 +471,7 @@ function RecentActivity() {
       .from("trades")
       .select("*")
       .eq("user_id", user.id)
+      .order("entry_date", { ascending: false })
       .order("entry_time", { ascending: false })
       .limit(5)
       .then(({ data: tradesData, error: tradesError }) => {
@@ -653,7 +616,7 @@ function RecentActivity() {
                 ) : (
                   recentTrades.map((trade, index) => (
                     <TableRow key={trade.id || index}>
-                      <TableCell className="text-sm">{formatDate(trade.entry_time)}</TableCell>
+                      <TableCell className="text-sm">{formatDate(trade.entry_date)}</TableCell>
                       <TableCell className="font-medium">{trade.currency_pair}</TableCell>
                       <TableCell className={trade.profit_loss >= 0 ? "text-green-600" : "text-red-600"}>
                         {formatProfitLoss(trade.profit_loss)}
