@@ -289,7 +289,7 @@ export async function updateExistingTradePerformanceMetrics(oldTrade: TradeInput
     await removeTradeFromPerformanceMetrics(oldTrade);
     
     // Then, add the new trade's contribution
-    await updateUserPerformanceMetrics(newTrade);
+    await updates(newTrade);
     
     console.log('Successfully updated existing trade performance metrics');
   } catch (error) {
@@ -307,7 +307,7 @@ export async function updateUserPerformanceMetricsBatch(trades: TradeInput[]): P
   try {
     // Process trades sequentially to maintain data consistency
     for (const trade of trades) {
-      await updateUserPerformanceMetrics(trade);
+      await updates(trade);
     }
   } catch (error) {
     console.error('Error in batch update of user performance metrics:', error);
