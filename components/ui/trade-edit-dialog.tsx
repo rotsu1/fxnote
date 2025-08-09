@@ -439,10 +439,17 @@ export function TradeEditDialog({
       }
       
       // Basic validation for numbers
-      const parsedEntry = formData.entry !== undefined && formData.entry !== null ? Number.parseFloat(String(formData.entry)) : 0
-      const parsedExit = formData.exit !== undefined && formData.exit !== null ? Number.parseFloat(String(formData.exit)) : 0
-      const parsedLot = formData.lot !== undefined && formData.lot !== null ? Number.parseFloat(String(formData.lot)) : 0
-      const parsedPips = formData.pips !== undefined && formData.pips !== null ? Number.parseFloat(String(formData.pips)) : 0
+      const parseNullableNumber = (v: any) => {
+        if (v === undefined || v === null) return null;
+        const s = String(v).trim();
+        if (s === "") return null;
+        const n = Number.parseFloat(s);
+        return isNaN(n) ? null : n;
+      }
+      const parsedEntry = parseNullableNumber(formData.entry)
+      const parsedExit = parseNullableNumber(formData.exit)
+      const parsedLot = parseNullableNumber(formData.lot)
+      const parsedPips = parseNullableNumber(formData.pips)
       const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
   
       // Calculate holding time in seconds from actual entry and exit times
@@ -620,7 +627,7 @@ export function TradeEditDialog({
                   type="number"
                     step="0.0001"
                   value={formData.entry ?? ""}
-                    onChange={(e) => handleFormChange({ entry: Number.parseFloat(e.target.value) })}
+                    onChange={(e) => handleFormChange({ entry: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
                     className="no-spinner"
                 />
               </div>
@@ -631,7 +638,7 @@ export function TradeEditDialog({
                   type="number"
                     step="0.0001"
                   value={formData.exit ?? ""}
-                    onChange={(e) => handleFormChange({ exit: Number.parseFloat(e.target.value) })}
+                    onChange={(e) => handleFormChange({ exit: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
                     className="no-spinner"
                 />
               </div>
@@ -645,7 +652,7 @@ export function TradeEditDialog({
                   type="number"
                   step="0.01"
                   value={formData.lot ?? ""}
-                  onChange={(e) => handleFormChange({ lot: Number.parseFloat(e.target.value) })}
+                  onChange={(e) => handleFormChange({ lot: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
                   placeholder="0.01"
                   className="no-spinner"
                 />
@@ -657,7 +664,7 @@ export function TradeEditDialog({
                   type="number"
                   step="0.1"
                   value={formData.pips ?? ""}
-                  onChange={(e) => handleFormChange({ pips: Number.parseFloat(e.target.value) })}
+                  onChange={(e) => handleFormChange({ pips: e.target.value === "" ? undefined : Number.parseFloat(e.target.value) })}
                   className="no-spinner"
                 />
               </div>
@@ -862,17 +869,17 @@ export function TradeEditDialog({
               <div>
                 <Label htmlFor="newTagInput">新しいタグを追加</Label>
                 <div className="flex gap-2 mt-1">
-                <Input
+                  <Input
                     id="newTagInput"
                     placeholder="新しいタグ名を入力"
-                  value={newTag}
+                    value={newTag}
                     onChange={(e) => handleNewTagChange(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && addNewTagToDatabase(newTag)}
-                />
+                  />
                   <Button type="button" onClick={() => addNewTagToDatabase(newTag)} size="sm">
-                  <Tag className="h-4 w-4" />
-                </Button>
-              </div>
+                    <Tag className="h-4 w-4" />
+                  </Button>
+                </div>
                 {tagError && (
                   <p className="text-red-600 text-sm mt-1">{tagError}</p>
                 )}
@@ -891,26 +898,26 @@ export function TradeEditDialog({
                         onClick={() => confirmDeleteTag(tag)}
                       >
                         {tag} ×
-                  </Badge>
+                      </Badge>
                     ))
                   ) : (
                     <span className="text-sm text-muted-foreground">タグがありません</span>
                   )}
-              </div>
+                </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   タグをクリックして削除
                 </p>
+              </div>
             </div>
-          </div>
   
-          <div className="flex justify-end gap-2 mt-6">
+            <div className="flex justify-end gap-2 mt-6">
               <Button variant="outline" onClick={() => setIsTagEditOpen(false)}>
                 閉じる
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-  
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
         {/* Emotion Edit Dialog */}
         <Dialog open={isEmotionEditOpen} onOpenChange={setIsEmotionEditOpen}>
           <DialogContent className="max-w-md">
@@ -918,7 +925,7 @@ export function TradeEditDialog({
               <DialogTitle>感情管理</DialogTitle>
               <DialogDescription>感情を選択、追加、または削除してください。</DialogDescription>
             </DialogHeader>
-  
+
             <div className="space-y-4">
               {/* Add new emotion */}
               <div>
@@ -939,7 +946,7 @@ export function TradeEditDialog({
                   <p className="text-red-600 text-sm mt-1">{emotionError}</p>
                 )}
               </div>
-  
+
               {/* Available emotions */}
               <div>
                 <Label className="text-sm text-muted-foreground mb-2 block">利用可能な感情:</Label>
@@ -957,16 +964,15 @@ export function TradeEditDialog({
                         onClick={() => {
                           const currentEmotions = formData.emotion || [];
                           if (currentEmotions.includes(emotion)) {
-                            // If already selected, allow deletion
-                            confirmDeleteEmotion(emotion)
+                            // If already selected, unselect it
+                            handleFormChange({ emotion: currentEmotions.filter(e => e !== emotion) })
                           } else {
                             // If not selected, select it
                             handleFormChange({ emotion: [...currentEmotions, emotion] })
-                            setIsEmotionEditOpen(false)
                           }
                         }}
                       >
-                        {emotion} {formData.emotion?.includes(emotion) ? "" : "×"}
+                        {emotion}
                       </Badge>
                     ))
                   ) : (
@@ -978,7 +984,7 @@ export function TradeEditDialog({
                 </p>
               </div>
             </div>
-  
+
             <div className="flex justify-end gap-2 mt-6">
               <Button variant="outline" onClick={() => setIsEmotionEditOpen(false)}>
                 閉じる
@@ -986,7 +992,7 @@ export function TradeEditDialog({
             </div>
           </DialogContent>
         </Dialog>
-  
+
         {/* Tag Delete Warning Dialog */}
         <AlertDialog open={tagToDelete !== null} onOpenChange={() => setTagToDelete(null)}>
           <AlertDialogContent>
@@ -1015,7 +1021,7 @@ export function TradeEditDialog({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-  
+
         {/* Emotion Delete Warning Dialog */}
         <AlertDialog open={emotionToDelete !== null} onOpenChange={() => setEmotionToDelete(null)}>
           <AlertDialogContent>
@@ -1044,7 +1050,7 @@ export function TradeEditDialog({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-  
+
         {/* Discard Changes Warning Dialog */}
         <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
           <AlertDialogContent>
