@@ -137,17 +137,18 @@ export function getColumnValue(trade: Trade, columnId: string, allColumns: any[]
 export function transformTradeData(trade: any, tagsByTradeId: Record<number, string[]>, emotionsByTradeId: Record<number, string[]>): Trade {
   // Build Date objects from separate date and time stored in DB (treating as UTC)
   const toLocalDateFromParts = (dateStr?: string, timeStr?: string): Date | undefined => {
-    if (!dateStr || !timeStr) return undefined;
-    // Interpret DB parts as UTC and let Date convert to local when formatting
-    return new Date(`${dateStr}T${timeStr}Z`);
+    if (!dateStr) return undefined;
+    // Use 00:00:00 if time missing for date-only purposes
+    const time = timeStr && timeStr.trim() !== '' ? timeStr : '00:00:00';
+    return new Date(`${dateStr}T${time}Z`);
   };
 
   const localEntry = toLocalDateFromParts(trade.entry_date, trade.entry_time);
   const localExit = toLocalDateFromParts(trade.exit_date, trade.exit_time);
 
   // Format to datetime-local string for inputs (YYYY-MM-DDTHH:MM:SS)
-  const toLocalInputString = (d?: Date): string => {
-    if (!d) return "";
+  const toLocalInputString = (d?: Date, hadTime?: boolean): string => {
+    if (!d || !hadTime) return "";
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -157,12 +158,25 @@ export function transformTradeData(trade: any, tagsByTradeId: Record<number, str
     return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
   };
 
+  // Determine display date: prefer exit_date; fall back to entry_date
+  const displayDate = (() => {
+    if (trade.exit_date) {
+      const d = toLocalDateFromParts(trade.exit_date, trade.exit_time);
+      return d ? d.toLocaleDateString('en-CA') : '';
+    }
+    if (trade.entry_date) {
+      const d = toLocalDateFromParts(trade.entry_date, trade.entry_time);
+      return d ? d.toLocaleDateString('en-CA') : '';
+    }
+    return '';
+  })();
+
   return {
     id: trade.id,
-    date: localEntry ? localEntry.toLocaleDateString('en-CA') : "",
+    date: displayDate,
     time: localEntry ? formatLocalTime(localEntry) : "",
-    entryTime: toLocalInputString(localEntry),
-    exitTime: toLocalInputString(localExit),
+    entryTime: toLocalInputString(localEntry, !!trade.entry_time),
+    exitTime: toLocalInputString(localExit, !!trade.exit_time),
     pair: trade.symbols?.symbol || "",
     type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
     lot: trade.lot_size || 0,

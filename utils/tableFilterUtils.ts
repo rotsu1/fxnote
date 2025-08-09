@@ -25,12 +25,20 @@ export const filterAndSortTrades = (
 
   const dateString = format(selectedDate, "yyyy-MM-dd")
   
-  // Filter trades by exit date
+  // Filter trades by exit date (fallback to entry date), include those without time
   let filtered = trades.filter((trade) => {
-    if (!trade.exitTime) return false
-    const exitDate = new Date(trade.exitTime)
-    const exitDateString = exitDate.toLocaleDateString('en-CA') // YYYY-MM-DD format
-    return exitDateString === dateString
+    // Prefer exitTime/date, else use date from trade.date
+    const referenceDate = (() => {
+      // If we have exitTime string, use it
+      if (trade.exitTime) return new Date(trade.exitTime)
+      // Else fall back to trade.date (already local YYYY-MM-DD string)
+      if (trade.date) return new Date(`${trade.date}T00:00:00`)
+      return null
+    })()
+
+    if (!referenceDate) return false
+    const refDateString = referenceDate.toLocaleDateString('en-CA') // YYYY-MM-DD format
+    return refDateString === dateString
   })
 
   // Apply sorting

@@ -117,12 +117,13 @@ export function parseTimeToMinutes(timeStr: string): number {
 // Helper to group trades by date (exit_date/exit_time) with proper timezone handling
 export function groupTradesByDate(trades: any[]): Record<string, any[]> {
     return trades.reduce((acc: Record<string, any[]>, trade: any) => {
-      const hasExit = trade.exit_date && trade.exit_time;
-      if (!hasExit) return acc;
+      // Prefer exit date; fall back to entry date; allow missing time
+      const dateStr = trade.exit_date || trade.entry_date;
+      if (!dateStr) return acc;
+      const timeStr = trade.exit_date ? (trade.exit_time || '00:00:00') : (trade.entry_time || '00:00:00');
       
-      // Combine to local date string YYYY-MM-DD
-      const exitDate = new Date(`${trade.exit_date}T${trade.exit_time || '00:00:00'}Z`);
-      const localDate = exitDate.toLocaleDateString('en-CA');
+      const d = new Date(`${dateStr}T${timeStr}Z`);
+      const localDate = d.toLocaleDateString('en-CA');
       
       if (!acc[localDate]) acc[localDate] = [];
       acc[localDate].push(trade);
