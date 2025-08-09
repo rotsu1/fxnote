@@ -92,6 +92,7 @@ export function TradeEditDialog({
             holdingDays: undefined,
             holdingHours: undefined,
             holdingMinutes: undefined,
+            holdingSeconds: undefined,
             notes: "",
             tags: [],
           },

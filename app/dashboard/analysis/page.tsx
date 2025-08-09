@@ -97,8 +97,12 @@ function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGrid
       const winPipsAvg = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.pips || 0), 0) / winCount : 0;
       const lossPipsAvg = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.pips || 0), 0) / lossCount : 0;
 
-      const winHoldAvg = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / winCount : 0;
-      const lossHoldAvg = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / lossCount : 0;
+      // Calculate average holding time only for trades with valid holding time data
+      const winTradesWithHoldingTime = wins.filter((t: any) => t.hold_time && t.hold_time > 0);
+      const lossTradesWithHoldingTime = losses.filter((t: any) => t.hold_time && t.hold_time > 0);
+      
+      const winHoldAvg = winTradesWithHoldingTime.length > 0 ? winTradesWithHoldingTime.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / winTradesWithHoldingTime.length : 0;
+      const lossHoldAvg = lossTradesWithHoldingTime.length > 0 ? lossTradesWithHoldingTime.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / lossTradesWithHoldingTime.length : 0;
 
       const winRate = totalCount > 0 ? (winCount / totalCount) * 100 : 0;
       const avgWinProfit = winCount > 0 ? winProfitSum / winCount : 0;
@@ -530,6 +534,7 @@ function TimeAnalysis() {
           const avgLossLoss = losses > 0 ? lossLoss / losses : 0;
           const avgWinPips = winCountWithPips > 0 ? winPips / winCountWithPips : 0;
           const avgLossPips = lossCountWithPips > 0 ? lossPips / lossCountWithPips : 0;
+          // Calculate average holding time only for trades with valid holding time data
           const avgWinHoldingTime = winCountWithHoldingTime > 0 ? winHoldingTime / winCountWithHoldingTime : 0;
           const avgLossHoldingTime = lossCountWithHoldingTime > 0 ? lossHoldingTime / lossCountWithHoldingTime : 0;
           
@@ -786,8 +791,12 @@ function MonthlyBreakdown() {
             const avgWinPips = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.pips || 0), 0) / winCount : 0;
             const avgLossPips = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.pips || 0), 0) / lossCount : 0;
 
-            const avgWinHoldingTime = winCount > 0 ? wins.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / winCount : 0;
-            const avgLossHoldingTime = lossCount > 0 ? losses.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / lossCount : 0;
+            // Calculate average holding time only for trades with valid holding time data
+            const winTradesWithHoldingTime = wins.filter((t: any) => t.hold_time && t.hold_time > 0);
+            const lossTradesWithHoldingTime = losses.filter((t: any) => t.hold_time && t.hold_time > 0);
+            
+            const avgWinHoldingTime = winTradesWithHoldingTime.length > 0 ? winTradesWithHoldingTime.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / winTradesWithHoldingTime.length : 0;
+            const avgLossHoldingTime = lossTradesWithHoldingTime.length > 0 ? lossTradesWithHoldingTime.reduce((s: number, t: any) => s + (t.hold_time || 0), 0) / lossTradesWithHoldingTime.length : 0;
 
             const winRate = total > 0 ? (winCount / total) * 100 : 0;
 
