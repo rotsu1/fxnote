@@ -48,48 +48,53 @@ export function TradeEditDialog({
     const [showDiscardWarning, setShowDiscardWarning] = useState(false);
     const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
     
-    // Create datetime strings from defaultDate for entry and exit times
-    const createDateTimeString = (dateStr: string, timeStr: string = "00:00:00") => {
-      return dateStr ? `${dateStr}T${timeStr}` : "";
-    };
-    
-    const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
-    
-    const getDatePart = (dt?: string) => (dt ? dt.split("T")[0] : "");
-    const getTimePart = (dt?: string) => {
-      if (!dt) return "";
-      const part = dt.split("T")[1] || "";
-      if (!part) return "";
-      const [hh = "00", mm = "00", ss = "00"] = part.split(":");
-      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}`;
-    };
+    // Create datetime strings helpers
     const ensureTimeWithSeconds = (t: string) => {
       if (!t) return "";
       const [hh = "00", mm = "00", ss] = t.split(":");
       return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String((ss ?? "00")).padStart(2, "0")}`;
     };
     
-    const [formData, setFormData] = useState<Partial<Trade>>(
-      trade || {
-        date: defaultDateStr,
-        time: "",
-        entryTime: createDateTimeString(defaultDateStr),
-        exitTime: createDateTimeString(defaultDateStr),
-        pair: "",
-        type: "買い",
-        entry: undefined,
-        exit: undefined,
-        lot: undefined,
-        pips: undefined,
-        profit: undefined,
-        emotion: [],
-        holdingTime: 0,
-        holdingDays: 0,
-        holdingHours: 0,
-        holdingMinutes: 0,
-        notes: "",
-        tags: [],
-      },
+    const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
+
+    type TradeForm = Partial<Trade> & {
+      entryDate: string;
+      entryTime: string; // HH:mm or HH:mm:ss
+      exitDate: string;
+      exitTime: string;  // HH:mm or HH:mm:ss
+    };
+    
+    const [formData, setFormData] = useState<TradeForm>(
+      trade
+        ? {
+            ...trade,
+            entryDate: trade.entryTime ? (trade.entryTime.split("T")[0] || "") : defaultDateStr,
+            entryTime: trade.entryTime ? (trade.entryTime.split("T")[1] || "") : "",
+            exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : defaultDateStr,
+            exitTime: trade.exitTime ? (trade.exitTime.split("T")[1] || "") : "",
+          }
+        : {
+            date: defaultDateStr,
+            time: "",
+            entryDate: defaultDateStr,
+            entryTime: "",
+            exitDate: defaultDateStr,
+            exitTime: "",
+            pair: "",
+            type: "買い",
+            entry: undefined,
+            exit: undefined,
+            lot: undefined,
+            pips: undefined,
+            profit: undefined,
+            emotion: [],
+            holdingTime: 0,
+            holdingDays: 0,
+            holdingHours: 0,
+            holdingMinutes: 0,
+            notes: "",
+            tags: [],
+          },
     )
     const [newTag, setNewTag] = useState("")
     const [isTagEditOpen, setIsTagEditOpen] = useState(false)
@@ -108,32 +113,40 @@ export function TradeEditDialog({
     const [loadingSymbols, setLoadingSymbols] = useState(false)
   
     useEffect(() => {
-      const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
+      const defaultDateStrLocal = defaultDate || new Date().toISOString().split("T")[0];
       
-      const newFormData = trade || {
-        date: defaultDateStr,
-        time: "",
-        entryTime: createDateTimeString(defaultDateStr, "00:00:00"),
-        exitTime: createDateTimeString(defaultDateStr, "00:00:00"),
-        pair: "",
-        type: "買い",
-        entry: undefined,
-        exit: undefined,
-        lot: undefined,
-        pips: undefined,
-        profit: undefined,
-        emotion: [],
-        holdingTime: 0,
-        holdingDays: 0,
-        holdingHours: 0,
-        holdingMinutes: 0,
-        holdingSeconds: 0,
-        notes: "",
-        tags: [],
-      };
+      const newFormData: TradeForm = trade
+        ? {
+            ...trade,
+            entryDate: trade.entryTime ? (trade.entryTime.split("T")[0] || "") : defaultDateStrLocal,
+            entryTime: trade.entryTime ? (trade.entryTime.split("T")[1] || "") : "",
+            exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : defaultDateStrLocal,
+            exitTime: trade.exitTime ? (trade.exitTime.split("T")[1] || "") : "",
+          }
+        : {
+            date: defaultDateStrLocal,
+            time: "",
+            entryDate: defaultDateStrLocal,
+            entryTime: "",
+            exitDate: defaultDateStrLocal,
+            exitTime: "",
+            pair: "",
+            type: "買い",
+            entry: undefined,
+            exit: undefined,
+            lot: undefined,
+            pips: undefined,
+            profit: undefined,
+            emotion: [],
+            holdingTime: 0,
+            holdingDays: 0,
+            holdingHours: 0,
+            holdingMinutes: 0,
+            holdingSeconds: 0,
+            notes: "",
+            tags: [],
+          };
 
-      console.log("holdingTime:", newFormData.holdingTime);
-      
       setFormData(newFormData);
       setHasUnsavedChanges(false);
     }, [trade, defaultDate, isOpen])
@@ -224,13 +237,13 @@ export function TradeEditDialog({
       loadSymbolsFromDatabase()
     }, [user])
   
-    // Auto-calculate holding time when entry and exit times change
+    // Auto-calculate holding time when entry and exit times change (only when both are present)
     useEffect(() => {
-      if (formData.entryTime && formData.exitTime) {
-        const entryDate = new Date(formData.entryTime);
-        const exitDate = new Date(formData.exitTime);
+      if (formData.entryDate && formData.entryTime && formData.exitDate && formData.exitTime) {
+        const entryDateObj = new Date(`${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`);
+        const exitDateObj = new Date(`${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`);
         
-        const diffMs = exitDate.getTime() - entryDate.getTime();
+        const diffMs = exitDateObj.getTime() - entryDateObj.getTime();
         const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
         const diffHours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
         const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
@@ -244,7 +257,7 @@ export function TradeEditDialog({
           holdingSeconds: diffSeconds
         }));
       }
-    }, [formData.entryTime, formData.exitTime])
+    }, [formData.entryDate, formData.entryTime, formData.exitDate, formData.exitTime])
   
     const addNewTagToDatabase = async (tagName: string) => {
       if (!tagName.trim() || !user) return
@@ -398,7 +411,7 @@ export function TradeEditDialog({
       }
     }
   
-    const handleFormChange = (updates: Partial<Trade>) => {
+    const handleFormChange = (updates: Partial<TradeForm>) => {
       setFormData(prev => ({ ...prev, ...updates }));
       setHasUnsavedChanges(true);
     };
@@ -435,9 +448,16 @@ export function TradeEditDialog({
       // Calculate holding time in seconds from actual entry and exit times
       let holdingTimeInSeconds = 0;
       
-      if (formData.entryTime && formData.exitTime) {
-        const entryDate = new Date(formData.entryTime);
-        const exitDate = new Date(formData.exitTime);
+      const entryCombined = formData.entryDate && formData.entryTime
+        ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
+        : "";
+      const exitCombined = formData.exitDate && formData.exitTime
+        ? `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`
+        : "";
+      
+      if (entryCombined && exitCombined) {
+        const entryDate = new Date(entryCombined);
+        const exitDate = new Date(exitCombined);
         
         // Check if dates are valid
         if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
@@ -450,15 +470,17 @@ export function TradeEditDialog({
           }
         }
       } else {
-              // Fallback to manual calculation if datetime fields are not available
-      holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
-                            (formData.holdingHours || 0) * 60 * 60 + 
-                            (formData.holdingMinutes || 0) * 60 +
-                            (formData.holdingSeconds || 0)
+        // Fallback to manual calculation if datetime fields are not available
+        holdingTimeInSeconds = (formData.holdingDays || 0) * 24 * 60 * 60 + 
+                              (formData.holdingHours || 0) * 60 * 60 + 
+                              (formData.holdingMinutes || 0) * 60 +
+                              (formData.holdingSeconds || 0)
       }
   
-      const tradeDataToSave = {
+      const tradeDataToSave: any = {
         ...formData,
+        entryTime: entryCombined,
+        exitTime: exitCombined,
         entry: parsedEntry,
         exit: parsedExit,
         lot: parsedLot,
@@ -466,7 +488,7 @@ export function TradeEditDialog({
         profit: parsedProfit,
         holdingTime: holdingTimeInSeconds,
       };
-  
+      
       onSave(tradeDataToSave)
       setHasUnsavedChanges(false);
     }
@@ -502,22 +524,21 @@ export function TradeEditDialog({
                     <Input
                       id="entryDate"
                       type="date"
-                      value={getDatePart(formData.entryTime) || ""}
+                      value={formData.entryDate || ""}
                       onChange={(e) => {
                         const date = e.target.value;
-                        const time = ensureTimeWithSeconds(getTimePart(formData.entryTime));
-                        handleFormChange({ entryTime: date ? `${date}T${time}` : "" });
+                        handleFormChange({ entryDate: date });
                       }}
                     />
                     <Input
                       id="entryTime"
                       type="time"
                       step="1"
-                      value={getTimePart(formData.entryTime) || ""}
+                      placeholder="--:--:--"
+                      value={formData.entryTime || ""}
                       onChange={(e) => {
                         const time = ensureTimeWithSeconds(e.target.value);
-                        const date = getDatePart(formData.entryTime) || defaultDateStr;
-                        handleFormChange({ entryTime: date ? `${date}T${time}` : "" });
+                        handleFormChange({ entryTime: time });
                       }}
                     />
                   </div>
@@ -528,22 +549,21 @@ export function TradeEditDialog({
                     <Input
                       id="exitDate"
                       type="date"
-                      value={getDatePart(formData.exitTime) || ""}
+                      value={formData.exitDate || ""}
                       onChange={(e) => {
                         const date = e.target.value;
-                        const time = ensureTimeWithSeconds(getTimePart(formData.exitTime));
-                        handleFormChange({ exitTime: date ? `${date}T${time}` : "" });
+                        handleFormChange({ exitDate: date });
                       }}
                     />
                     <Input
                       id="exitTime"
                       type="time"
                       step="1"
-                      value={getTimePart(formData.exitTime) || ""}
+                      placeholder="--:--:--"
+                      value={formData.exitTime || ""}
                       onChange={(e) => {
                         const time = ensureTimeWithSeconds(e.target.value);
-                        const date = getDatePart(formData.exitTime) || defaultDateStr;
-                        handleFormChange({ exitTime: date ? `${date}T${time}` : "" });
+                        handleFormChange({ exitTime: time });
                       }}
                     />
                   </div>

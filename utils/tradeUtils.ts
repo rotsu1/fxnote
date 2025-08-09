@@ -91,26 +91,57 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         }
       }
 
-      const entryUtc = toUTCDateAndTime(tradeData.entryTime);
-      const exitUtc = toUTCDateAndTime(tradeData.exitTime);
+      // Compute entry/exit date and time allowing date-only values and time-only values
+      const fallbackEntryDate = (tradeData as any).entryDate as string | undefined;
+      const fallbackExitDate = (tradeData as any).exitDate as string | undefined;
+      const fallbackEntryTimeOnly = (tradeData as any).entryTime as string | undefined;
+      const fallbackExitTimeOnly = (tradeData as any).exitTime as string | undefined;
+
+      let entryDateVal: string | null = null;
+      let entryTimeVal: string | null = null;
+      if (tradeData.entryTime && tradeData.entryTime.includes('T')) {
+        const entryUtc = toUTCDateAndTime(tradeData.entryTime);
+        entryDateVal = entryUtc.date;
+        entryTimeVal = entryUtc.time;
+      } else {
+        // accept split fields
+        if (fallbackEntryDate) entryDateVal = fallbackEntryDate;
+        entryTimeVal = fallbackEntryTimeOnly ? ensureTimeWithSeconds(fallbackEntryTimeOnly) : null;
+      }
+
+      let exitDateVal: string | null = null;
+      let exitTimeVal: string | null = null;
+      if (tradeData.exitTime && tradeData.exitTime.includes('T')) {
+        const exitUtc = toUTCDateAndTime(tradeData.exitTime);
+        exitDateVal = exitUtc.date;
+        exitTimeVal = exitUtc.time;
+      } else {
+        // accept split fields
+        if (fallbackExitDate) exitDateVal = fallbackExitDate;
+        exitTimeVal = fallbackExitTimeOnly ? ensureTimeWithSeconds(fallbackExitTimeOnly) : null;
+      }
+
+      const payloadCommon = {
+        symbol: symbolId,
+        trade_type: tradeData.type === "買い" ? 0 : 1,
+        lot_size: tradeData.lot,
+        entry_price: tradeData.entry,
+        exit_price: tradeData.exit,
+        pips: tradeData.pips,
+        profit_loss: tradeData.profit,
+        trade_memo: tradeData.notes,
+        entry_date: entryDateVal,
+        entry_time: entryTimeVal,
+        exit_date: exitDateVal,
+        exit_time: exitTimeVal,
+      } as const;
 
       if (editingTrade?.id) {
         // Update existing trade
         const { error } = await supabase
           .from("trades")
           .update({
-            symbol: symbolId,
-            trade_type: tradeData.type === "買い" ? 0 : 1,
-            lot_size: tradeData.lot,
-            entry_price: tradeData.entry,
-            exit_price: tradeData.exit,
-            pips: tradeData.pips,
-            profit_loss: tradeData.profit,
-            trade_memo: tradeData.notes,
-            entry_date: entryUtc.date,
-            entry_time: entryUtc.time,
-            exit_date: exitUtc.date,
-            exit_time: exitUtc.time,
+            ...payloadCommon,
             updated_at: new Date().toISOString(),
           })
           .eq("id", editingTrade.id)
@@ -126,20 +157,9 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         // Add new trade
         const { data, error } = await supabase
           .from("trades")
-          .insert([{
+          .insert([{ 
             user_id: user.id,
-            symbol: symbolId,
-            trade_type: tradeData.type === "買い" ? 0 : 1,
-            lot_size: tradeData.lot,
-            entry_price: tradeData.entry,
-            exit_price: tradeData.exit,
-            pips: tradeData.pips,
-            profit_loss: tradeData.profit,
-            trade_memo: tradeData.notes,
-            entry_date: entryUtc.date,
-            entry_time: entryUtc.time,
-            exit_date: exitUtc.date,
-            exit_time: exitUtc.time,
+            ...payloadCommon,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }])
