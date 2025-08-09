@@ -7,16 +7,12 @@ export const transformTradeForEditing = (trade: any): Trade => {
   const tradeTags = trade.tradeTags || [];
   const tradeEmotions = trade.tradeEmotions || [];
 
-  // Combine separate date/time into ISO-like local strings for UI
+  // Convert UTC date/time parts from DB into a local datetime string for UI inputs
   const toLocalDateTime = (dateStr?: string, timeStr?: string): string => {
     if (!dateStr || !timeStr) return "";
-    const ensure = (t: string) => {
-      const [hh = "00", mm = "00", ss] = (t || "00:00:00").split(":");
-      return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss ?? "00").padStart(2, "0")}`;
-    };
-    const local = `${dateStr}T${ensure(timeStr)}`;
-    // Store as local string for datetime-local/time inputs
-    return local;
+    const [hh = "00", mm = "00", ss = "00"] = (timeStr || "00:00:00").split(":");
+    const isoUtc = `${dateStr}T${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String(ss).padStart(2, "0")}Z`;
+    return utcToLocalDateTime(isoUtc);
   };
 
   return {
