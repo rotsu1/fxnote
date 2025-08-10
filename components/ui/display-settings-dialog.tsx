@@ -110,15 +110,15 @@ export function DisplaySettingsDialog({
           <AlertDialogHeader>
             <AlertDialogTitle>設定を破棄しますか？</AlertDialogTitle>
             <AlertDialogDescription>
-              <p className="mb-2">
+              <span className="mb-2">
                 保存されていない設定変更があります。
-              </p>
-              <p className="text-red-600">
+              </span>
+              <span className="text-red-600">
                 ⚠️ 現在の設定変更は破棄されます。
-              </p>
-              <p className="text-sm text-muted-foreground mt-2">
+              </span>
+              <span className="text-sm text-muted-foreground mt-2">
                 この操作は取り消すことができません。
-              </p>
+              </span>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

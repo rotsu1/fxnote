@@ -92,31 +92,31 @@ export function TradeCard({
   
           {displaySettings.show_entry_price && (
             <div className="text-sm mb-1">
-              エントリー価格: {trade.entry || trade.entry_price}
-          </div>
+              エントリー価格: {trade.entry || trade.entry_price || ""}
+            </div>
           )}
   
           {displaySettings.show_exit_price && (
             <div className="text-sm mb-1">
-              エグジット価格: {trade.exit || trade.exit_price}
-          </div>
-          )}
-  
-          {displaySettings.show_lot && trade.lot_size && (
-            <div className="text-sm mb-1">
-              ロット: {trade.lot_size}
+              エグジット価格: {trade.exit || trade.exit_price || ""}
             </div>
           )}
   
-          {displaySettings.show_pips && trade.pips && (
+          {displaySettings.show_lot && (
             <div className="text-sm mb-1">
-              pips: {trade.pips}
+              ロット: {trade.lot_size || ""}
             </div>
           )}
   
-          {displaySettings.show_hold_time && trade.hold_time && (
+          {displaySettings.show_pips && (
             <div className="text-sm mb-1">
-              保有時間: {formatHoldTime(trade.hold_time)}
+              pips: {trade.pips || ""}
+            </div>
+          )}
+  
+          {displaySettings.show_hold_time && (
+            <div className="text-sm mb-1">
+              保有時間: {trade.hold_time !== undefined && trade.hold_time !== null ? formatHoldTime(trade.hold_time) : ""}
             </div>
           )}
   
@@ -141,9 +141,9 @@ export function TradeCard({
           </div>
           )}
   
-          {displaySettings.show_note && trade.trade_memo && (
+          {displaySettings.show_note && (
             <div className="text-sm text-gray-600">
-              メモ: {trade.trade_memo}
+              メモ: {trade.trade_memo || ""}
             </div>
           )}
         </CardContent>

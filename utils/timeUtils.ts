@@ -34,7 +34,7 @@ export function utcToLocalDateTime(input: string): string {
 
 // Helper to format hold time from seconds to readable format
 export function formatHoldTime(seconds: number): string {
-    if (!seconds || seconds <= 0) return "0分";
+    if (!seconds || seconds <= 0) return "0秒";
     
     const days = Math.floor(seconds / (24 * 60 * 60));
     const hours = Math.floor((seconds % (24 * 60 * 60)) / (60 * 60));
@@ -47,7 +47,7 @@ export function formatHoldTime(seconds: number): string {
     if (minutes > 0) result += `${minutes}分`;
     if (remainingSeconds > 0) result += `${remainingSeconds}秒`;
     
-    return result || "0分";
+    return result || "0秒";
 }
 
 // Helper to format hold time from seconds to compact format (for table display)
