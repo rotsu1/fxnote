@@ -19,8 +19,56 @@ export function MonthlyNavigation({ currentDate, onDateChange, trades, onImportC
 
   // Calculate monthly P/L with proper timezone handling
   const monthlyPL = trades.reduce((sum: number, trade: any) => {
-    const tradeDate = combine(trade);
+    // For monthly P/L, prioritize closed trades (exit_date/exit_time) over open trades
+    let tradeDate: Date | null = null;
+    
+    // First, try to use exit_date and exit_time (when trade was closed)
+    if (trade?.exit_date && trade?.exit_time) {
+      try {
+        // Create date from exit_date and exit_time, then convert to local time
+        const utcDate = new Date(`${trade.exit_date}T${trade.exit_time}Z`);
+        tradeDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60000));
+      } catch (error) {
+        console.warn('Error parsing exit date/time for trade:', trade.id, trade.exit_date, trade.exit_time);
+      }
+    }
+    
+    // If only exit_date is present (without exit_time), use that for monthly P/L
+    if (!tradeDate && trade?.exit_date) {
+      try {
+        tradeDate = new Date(trade.exit_date);
+      } catch (error) {
+        console.warn('Error parsing exit date for trade:', trade.id, trade.exit_date);
+      }
+    }
+    
+    // If no exit date/time, fall back to entry date/time (when trade was opened)
+    if (!tradeDate && trade?.entry_date && trade?.entry_time) {
+      try {
+        // Create date from entry_date and entry_time, then convert to local time
+        const utcDate = new Date(`${trade.entry_date}T${trade.entry_time}Z`);
+        tradeDate = new Date(utcDate.getTime() - (utcDate.getTimezoneOffset() * 60000));
+      } catch (error) {
+        console.warn('Error parsing entry date/time for trade:', trade.id, trade.entry_date, trade.entry_time);
+      }
+    }
+    
+    // If only entry_date is present (without entry_time), use that
+    if (!tradeDate && trade?.entry_date) {
+      try {
+        tradeDate = new Date(trade.entry_date);
+      } catch (error) {
+        console.warn('Error parsing entry date for trade:', trade.id, trade.entry_date);
+      }
+    }
+    
+    // If still no valid date, try the old combine function as fallback
+    if (!tradeDate) {
+      tradeDate = combine(trade);
+    }
+    
     if (!tradeDate) return sum;
+    
     // Use local date for comparison
     if (tradeDate.getFullYear() === currentYear && tradeDate.getMonth() === currentMonth) {
       return sum + (trade.profit_loss || trade.pnl || 0);
