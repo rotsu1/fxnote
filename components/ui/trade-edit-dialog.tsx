@@ -1,14 +1,12 @@
 "use client"
 
 import {
-    Plus,
     Edit,
     Tag,
   } from "lucide-react"
 
 import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,7 +24,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Trade } from "@/utils/types"
-
+import { TagEditDialog } from "./tag-edit-dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 
 export function TradeEditDialog({
@@ -1089,141 +1088,42 @@ export function TradeEditDialog({
         </Dialog>
   
               {/* Tag Edit Dialog */}
-        <Dialog open={isTagEditOpen} onOpenChange={setIsTagEditOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>タグ管理</DialogTitle>
-              <DialogDescription>データベースのタグを追加または削除してください。</DialogDescription>
-            </DialogHeader>
-  
-            <div className="space-y-4">
-              {/* Add new tag */}
-              <div>
-                <Label htmlFor="newTagInput">新しいタグを追加</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="newTagInput"
-                    placeholder="新しいタグ名を入力"
-                    value={newTag}
-                    onChange={(e) => handleNewTagChange(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addNewTagToDatabase(newTag)}
-                  />
-                  <Button type="button" onClick={() => addNewTagToDatabase(newTag)} size="sm">
-                    <Tag className="h-4 w-4" />
-                  </Button>
-                </div>
-                {tagError && (
-                  <p className="text-red-600 text-sm mt-1">{tagError}</p>
-                )}
-              </div>
-  
-              {/* All available tags with delete option */}
-              <div>
-                <Label className="text-sm text-muted-foreground mb-2 block">利用可能なタグ:</Label>
-                <div className="flex flex-wrap gap-1 max-h-64 overflow-y-auto border rounded p-2">
-                  {availableTagsList.length > 0 ? (
-                    availableTagsList.map((tag, index) => (
-                      <Badge
-                        key={index}
-                        variant="outline"
-                        className="cursor-pointer text-xs hover:bg-red-50 hover:border-red-300"
-                        onClick={() => confirmDeleteTag(tag)}
-                      >
-                        {tag} ×
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-muted-foreground">タグがありません</span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  タグをクリックして削除
-                </p>
-              </div>
-            </div>
-  
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setIsTagEditOpen(false)}>
-                閉じる
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <TagEditDialog
+          isOpen={isTagEditOpen}
+          onOpenChange={setIsTagEditOpen}
+          title="タグ管理"
+          description="データベースのタグを追加または削除してください。"
+          addLabel="新しいタグを追加"
+          placeholder="新しいタグ名を入力"
+          availableItems={availableTagsList}
+          newItem={newTag}
+          onNewItemChange={handleNewTagChange}
+          onAddItem={addNewTagToDatabase}
+          onDeleteItem={confirmDeleteTag}
+          error={tagError}
+          icon="tag"
+          emptyMessage="タグがありません"
+          helpText="タグをクリックして削除"
+        />
 
         {/* Emotion Edit Dialog */}
-        <Dialog open={isEmotionEditOpen} onOpenChange={setIsEmotionEditOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>感情管理</DialogTitle>
-              <DialogDescription>感情を選択、追加、または削除してください。</DialogDescription>
-            </DialogHeader>
-
-            <div className="space-y-4">
-              {/* Add new emotion */}
-              <div>
-                <Label htmlFor="newEmotionInput">新しい感情を追加</Label>
-                <div className="flex gap-2 mt-1">
-                  <Input
-                    id="newEmotionInput"
-                    placeholder="新しい感情名を入力"
-                    value={newEmotion}
-                    onChange={(e) => handleNewEmotionChange(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && addNewEmotionToDatabase(newEmotion)}
-                  />
-                  <Button type="button" onClick={() => addNewEmotionToDatabase(newEmotion)} size="sm">
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                {emotionError && (
-                  <p className="text-red-600 text-sm mt-1">{emotionError}</p>
-                )}
-              </div>
-
-              {/* Available emotions */}
-              <div>
-                <Label className="text-sm text-muted-foreground mb-2 block">利用可能な感情:</Label>
-                <div className="flex flex-wrap gap-1 max-h-64 overflow-y-auto border rounded p-2">
-                  {loadingEmotions ? (
-                    <span className="text-sm text-muted-foreground">感情を読み込み中...</span>
-                  ) : availableEmotions.length > 0 ? (
-                    availableEmotions.map((emotion, index) => (
-                      <Badge
-                        key={index}
-                        variant={formData.emotion?.includes(emotion) ? "default" : "outline"}
-                        className={`cursor-pointer text-xs ${
-                          formData.emotion?.includes(emotion) ? "bg-black text-white hover:bg-black/90" : "hover:bg-red-50 hover:border-red-300"
-                        }`}
-                        onClick={() => {
-                          const currentEmotions = formData.emotion || [];
-                          if (currentEmotions.includes(emotion)) {
-                            // If already selected, unselect it
-                            handleFormChange({ emotion: currentEmotions.filter(e => e !== emotion) })
-                          } else {
-                            // If not selected, select it
-                            handleFormChange({ emotion: [...currentEmotions, emotion] })
-                          }
-                        }}
-                      >
-                        {emotion}
-                      </Badge>
-                    ))
-                  ) : (
-                    <span className="text-sm text-muted-foreground">感情がありません</span>
-                  )}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  選択済みの感情をクリックして削除、未選択の感情をクリックして選択
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <Button variant="outline" onClick={() => setIsEmotionEditOpen(false)}>
-                閉じる
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <TagEditDialog
+          isOpen={isEmotionEditOpen}
+          onOpenChange={setIsEmotionEditOpen}
+          title="感情管理"
+          description="データベースの感情を追加または削除してください。"
+          addLabel="新しい感情を追加"
+          placeholder="新しい感情名を入力"
+          availableItems={availableEmotions}
+          newItem={newEmotion}
+          onNewItemChange={handleNewEmotionChange}
+          onAddItem={addNewEmotionToDatabase}
+          onDeleteItem={confirmDeleteEmotion}
+          error={emotionError}
+          icon="plus"
+          emptyMessage="感情がありません"
+          helpText="感情をクリックして削除"
+        />
 
         {/* Tag Delete Warning Dialog */}
         <AlertDialog open={tagToDelete !== null} onOpenChange={() => setTagToDelete(null)}>
