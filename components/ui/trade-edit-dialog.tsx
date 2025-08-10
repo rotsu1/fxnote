@@ -123,6 +123,7 @@ export function TradeEditDialog({
     const [emotionToDelete, setEmotionToDelete] = useState<string | null>(null)
     const [validationError, setValidationError] = useState("")
     const [datetimeValidationError, setDatetimeValidationError] = useState("")
+    const [dateValidationError, setDateValidationError] = useState("")
     const [lotValidationError, setLotValidationError] = useState("")
     const [holdingTimeValidationError, setHoldingTimeValidationError] = useState("")
     const [availableSymbols, setAvailableSymbols] = useState<string[]>([])
@@ -471,6 +472,11 @@ export function TradeEditDialog({
       setFormData(prev => ({ ...prev, ...updates }));
       setHasUnsavedChanges(true);
       
+      // Clear date validation errors when date fields change (times are optional)
+      if ('entryDate' in updates || 'exitDate' in updates) {
+        setDateValidationError("");
+      }
+      
       // Clear lot validation errors when lot field changes
       if ('lot' in updates) {
         setLotValidationError("");
@@ -486,22 +492,34 @@ export function TradeEditDialog({
         }
       }
       
-      // Real-time datetime validation
+      // Real-time datetime validation - check both full datetime and date-only scenarios
       const newFormData = { ...formData, ...updates };
+      let hasDatetimeError = false;
+      
       if (newFormData.entryDate && newFormData.entryTime && newFormData.exitDate && newFormData.exitTime) {
+        // Both times provided - validate full datetime
         const entryCombined = `${newFormData.entryDate}T${ensureTimeWithSeconds(newFormData.entryTime)}`;
         const exitCombined = `${newFormData.exitDate}T${ensureTimeWithSeconds(newFormData.exitTime)}`;
         const entryDate = new Date(entryCombined);
         const exitDate = new Date(exitCombined);
         
         if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime()) && exitDate < entryDate) {
-          setDatetimeValidationError("エグジット日時はエントリー日時より後である必要があります");
-          scrollToTop();
-        } else {
-          setDatetimeValidationError("");
+          hasDatetimeError = true;
         }
+      } else if (newFormData.entryDate && newFormData.exitDate) {
+        // Only dates provided - validate date order (times will default to midnight)
+        const entryDate = new Date(newFormData.entryDate);
+        const exitDate = new Date(newFormData.exitDate);
+        
+        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime()) && exitDate < entryDate) {
+          hasDatetimeError = true;
+        }
+      }
+      
+      if (hasDatetimeError) {
+        setDatetimeValidationError("エグジット日付はエントリー日付より後である必要があります");
+        scrollToTop();
       } else {
-        // Clear error if not all fields are filled
         setDatetimeValidationError("");
       }
       
@@ -526,19 +544,42 @@ export function TradeEditDialog({
     const handleSave = () => {
       // Clear previous validation errors
       setValidationError("")
+      setDateValidationError("")
       
-      // Always validate datetime before proceeding
+      // Validate that both entry and exit dates are filled (times are optional)
+      if (!formData.entryDate || !formData.exitDate) {
+        setDateValidationError("エントリー日付とエグジット日付は両方とも入力が必要です");
+        scrollToTop();
+        return;
+      }
+      
+      // Validate datetime order - check both full datetime and date-only scenarios
+      let hasDatetimeError = false;
+      
       if (formData.entryDate && formData.entryTime && formData.exitDate && formData.exitTime) {
+        // Both times provided - validate full datetime
         const entryCombined = `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`;
         const exitCombined = `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`;
         const entryDate = new Date(entryCombined);
         const exitDate = new Date(exitCombined);
         
         if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime()) && exitDate < entryDate) {
-          setDatetimeValidationError("エグジット日時はエントリー日時より後である必要があります");
-          scrollToTop();
-          return;
+          hasDatetimeError = true;
         }
+      } else if (formData.entryDate && formData.exitDate) {
+        // Only dates provided - validate date order (times will default to midnight)
+        const entryDate = new Date(formData.entryDate);
+        const exitDate = new Date(formData.exitDate);
+        
+        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime()) && exitDate < entryDate) {
+          hasDatetimeError = true;
+        }
+      }
+      
+      if (hasDatetimeError) {
+        setDatetimeValidationError("エグジット日付はエントリー日付より後である必要があります");
+        scrollToTop();
+        return;
       }
       
       // Clear datetime validation error if validation passes
@@ -600,11 +641,16 @@ export function TradeEditDialog({
       const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
       
       // Build combined datetime strings once so they are available for both save and calculations
-      const entryCombined = formData.entryDate && formData.entryTime
-        ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
+      // If time is not provided, use just the date (will be treated as midnight)
+      const entryCombined = formData.entryDate
+        ? formData.entryTime 
+          ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
+          : `${formData.entryDate}T00:00:00`
         : "";
-      const exitCombined = formData.exitDate && formData.exitTime
-        ? `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`
+      const exitCombined = formData.exitDate
+        ? formData.exitTime 
+          ? `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`
+          : `${formData.exitDate}T00:00:00`
         : "";
 
       // Calculate holding time in seconds. If any manual holding input is provided, use it. Otherwise, use entry/exit datetime difference if available.
@@ -625,7 +671,7 @@ export function TradeEditDialog({
         const s = Number(formData.holdingSeconds) || 0;
         holdingTimeInSeconds = d * 24 * 60 * 60 + h * 60 * 60 + m * 60 + s;
       } else if (entryCombined && exitCombined) {
-        // Only calculate from entry/exit if both are provided
+        // Calculate from entry/exit if both dates are provided (times are optional)
         const entryDate = new Date(entryCombined);
         const exitDate = new Date(exitCombined);
         if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
@@ -651,6 +697,7 @@ export function TradeEditDialog({
       
       onSave(tradeDataToSave)
       setHasUnsavedChanges(false);
+      setDateValidationError("");
     }
   
     const handleClose = () => {
@@ -658,6 +705,7 @@ export function TradeEditDialog({
         setShowDiscardWarning(true);
       } else {
         setDatetimeValidationError("");
+        setDateValidationError("");
         setValidationError("");
         setLotValidationError("");
         setHoldingTimeValidationError("");
@@ -669,6 +717,7 @@ export function TradeEditDialog({
       setShowDiscardWarning(false);
       setHasUnsavedChanges(false);
       setDatetimeValidationError("");
+      setDateValidationError("");
       setValidationError("");
       setLotValidationError("");
       setHoldingTimeValidationError("");
@@ -710,6 +759,9 @@ export function TradeEditDialog({
                       }}
                     />
                   </div>
+                  {dateValidationError && (
+                    <div className="text-red-600 text-sm mt-1">{dateValidationError}</div>
+                  )}
                   {datetimeValidationError && (
                     <div className="text-red-600 text-sm mt-1">{datetimeValidationError}</div>
                   )}
