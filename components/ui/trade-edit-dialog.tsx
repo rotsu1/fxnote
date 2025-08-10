@@ -6,7 +6,7 @@ import {
     Tag,
   } from "lucide-react"
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabaseClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -53,6 +53,19 @@ export function TradeEditDialog({
       if (!t) return "";
       const [hh = "00", mm = "00", ss] = t.split(":");
       return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}:${String((ss ?? "00")).padStart(2, "0")}`;
+    };
+    
+    // Ref for dialog content to enable scrolling
+    const dialogContentRef = useRef<HTMLDivElement>(null);
+    
+    // Function to scroll dialog to top
+    const scrollToTop = () => {
+      // Small delay to ensure error message is rendered before scrolling
+      setTimeout(() => {
+        if (dialogContentRef.current) {
+          dialogContentRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      }, 100);
     };
     
     const defaultDateStr = defaultDate || new Date().toISOString().split("T")[0];
@@ -110,11 +123,39 @@ export function TradeEditDialog({
     const [emotionError, setEmotionError] = useState("")
     const [emotionToDelete, setEmotionToDelete] = useState<string | null>(null)
     const [validationError, setValidationError] = useState("")
+    const [datetimeValidationError, setDatetimeValidationError] = useState("")
+    const [lotValidationError, setLotValidationError] = useState("")
+    const [holdingTimeValidationError, setHoldingTimeValidationError] = useState("")
     const [availableSymbols, setAvailableSymbols] = useState<string[]>([])
     const [loadingSymbols, setLoadingSymbols] = useState(false)
   
     useEffect(() => {
       const defaultDateStrLocal = defaultDate || new Date().toISOString().split("T")[0];
+      
+      // Helper function to convert holding time in seconds to individual fields
+      const convertHoldingTimeToFields = (holdingTimeInSeconds: number | null | undefined) => {
+        if (holdingTimeInSeconds === null || holdingTimeInSeconds === undefined || holdingTimeInSeconds === 0) {
+          return {
+            holdingDays: undefined,
+            holdingHours: undefined,
+            holdingMinutes: undefined,
+            holdingSeconds: undefined,
+          };
+        }
+        
+        const totalSeconds = Math.abs(holdingTimeInSeconds);
+        const days = Math.floor(totalSeconds / (24 * 60 * 60));
+        const hours = Math.floor((totalSeconds % (24 * 60 * 60)) / (60 * 60));
+        const minutes = Math.floor((totalSeconds % (60 * 60)) / 60);
+        const seconds = totalSeconds % 60;
+        
+        return {
+          holdingDays: days > 0 ? days : undefined,
+          holdingHours: hours > 0 ? hours : undefined,
+          holdingMinutes: minutes > 0 ? minutes : undefined,
+          holdingSeconds: seconds > 0 ? seconds : undefined,
+        };
+      };
       
       const newFormData: TradeForm = trade
         ? {
@@ -123,6 +164,7 @@ export function TradeEditDialog({
             entryTime: trade.entryTime ? (trade.entryTime.split("T")[1] || "") : "",
             exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : defaultDateStrLocal,
             exitTime: trade.exitTime ? (trade.exitTime.split("T")[1] || "") : "",
+            ...convertHoldingTimeToFields(trade.holdingTime),
           }
         : {
             date: defaultDateStrLocal,
@@ -150,7 +192,21 @@ export function TradeEditDialog({
 
       setFormData(newFormData);
       setHasUnsavedChanges(false);
+      setDatetimeValidationError("");
+      setValidationError("");
+      setLotValidationError("");
+      setHoldingTimeValidationError("");
     }, [trade, defaultDate, isOpen])
+    
+    // Clear validation errors when dialog closes
+    useEffect(() => {
+      if (!isOpen) {
+        setDatetimeValidationError("");
+        setValidationError("");
+        setLotValidationError("");
+        setHoldingTimeValidationError("");
+      }
+    }, [isOpen])
   
     // Load tags from database
     const loadTagsFromDatabase = async () => {
@@ -415,20 +471,90 @@ export function TradeEditDialog({
     const handleFormChange = (updates: Partial<TradeForm>) => {
       setFormData(prev => ({ ...prev, ...updates }));
       setHasUnsavedChanges(true);
+      
+      // Clear lot validation errors when lot field changes
+      if ('lot' in updates) {
+        setLotValidationError("");
+        
+        // Real-time lot validation
+        const newLot = updates.lot;
+        if (newLot !== undefined && newLot !== null) {
+          if (newLot < 0) {
+            setLotValidationError("ロットサイズは正の数値を入力してください");
+          } else {
+            setLotValidationError("");
+          }
+        }
+      }
+      
+      // Real-time datetime validation
+      const newFormData = { ...formData, ...updates };
+      if (newFormData.entryDate && newFormData.entryTime && newFormData.exitDate && newFormData.exitTime) {
+        const entryCombined = `${newFormData.entryDate}T${ensureTimeWithSeconds(newFormData.entryTime)}`;
+        const exitCombined = `${newFormData.exitDate}T${ensureTimeWithSeconds(newFormData.exitTime)}`;
+        const entryDate = new Date(entryCombined);
+        const exitDate = new Date(exitCombined);
+        
+        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime()) && exitDate < entryDate) {
+          setDatetimeValidationError("エグジット日時はエントリー日時より後である必要があります");
+          scrollToTop();
+        } else {
+          setDatetimeValidationError("");
+        }
+      } else {
+        // Clear error if not all fields are filled
+        setDatetimeValidationError("");
+      }
+      
+      // Real-time holding time validation
+      if ('holdingDays' in updates || 'holdingHours' in updates || 'holdingMinutes' in updates || 'holdingSeconds' in updates) {
+        const updatedFormData = { ...formData, ...updates };
+        const hasNegativeHoldingTime = (
+          (updatedFormData.holdingDays !== undefined && updatedFormData.holdingDays !== null && updatedFormData.holdingDays < 0) ||
+          (updatedFormData.holdingHours !== undefined && updatedFormData.holdingHours !== null && updatedFormData.holdingHours < 0) ||
+          (updatedFormData.holdingMinutes !== undefined && updatedFormData.holdingMinutes !== null && updatedFormData.holdingMinutes < 0) ||
+          (updatedFormData.holdingSeconds !== undefined && updatedFormData.holdingSeconds !== null && updatedFormData.holdingSeconds < 0)
+        );
+        
+        if (hasNegativeHoldingTime) {
+          setHoldingTimeValidationError("保持時間は正の数値を入力してください");
+        } else {
+          setHoldingTimeValidationError("");
+        }
+      }
     };
   
     const handleSave = () => {
       // Clear previous validation errors
       setValidationError("")
       
+      // Always validate datetime before proceeding
+      if (formData.entryDate && formData.entryTime && formData.exitDate && formData.exitTime) {
+        const entryCombined = `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`;
+        const exitCombined = `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`;
+        const entryDate = new Date(entryCombined);
+        const exitDate = new Date(exitCombined);
+        
+        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime()) && exitDate < entryDate) {
+          setDatetimeValidationError("エグジット日時はエントリー日時より後である必要があります");
+          scrollToTop();
+          return;
+        }
+      }
+      
+      // Clear datetime validation error if validation passes
+      setDatetimeValidationError("");
+      
       // Validation: Check if required fields are filled
       if (!formData.pair || !formData.pair.trim()) {
         setValidationError("シンボルを選択してください")
+        scrollToTop();
         return
       }
       
       if (formData.profit === undefined || formData.profit === null) {
         setValidationError("損益を入力してください")
+        scrollToTop();
         return
       }
       
@@ -436,7 +562,28 @@ export function TradeEditDialog({
       const profitValue = Number.parseFloat(String(formData.profit));
       if (isNaN(profitValue)) {
         setValidationError("損益は有効な数値を入力してください")
+        scrollToTop();
         return
+      }
+      
+      // Validation: Check if lot is negative
+      if (formData.lot !== undefined && formData.lot !== null && formData.lot < 0) {
+        setLotValidationError("ロットサイズは正の数値を入力してください")
+        scrollToTop();
+        return
+      }
+      
+      // Validation: Check if any holding time fields are negative
+      const hasNegativeHoldingTime = (
+        (formData.holdingDays !== undefined && formData.holdingDays !== null && formData.holdingDays < 0) ||
+        (formData.holdingHours !== undefined && formData.holdingHours !== null && formData.holdingHours < 0) ||
+        (formData.holdingMinutes !== undefined && formData.holdingMinutes !== null && formData.holdingMinutes < 0) ||
+        (formData.holdingSeconds !== undefined && formData.holdingSeconds !== null && formData.holdingSeconds < 0)
+      );
+      
+      if (hasNegativeHoldingTime) {
+        setHoldingTimeValidationError("保持時間は正の数値を入力してください");
+        return;
       }
       
       // Basic validation for numbers
@@ -452,7 +599,7 @@ export function TradeEditDialog({
       const parsedLot = parseNullableNumber(formData.lot)
       const parsedPips = parseNullableNumber(formData.pips)
       const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
- 
+      
       // Build combined datetime strings once so they are available for both save and calculations
       const entryCombined = formData.entryDate && formData.entryTime
         ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
@@ -462,30 +609,32 @@ export function TradeEditDialog({
         : "";
 
       // Calculate holding time in seconds. If any manual holding input is provided, use it. Otherwise, use entry/exit datetime difference if available.
-      let holdingTimeInSeconds = 0;
+      let holdingTimeInSeconds: number | null = null;
+      
+      // Check if any manual holding input has actual values (not undefined, null, or 0)
       const hasManualHoldingInput = (
-        formData.holdingDays !== undefined ||
-        formData.holdingHours !== undefined ||
-        formData.holdingMinutes !== undefined ||
-        formData.holdingSeconds !== undefined
+        (formData.holdingDays !== undefined && formData.holdingDays !== null && formData.holdingDays !== 0) ||
+        (formData.holdingHours !== undefined && formData.holdingHours !== null && formData.holdingHours !== 0) ||
+        (formData.holdingMinutes !== undefined && formData.holdingMinutes !== null && formData.holdingMinutes !== 0) ||
+        (formData.holdingSeconds !== undefined && formData.holdingSeconds !== null && formData.holdingSeconds !== 0)
       );
 
       if (hasManualHoldingInput) {
-        const d = formData.holdingDays ?? 0;
-        const h = formData.holdingHours ?? 0;
-        const m = formData.holdingMinutes ?? 0;
-        const s = formData.holdingSeconds ?? 0;
+        const d = Number(formData.holdingDays) || 0;
+        const h = Number(formData.holdingHours) || 0;
+        const m = Number(formData.holdingMinutes) || 0;
+        const s = Number(formData.holdingSeconds) || 0;
         holdingTimeInSeconds = d * 24 * 60 * 60 + h * 60 * 60 + m * 60 + s;
-      } else {
-        if (entryCombined && exitCombined) {
-          const entryDate = new Date(entryCombined);
-          const exitDate = new Date(exitCombined);
-          if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
-            const timeDiff = exitDate.getTime() - entryDate.getTime();
-            holdingTimeInSeconds = Math.max(0, Math.floor(timeDiff / 1000));
-          }
+      } else if (entryCombined && exitCombined) {
+        // Only calculate from entry/exit if both are provided
+        const entryDate = new Date(entryCombined);
+        const exitDate = new Date(exitCombined);
+        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
+          const timeDiff = exitDate.getTime() - entryDate.getTime();
+          holdingTimeInSeconds = Math.max(0, Math.floor(timeDiff / 1000));
         }
       }
+      // If neither manual input nor entry/exit datetime is available, holdingTimeInSeconds remains null
   
       const tradeDataToSave: any = {
         ...formData,
@@ -507,6 +656,10 @@ export function TradeEditDialog({
       if (hasUnsavedChanges) {
         setShowDiscardWarning(true);
       } else {
+        setDatetimeValidationError("");
+        setValidationError("");
+        setLotValidationError("");
+        setHoldingTimeValidationError("");
         onClose();
       }
     };
@@ -514,13 +667,17 @@ export function TradeEditDialog({
     const handleDiscard = () => {
       setShowDiscardWarning(false);
       setHasUnsavedChanges(false);
+      setDatetimeValidationError("");
+      setValidationError("");
+      setLotValidationError("");
+      setHoldingTimeValidationError("");
       onClose();
     };
   
     return (
       <>
         <Dialog open={isOpen} onOpenChange={handleClose}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent ref={dialogContentRef} className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
               <DialogTitle>{trade?.id ? "取引編集" : "新規取引"}</DialogTitle>
               <DialogDescription>取引の詳細を入力または編集してください。</DialogDescription>
@@ -552,6 +709,9 @@ export function TradeEditDialog({
                       }}
                     />
                   </div>
+                  {datetimeValidationError && (
+                    <div className="text-red-600 text-sm mt-1">{datetimeValidationError}</div>
+                  )}
                 </div>
                 <div>
                   <Label>エグジット日時</Label>
@@ -604,6 +764,9 @@ export function TradeEditDialog({
                     )}
                   </SelectContent>
                 </Select>
+                {validationError && validationError.includes("シンボル") && (
+                  <div className="text-red-600 text-sm mt-1">{validationError}</div>
+                )}
               </div>
               <div>
                 <Label htmlFor="type">取引種別</Label>
@@ -669,7 +832,11 @@ export function TradeEditDialog({
                   value={formData.lot ?? ""}
                   onChange={(e) => {
                     const v = e.target.value
-                    if (v === "") { handleFormChange({ lot: undefined }); return }
+                    if (v === "") { 
+                      handleFormChange({ lot: undefined }); 
+                      return 
+                    }
+                    
                     const n = Number.parseFloat(v)
                     if (Number.isNaN(n)) return
                     handleFormChange({ lot: n })
@@ -677,6 +844,9 @@ export function TradeEditDialog({
                   placeholder="0.01"
                   className="no-spinner"
                 />
+                {lotValidationError && (
+                  <div className="text-red-600 text-sm mt-1">{lotValidationError}</div>
+                )}
               </div>
               <div>
                 <Label htmlFor="pips">pips</Label>
@@ -713,13 +883,12 @@ export function TradeEditDialog({
                     }}
                     className="no-spinner"
                 />
+                {validationError && (validationError.includes("損益") || validationError.includes("有効な数値")) && (
+                  <div className="text-red-600 text-sm mt-1">{validationError}</div>
+                )}
               </div>
             </div>
             
-            {validationError && (
-              <div className="text-red-600 text-sm mt-1">{validationError}</div>
-            )}
-  
             <div>
               <div className="flex items-center justify-between mb-2">
                 <Label>感情</Label>
@@ -840,6 +1009,9 @@ export function TradeEditDialog({
                   />
                 </div>
               </div>
+              {holdingTimeValidationError && (
+                <div className="text-red-600 text-sm mt-1">{holdingTimeValidationError}</div>
+              )}
             </div>
   
               <div>
