@@ -1,27 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import { localDateTimeToUTC } from "./timeUtils";
-
-interface Trade {
-    id: number
-    date: string
-    time: string
-    entryTime?: string
-    exitTime?: string
-    pair: string
-    type: "買い" | "売り"
-    entry: number
-    exit: number
-    lot?: number
-    pips: number
-    profit: number
-    emotion: string[]
-    holdingTime: number
-    holdingDays?: number
-    holdingHours?: number
-    holdingMinutes?: number
-    notes?: string
-    tags: string[]
-}
+import { Trade } from "./types";
 
 const ensureTimeWithSeconds = (t: string): string => {
   if (!t) return "00:00:00";
@@ -56,8 +35,8 @@ const toUTCDateAndTime = (localDateTime?: string): { date: string | null; time: 
   return { date: `${yyyy}-${mm}-${dd}`, time: `${HH}:${MM}:${SS}` };
 };
 
-export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, user: any) => {
-    if (!user) return;
+export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade | null, user: any) => {
+    if (!user) return { success: false, error: "User not authenticated" };
     
     try {
       // Get or create symbol ID
@@ -137,8 +116,11 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         hold_time: tradeData.holdingTime,
       } as const;
 
+      let tradeId: number;
+
       if (editingTrade?.id) {
         // Update existing trade
+        tradeId = editingTrade.id;
         const { error } = await supabase
           .from("trades")
           .update({
@@ -149,10 +131,6 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
           .eq("user_id", user.id);
         
         if (error) throw error;
-        
-        // Refresh the data
-        const event = new Event('tradeUpdated');
-        window.dispatchEvent(event);
         
       } else {
         // Add new trade
@@ -168,12 +146,141 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade, 
         
         if (error) throw error;
         
-        if (data && data[0]) {
-          // Refresh the data
-          const event = new Event('tradeUpdated');
-          window.dispatchEvent(event);
+        if (!data || !data[0]) {
+          throw new Error("Failed to create trade");
+        }
+        
+        tradeId = data[0].id;
+      }
+
+      // Now handle tags and emotions
+      if (tradeId) {
+        // Delete existing tag and emotion links for this trade
+        await supabase
+          .from("trade_tag_links")
+          .delete()
+          .eq("trade_id", tradeId);
+        
+        await supabase
+          .from("trade_emotion_links")
+          .delete()
+          .eq("trade_id", tradeId);
+
+        // Insert new tag links
+        if (tradeData.tags && tradeData.tags.length > 0) {
+          // Get or create tags and insert links
+          for (const tagName of tradeData.tags) {
+            // First try to find existing tag
+            let { data: tagData, error: tagError } = await supabase
+              .from("trade_tags")
+              .select("id")
+              .eq("tag_name", tagName)
+              .eq("user_id", user.id)
+              .single();
+            
+            let tagId: number;
+            
+            if (tagError && tagError.code === 'PGRST116') {
+              // Tag doesn't exist, create it
+              const { data: newTag, error: createError } = await supabase
+                .from("trade_tags")
+                .insert([{ 
+                  user_id: user.id, 
+                  tag_name: tagName 
+                }])
+                .select()
+                .single();
+              
+              if (createError) {
+                console.error("Error creating tag:", createError);
+                throw createError;
+              }
+              tagId = newTag.id;
+            } else if (tagError) {
+              console.error("Error finding tag:", tagError);
+              throw tagError;
+            } else if (tagData) {
+              tagId = tagData.id;
+            } else {
+              throw new Error("Failed to get tag ID");
+            }
+
+            // Insert tag link
+            const { error: linkError } = await supabase
+              .from("trade_tag_links")
+              .insert([{
+                trade_id: tradeId,
+                tag_id: tagId,
+                created_at: new Date().toISOString()
+              }]);
+            
+            if (linkError) {
+              console.error("Error creating tag link:", linkError);
+              throw linkError;
+            }
+          }
+        }
+
+        // Insert new emotion links
+        if (tradeData.emotion && tradeData.emotion.length > 0) {
+          // Get or create emotions and insert links
+          for (const emotionName of tradeData.emotion) {
+            // First try to find existing emotion
+            let { data: emotionData, error: emotionError } = await supabase
+              .from("emotions")
+              .select("id")
+              .eq("emotion", emotionName)
+              .eq("user_id", user.id)
+              .single();
+            
+            let emotionId: number;
+            
+            if (emotionError && emotionError.code === 'PGRST116') {
+              // Emotion doesn't exist, create it
+              const { data: newEmotion, error: createError } = await supabase
+                .from("emotions")
+                .insert([{ 
+                  user_id: user.id, 
+                  emotion: emotionName 
+                }])
+                .select()
+                .single();
+              
+              if (createError) {
+                console.error("Error creating emotion:", createError);
+                throw createError;
+              }
+              emotionId = newEmotion.id;
+            } else if (emotionError) {
+              console.error("Error finding emotion:", emotionError);
+              throw emotionError;
+            } else if (emotionData) {
+              emotionId = emotionData.id;
+            } else {
+              throw new Error("Failed to get emotion ID");
+            }
+
+            // Insert emotion link
+            const { error: linkError } = await supabase
+              .from("trade_emotion_links")
+              .insert([{
+                trade_id: tradeId,
+                emotion_id: emotionId,
+                created_at: new Date().toISOString()
+              }]);
+            
+            if (linkError) {
+              console.error("Error creating emotion link:", linkError);
+              throw linkError;
+            }
+          }
         }
       }
+
+      // Refresh the data
+      const event = new Event('tradeUpdated');
+      window.dispatchEvent(event);
+      
       return { success: true };
     } catch (error: any) {
       console.error("Error saving trade:", error);

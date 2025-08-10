@@ -479,8 +479,8 @@ export function TradeEditDialog({
         // Real-time lot validation
         const newLot = updates.lot;
         if (newLot !== undefined && newLot !== null) {
-          if (newLot < 0) {
-            setLotValidationError("ロットサイズは正の数値を入力してください");
+          if (newLot <= 0) {
+            setLotValidationError("ロットサイズは0より大きい値を入力してください");
           } else {
             setLotValidationError("");
           }
@@ -566,9 +566,9 @@ export function TradeEditDialog({
         return
       }
       
-      // Validation: Check if lot is negative
-      if (formData.lot !== undefined && formData.lot !== null && formData.lot < 0) {
-        setLotValidationError("ロットサイズは正の数値を入力してください")
+      // Validation: Check if lot is valid (null is allowed, but if present must be > 0)
+      if (formData.lot !== undefined && formData.lot !== null && formData.lot <= 0) {
+        setLotValidationError("ロットサイズは0より大きい値を入力してください")
         scrollToTop();
         return
       }
@@ -611,12 +611,12 @@ export function TradeEditDialog({
       // Calculate holding time in seconds. If any manual holding input is provided, use it. Otherwise, use entry/exit datetime difference if available.
       let holdingTimeInSeconds: number | null = null;
       
-      // Check if any manual holding input has actual values (not undefined, null, or 0)
+      // Check if any manual holding input has been provided (including 0 values)
       const hasManualHoldingInput = (
-        (formData.holdingDays !== undefined && formData.holdingDays !== null && formData.holdingDays !== 0) ||
-        (formData.holdingHours !== undefined && formData.holdingHours !== null && formData.holdingHours !== 0) ||
-        (formData.holdingMinutes !== undefined && formData.holdingMinutes !== null && formData.holdingMinutes !== 0) ||
-        (formData.holdingSeconds !== undefined && formData.holdingSeconds !== null && formData.holdingSeconds !== 0)
+        (formData.holdingDays !== undefined && formData.holdingDays !== null) ||
+        (formData.holdingHours !== undefined && formData.holdingHours !== null) ||
+        (formData.holdingMinutes !== undefined && formData.holdingMinutes !== null) ||
+        (formData.holdingSeconds !== undefined && formData.holdingSeconds !== null)
       );
 
       if (hasManualHoldingInput) {
@@ -646,6 +646,8 @@ export function TradeEditDialog({
         pips: parsedPips,
         profit: parsedProfit,
         holdingTime: holdingTimeInSeconds,
+        tags: formData.tags || [],
+        emotion: formData.emotion || [],
       };
       
       onSave(tradeDataToSave)
@@ -800,6 +802,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ entry: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="no-spinner"
                 />
               </div>
@@ -817,6 +820,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ exit: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="no-spinner"
                 />
               </div>
@@ -841,6 +845,7 @@ export function TradeEditDialog({
                     if (Number.isNaN(n)) return
                     handleFormChange({ lot: n })
                   }}
+                  onWheel={(e) => e.currentTarget.blur()}
                   placeholder="0.01"
                   className="no-spinner"
                 />
@@ -862,6 +867,7 @@ export function TradeEditDialog({
                     if (Number.isNaN(n)) return
                     handleFormChange({ pips: n })
                   }}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className="no-spinner"
                 />
               </div>
@@ -881,6 +887,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ profit: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     className="no-spinner"
                 />
                 {validationError && (validationError.includes("損益") || validationError.includes("有効な数値")) && (
@@ -951,6 +958,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ holdingDays: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="0"
                   />
                 </div>
@@ -969,6 +977,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ holdingHours: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="0"
                   />
                 </div>
@@ -987,6 +996,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ holdingMinutes: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="0"
                   />
                 </div>
@@ -1005,6 +1015,7 @@ export function TradeEditDialog({
                       if (Number.isNaN(n)) return
                       handleFormChange({ holdingSeconds: n })
                     }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="0"
                   />
                 </div>

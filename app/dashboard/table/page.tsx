@@ -976,6 +976,7 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
+                                              onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={status.isSaving}
@@ -994,6 +995,7 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
+                                              onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={status.isSaving}
@@ -1012,6 +1014,7 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
+                                              onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={status.isSaving}
@@ -1030,6 +1033,7 @@ export default function TablePage() {
                                                 const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
                                                 handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
                                               }}
+                                              onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                               className="w-12 h-8 text-xs no-spinner"
                                               disabled={status.isSaving}
