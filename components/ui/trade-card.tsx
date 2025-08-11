@@ -120,25 +120,34 @@ export function TradeCard({
             </div>
           )}
   
-          {displaySettings.show_emotion && tradeEmotions.length > 0 && (
+          {displaySettings.show_emotion && (
             <div className="flex flex-wrap gap-1 mb-1">
               <span className="text-sm">感情:</span>
-              {tradeEmotions.map((emotion: string, index: number) => (
-                <Badge key={index} variant="outline" className="text-xs">
-                  {emotion}
-                </Badge>
-              ))}
+              {tradeEmotions.length > 0 ? (
+                tradeEmotions.map((emotion: string, index: number) => (
+                  <Badge key={index} variant="outline" className="text-xs">
+                    {emotion}
+                  </Badge>
+                ))
+              ) : (
+                <span className="text-sm text-gray-500"></span>
+              )}
             </div>
           )}
   
-          {displaySettings.show_tag && tradeTags.length > 0 && (
+          {displaySettings.show_tag && (
             <div className="flex flex-wrap gap-1 mb-1">
-              {tradeTags.map((tag: string, index: number) => (
-              <Badge key={index} variant="outline" className="text-xs">
-                {tag}
-              </Badge>
-            ))}
-          </div>
+              <span className="text-sm">タグ:</span>
+              {tradeTags.length > 0 ? (
+                tradeTags.map((tag: string, index: number) => (
+                <Badge key={index} variant="outline" className="text-xs">
+                  {tag}
+                </Badge>
+              ))
+              ) : (
+                <span className="text-sm text-gray-500"></span>
+              )}
+            </div>
           )}
   
           {displaySettings.show_note && (
