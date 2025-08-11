@@ -21,6 +21,8 @@ export const transformTradeForEditing = (trade: any): Trade => {
     time: (trade.entry_time || "").slice(0, 5) || "",
     entryTime: toLocalDateTime(trade.entry_date, trade.entry_time),
     exitTime: toLocalDateTime(trade.exit_date, trade.exit_time),
+    entryDate: trade.entry_date || "",
+    exitDate: trade.exit_date || "",
     pair: trade.symbol_name || "",
     type: trade.trade_type === 0 ? "買い" : "売り",
     entry: trade.entry_price,

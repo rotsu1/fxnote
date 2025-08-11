@@ -4,6 +4,8 @@ export interface Trade {
     time: string
     entryTime?: string
     exitTime?: string
+    entryDate?: string
+    exitDate?: string
     pair: string
     type: "買い" | "売り"
     entry: number

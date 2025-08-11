@@ -80,9 +80,9 @@ export function TradeEditDialog({
       trade
         ? {
             ...trade,
-            entryDate: trade.entryTime ? (trade.entryTime.split("T")[0] || "") : defaultDateStr,
+            entryDate: trade.entryTime ? (trade.entryTime.split("T")[0] || "") : (trade.entryDate || trade.date || defaultDateStr),
             entryTime: trade.entryTime ? (trade.entryTime.split("T")[1] || "") : "",
-            exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : defaultDateStr,
+            exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : (trade.exitDate || trade.date || defaultDateStr),
             exitTime: trade.exitTime ? (trade.exitTime.split("T")[1] || "") : "",
           }
         : {
@@ -160,9 +160,9 @@ export function TradeEditDialog({
       const newFormData: TradeForm = trade
         ? {
             ...trade,
-            entryDate: trade.entryTime ? (trade.entryTime.split("T")[0] || "") : defaultDateStrLocal,
+            entryDate: trade.entryTime ? (trade.entryTime.split("T")[0] || "") : (trade.entryDate || trade.date || defaultDateStrLocal),
             entryTime: trade.entryTime ? (trade.entryTime.split("T")[1] || "") : "",
-            exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : defaultDateStrLocal,
+            exitDate: trade.exitTime ? (trade.exitTime.split("T")[0] || "") : (trade.exitDate || trade.date || defaultDateStrLocal),
             exitTime: trade.exitTime ? (trade.exitTime.split("T")[1] || "") : "",
             ...convertHoldingTimeToFields(trade.holdingTime),
           }
