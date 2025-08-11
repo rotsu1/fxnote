@@ -56,7 +56,7 @@ export default function Component() {
           ]);
 
           if (profileError) {
-            console.error("Profile creation error:", profileError);
+            // Profile creation failed silently
           }
         }
 
@@ -192,14 +192,12 @@ export default function Component() {
     
       if (profileError) {
         setMessage("アカウントは作成されましたが、プロフィールの保存に失敗しました。");
-        console.error("Profile insert error:", profileError);
         return;
       }
     
       setMessage("サインアップに成功しました。");
       router.push("/dashboard");
     } catch (error) {
-      console.error("Signup error:", error);
       setMessage("サインアップに失敗しました");
     } finally {
       setIsLoading(false);
@@ -211,11 +209,9 @@ export default function Component() {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        console.error("Google signup error:", error);
         setMessage("Googleでのサインアップに失敗しました");
       }
     } catch (error) {
-      console.error("Google signup error:", error);
       setMessage("Googleでのサインアップに失敗しました");
     } finally {
       setIsGoogleLoading(false);

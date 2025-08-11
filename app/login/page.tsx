@@ -94,7 +94,6 @@ export default function Component() {
         router.push("/dashboard");
       }
     } catch (error) {
-      console.error("Login error:", error);
       setAuthError("ログインに失敗しました");
     } finally {
       setIsLoading(false);
@@ -106,11 +105,9 @@ export default function Component() {
     try {
       const { error } = await signInWithGoogle();
       if (error) {
-        console.error("Google login error:", error);
         setAuthError("Googleでのログインに失敗しました");
       }
     } catch (error) {
-      console.error("Google login error:", error);
       setAuthError("Googleでのログインに失敗しました");
     } finally {
       setIsGoogleLoading(false);

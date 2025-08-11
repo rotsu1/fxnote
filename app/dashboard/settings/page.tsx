@@ -1,19 +1,18 @@
 "use client"
-import { useState } from "react"
-import type React from "react"
+import { useState, useEffect } from "react"
 
 import {
   Mail,
   Lock,
-  Shield,
   Eye,
   EyeOff,
   Check,
   X,
   AlertCircle,
-  Smartphone,
-  Key,
-  Copy,
+  CreditCard,
+  Receipt,
+  Crown,
+  User,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -21,12 +20,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Switch } from "@/components/ui/switch"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
@@ -42,23 +40,85 @@ const initialUserData = {
   twoFactorEnabled: false,
 }
 
+// Sample billing data
+const sampleBillingData = {
+  currentPlan: {
+    name: "FXNote Pro",
+    price: "¥2,980",
+    period: "月額",
+    features: ["無制限の取引記録", "高度な分析ツール", "カスタムタグ", "データエクスポート"]
+  },
+  billingHistory: [
+    { id: 1, date: "2024-01-15", amount: "¥2,980", status: "完了", description: "FXNote Pro - 1月分" },
+    { id: 2, date: "2023-12-15", amount: "¥2,980", status: "完了", description: "FXNote Pro - 12月分" },
+    { id: 3, date: "2023-11-15", amount: "¥2,980", status: "完了", description: "FXNote Pro - 11月分" },
+  ],
+  paymentMethod: {
+    type: "クレジットカード",
+    last4: "****1234",
+    expiry: "12/25",
+    brand: "Visa"
+  }
+}
+
 function EmailManagement() {
-  const [email, setEmail] = useState(initialUserData.email)
-  const [isVerified, setIsVerified] = useState(initialUserData.emailVerified)
+  const [email, setEmail] = useState("")
+  const [isVerified, setIsVerified] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSending, setIsSending] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const handleSaveEmail = () => {
-    // Save email logic here
-    setIsEditing(false)
-    setIsVerified(false) // New email needs verification
+  // Fetch user data from Supabase on component mount
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (user && !error) {
+          setEmail(user.email || "")
+          setIsVerified(user.email_confirmed_at !== null)
+        }
+      } catch (error) {
+        console.error("Error fetching user data:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUserData()
+  }, [])
+
+  const handleSaveEmail = async () => {
+    try {
+      const { error } = await supabase.auth.updateUser({ email: email })
+      if (error) {
+        throw error
+      }
+      setIsEditing(false)
+      setIsVerified(false) // New email needs verification
+      // You can add a toast notification here for success
+    } catch (error) {
+      console.error("Error updating email:", error)
+      // You can add a toast notification here for error
+    }
   }
 
   const handleResendVerification = async () => {
     setIsSending(true)
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-    setIsSending(false)
+    try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+      })
+      if (error) {
+        throw error
+      }
+      // You can add a toast notification here for success
+    } catch (error) {
+      console.error("Error resending verification:", error)
+      // You can add a toast notification here for error
+    } finally {
+      setIsSending(false)
+    }
   }
 
   return (
@@ -71,17 +131,23 @@ function EmailManagement() {
         <CardDescription>アカウントのメールアドレスを管理します</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">メールアドレス</Label>
-          <div className="flex gap-2">
-            <Input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              disabled={!isEditing}
-              className="flex-1"
-            />
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="email">メールアドレス</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={!isEditing}
+                  className="flex-1"
+                />
             <Button
               variant={isEditing ? "default" : "outline"}
               onClick={isEditing ? handleSaveEmail : () => setIsEditing(true)}
@@ -127,6 +193,8 @@ function EmailManagement() {
             <AlertDescription>メールアドレスの認証が完了していません。認証メールを確認してください。</AlertDescription>
           </Alert>
         )}
+          </>
+        )}
       </CardContent>
     </Card>
   )
@@ -139,6 +207,9 @@ function PasswordManagement() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
 
   const getPasswordStrength = (password: string) => {
     let strength = 0
@@ -160,12 +231,54 @@ function PasswordManagement() {
   const strengthInfo = getStrengthLabel(passwordStrength)
   const passwordsMatch = newPassword === confirmPassword && confirmPassword !== ""
 
-  const handleChangePassword = () => {
-    if (passwordStrength >= 50 && passwordsMatch) {
-      // Change password logic here
+  const handleChangePassword = async () => {
+    if (passwordStrength < 50) {
+      setError("パスワードが弱すぎます。より強力なパスワードを選択してください。")
+      return
+    }
+    
+    if (!passwordsMatch) {
+      setError("新しいパスワードが一致しません。")
+      return
+    }
+
+    setIsLoading(true)
+    setError("")
+    setSuccess("")
+
+    try {
+      // First, re-authenticate the user with their current password
+      const { error: reAuthError } = await supabase.auth.signInWithPassword({
+        email: (await supabase.auth.getUser()).data.user?.email || "",
+        password: currentPassword,
+      })
+
+      if (reAuthError) {
+        throw new Error("現在のパスワードが正しくありません。")
+      }
+
+      // Then update the password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword
+      })
+
+      if (updateError) {
+        throw updateError
+      }
+
+      // Success - clear form and show success message
+      setSuccess("パスワードが正常に変更されました。")
       setCurrentPassword("")
       setNewPassword("")
       setConfirmPassword("")
+      
+      // Clear success message after 5 seconds
+      setTimeout(() => setSuccess(""), 5000)
+      
+    } catch (error: any) {
+      setError(error.message || "パスワードの変更中にエラーが発生しました。")
+    } finally {
+      setIsLoading(false)
     }
   }
 
@@ -271,169 +384,168 @@ function PasswordManagement() {
           )}
         </div>
 
+        {/* Error and Success Messages */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        
+        {success && (
+          <Alert className="border-green-200 bg-green-50 text-green-800">
+            <Check className="h-4 w-4" />
+            <AlertDescription>{success}</AlertDescription>
+          </Alert>
+        )}
+
         <Button
           onClick={handleChangePassword}
-          disabled={!currentPassword || passwordStrength < 50 || !passwordsMatch}
+          disabled={!currentPassword || passwordStrength < 50 || !passwordsMatch || isLoading}
           className="w-full"
         >
-          パスワードを変更
+          {isLoading ? (
+            <div className="flex items-center gap-2">
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              変更中...
+            </div>
+          ) : (
+            "パスワードを変更"
+          )}
         </Button>
       </CardContent>
     </Card>
   )
 }
 
-function AuthenticationManagement() {
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(initialUserData.twoFactorEnabled)
-  const [showBackupCodes, setShowBackupCodes] = useState(false)
-  const [isSetupDialogOpen, setIsSetupDialogOpen] = useState(false)
-
-  const backupCodes = [
-    "1234-5678-9012",
-    "2345-6789-0123",
-    "3456-7890-1234",
-    "4567-8901-2345",
-    "5678-9012-3456",
-    "6789-0123-4567",
-    "7890-1234-5678",
-    "8901-2345-6789",
-  ]
-
-  const handleToggle2FA = () => {
-    if (!twoFactorEnabled) {
-      setIsSetupDialogOpen(true)
-    } else {
-      setTwoFactorEnabled(false)
-    }
-  }
-
-  const handleSetup2FA = () => {
-    setTwoFactorEnabled(true)
-    setIsSetupDialogOpen(false)
-  }
-
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
-  }
+function CurrentPlan() {
+  const { currentPlan } = sampleBillingData
 
   return (
-    <>
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-orange-600" />
-            認証方法管理
-          </CardTitle>
-          <CardDescription>アカウントのセキュリティを強化します</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <div className="font-medium">二段階認証 (2FA)</div>
-              <div className="text-sm text-muted-foreground">
-                アカウントのセキュリティを向上させるため、二段階認証を有効にすることを推奨します
-              </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Crown className="h-5 w-5 text-yellow-600" />
+          現在のプラン
+        </CardTitle>
+        <CardDescription>あなたのサブスクリプションプラン</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-100 rounded-full">
+              <Crown className="h-6 w-6 text-blue-600" />
             </div>
-            <Switch checked={twoFactorEnabled} onCheckedChange={handleToggle2FA} />
+            <div>
+              <h3 className="font-semibold text-lg">{currentPlan.name}</h3>
+              <p className="text-2xl font-bold text-blue-600">
+                {currentPlan.price}<span className="text-sm font-normal text-muted-foreground">/{currentPlan.period}</span>
+              </p>
+            </div>
           </div>
+          <Badge variant="default" className="bg-blue-100 text-blue-800">
+            アクティブ
+          </Badge>
+        </div>
 
-          {twoFactorEnabled && (
-            <div className="space-y-4 p-4 bg-green-50 rounded-lg border border-green-200">
-              <div className="flex items-center gap-2">
+        <div className="space-y-2">
+          <h4 className="font-medium">含まれる機能</h4>
+          <ul className="space-y-1">
+            {currentPlan.features.map((feature, index) => (
+              <li key={index} className="flex items-center gap-2 text-sm">
                 <Check className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-800">二段階認証が有効です</span>
+                {feature}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <Button variant="outline" className="w-full">
+          プランを変更
+        </Button>
+      </CardContent>
+    </Card>
+  )
+}
+
+function BillingHistory() {
+  const { billingHistory } = sampleBillingData
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Receipt className="h-5 w-5 text-green-600" />
+          請求履歴
+        </CardTitle>
+        <CardDescription>過去の支払い履歴</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {billingHistory.map((item) => (
+            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
+              <div className="flex-1">
+                <p className="font-medium">{item.description}</p>
+                <p className="text-sm text-muted-foreground">{item.date}</p>
               </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Smartphone className="h-4 w-4 text-green-600" />
-                  <span className="text-sm">認証アプリ: Google Authenticator</span>
-                </div>
-                <div className="text-xs text-green-700">最終同期: 2024年1月15日 14:30</div>
-              </div>
-
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setShowBackupCodes(!showBackupCodes)}>
-                  <Key className="mr-2 h-4 w-4" />
-                  {showBackupCodes ? "バックアップコードを隠す" : "バックアップコードを表示"}
-                </Button>
-                <Button variant="outline" size="sm">
-                  新しいバックアップコードを生成
-                </Button>
-              </div>
-
-              {showBackupCodes && (
-                <div className="space-y-2">
-                  <div className="text-sm font-medium">バックアップコード</div>
-                  <div className="text-xs text-muted-foreground mb-2">
-                    これらのコードは安全な場所に保管してください。各コードは一度のみ使用できます。
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {backupCodes.map((code, index) => (
-                      <div key={index} className="flex items-center gap-2 p-2 bg-white rounded border">
-                        <code className="flex-1 text-sm font-mono">{code}</code>
-                        <Button variant="ghost" size="sm" onClick={() => copyToClipboard(code)}>
-                          <Copy className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {!twoFactorEnabled && (
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                二段階認証を有効にして、アカウントのセキュリティを向上させることを強く推奨します。
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
-
-      <Dialog open={isSetupDialogOpen} onOpenChange={setIsSetupDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>二段階認証の設定</DialogTitle>
-            <DialogDescription>認証アプリを使用して二段階認証を設定します</DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            <div className="text-center">
-              <div className="w-32 h-32 bg-gray-200 mx-auto mb-4 rounded-lg flex items-center justify-center">
-                <div className="text-xs text-gray-500">QRコード</div>
-              </div>
-              <div className="text-sm text-muted-foreground">認証アプリでこのQRコードをスキャンしてください</div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>手動入力用キー</Label>
-              <div className="flex items-center gap-2 p-2 bg-gray-100 rounded">
-                <code className="flex-1 text-sm">JBSWY3DPEHPK3PXP</code>
-                <Button variant="ghost" size="sm" onClick={() => copyToClipboard("JBSWY3DPEHPK3PXP")}>
-                  <Copy className="h-3 w-3" />
-                </Button>
+              <div className="flex items-center gap-3">
+                <span className="font-semibold">{item.amount}</span>
+                <Badge variant="outline" className="text-xs">
+                  {item.status}
+                </Badge>
               </div>
             </div>
+          ))}
+        </div>
+        
+        <div className="mt-4 pt-4 border-t">
+          <Button variant="outline" className="w-full">
+            請求書をダウンロード
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
-            <div className="space-y-2">
-              <Label htmlFor="verificationCode">認証コード</Label>
-              <Input id="verificationCode" placeholder="6桁の認証コードを入力" maxLength={6} />
+function PaymentMethod() {
+  const { paymentMethod } = sampleBillingData
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <CreditCard className="h-5 w-5 text-purple-600" />
+          支払い方法
+        </CardTitle>
+        <CardDescription>現在の支払い方法を管理します</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="p-4 border rounded-lg bg-gray-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-white rounded border">
+              <CreditCard className="h-5 w-5 text-gray-600" />
             </div>
+            <div className="flex-1">
+              <p className="font-medium">{paymentMethod.brand} •••• {paymentMethod.last4}</p>
+              <p className="text-sm text-muted-foreground">有効期限: {paymentMethod.expiry}</p>
+            </div>
+            <Badge variant="default" className="bg-green-100 text-green-800">
+              デフォルト
+            </Badge>
           </div>
+        </div>
 
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={() => setIsSetupDialogOpen(false)}>
-              キャンセル
-            </Button>
-            <Button onClick={handleSetup2FA}>設定完了</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
+        <div className="space-y-3">
+          <Button variant="outline" className="w-full">
+            支払い方法を更新
+          </Button>
+          <Button variant="outline" className="w-full">
+            新しいカードを追加
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }
 
@@ -463,16 +575,37 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 space-y-6">
-          <div className="max-w-2xl space-y-6">
-            <EmailManagement />
-            <PasswordManagement />
-            <AuthenticationManagement />
-          </div>
-          <div className="max-w-2xl mx-auto pt-8">
-            <Button onClick={handleLogout} className="w-full" variant="destructive">
-              ログアウト
-            </Button>
+        <main className="flex-1 p-4 md:p-6">
+          <div className="max-w-4xl mx-auto">
+            <Tabs defaultValue="account" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="account" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  アカウント & プロフィール
+                </TabsTrigger>
+                <TabsTrigger value="billing" className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4" />
+                  請求 & サブスクリプション
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="account" className="space-y-6">
+                <EmailManagement />
+                <PasswordManagement />
+              </TabsContent>
+
+              <TabsContent value="billing" className="space-y-6">
+                <CurrentPlan />
+                <BillingHistory />
+                <PaymentMethod />
+              </TabsContent>
+            </Tabs>
+
+            <div className="pt-8 border-t mt-8">
+              <Button onClick={handleLogout} className="w-full" variant="destructive">
+                ログアウト
+              </Button>
+            </div>
           </div>
         </main>
       </SidebarInset>
