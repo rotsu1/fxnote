@@ -206,10 +206,32 @@ export const handleCellBlurLogic = (
     valuesEqual = currentValue.length === originalValue.length && 
                  currentValue.every((item, index) => item === originalValue[index])
   } else {
-    valuesEqual = currentValue === originalValue
+    // Handle special case for numeric fields that can be null
+    if (currentEditingState.editingCell.field === 'lot' || 
+        currentEditingState.editingCell.field === 'entry' || 
+        currentEditingState.editingCell.field === 'exit' || 
+        currentEditingState.editingCell.field === 'pips') {
+      // Consider empty string and null as equal for these fields
+      if ((currentValue === '' || currentValue === null || currentValue === undefined) && 
+          (originalValue === '' || originalValue === null || originalValue === undefined)) {
+        valuesEqual = true;
+      } else {
+        valuesEqual = currentValue === originalValue;
+      }
+    } else {
+      valuesEqual = currentValue === originalValue;
+    }
   }
   
-  // Always exit editing mode first
+  // If changes were made, save them first, then clear state
+  if (!valuesEqual) {
+    return { 
+      shouldSave: true, 
+      newEditingState: {} // Don't clear state yet - let the save function handle it
+    }
+  }
+  
+  // If no changes, clear editing state immediately
   const newEditingState: Partial<CellEditingState> = {
     editingCell: null,
     editingValues: {
@@ -220,11 +242,6 @@ export const handleCellBlurLogic = (
       ...currentEditingState.originalValues,
       [cellKey]: undefined // Clear the value from originalValues
     }
-  }
-  
-  // If changes were made, save them
-  if (!valuesEqual) {
-    return { shouldSave: true, newEditingState }
   }
   
   return { shouldSave: false, newEditingState }

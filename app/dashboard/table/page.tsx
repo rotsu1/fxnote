@@ -76,7 +76,7 @@ import {
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
 import { Trade } from "@/utils/types"
-import { isFieldEditable, getColumnValue, transformTradeData } from "@/utils/tableUtils"
+import { isFieldEditable, getColumnValue, transformTradeData, validateNumericInput } from "@/utils/tableUtils"
 import { loadTags, loadSymbolsForTable, loadEmotionsForTable } from "@/utils/dataLoadingUtils"
 import { filterAndSortTrades } from "@/utils/tableFilterUtils"
 import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/cellEditingUtils"
@@ -321,6 +321,18 @@ export default function TablePage() {
     const trade = trades.find(t => t.id === id);
     if (!trade) return;
     
+    // Clear any existing errors for this cell when starting to edit
+    const cellKey = `${id}-${field}`;
+    if (cellEditingState.cellErrors[cellKey]) {
+      setCellEditingState(prev => ({
+        ...prev,
+        cellErrors: {
+          ...prev.cellErrors,
+          [cellKey]: ""
+        }
+      }));
+    }
+    
     const result = handleCellClickLogic(id, field, trade, cellEditingState);
     
     if (result.shouldOpenDialog) {
@@ -338,6 +350,15 @@ export default function TablePage() {
   const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
     const cellKey = `${id}-${field}`;
     
+    // Real-time validation for numeric fields
+    let validationError = "";
+    if (['lot', 'entry', 'exit', 'pips', 'profit'].includes(field)) {
+      const validation = validateNumericInput(field, String(value));
+      if (!validation.isValid) {
+        validationError = validation.error || "";
+      }
+    }
+    
     const newState = handleHoldingTimeChange(id, field, value, cellEditingState);
     
     setCellEditingState(prev => ({
@@ -345,7 +366,7 @@ export default function TablePage() {
       ...newState,
       cellErrors: {
         ...prev.cellErrors,
-        [cellKey]: ""
+        [cellKey]: validationError
       }
     }));
   }, [cellEditingState]);
@@ -396,9 +417,18 @@ export default function TablePage() {
         }
       }));
     } else {
-      // Set error state
+      // Set error state but clear editing state to prevent infinite loops
       setCellEditingState(prev => ({
         ...prev,
+        editingCell: null,
+        editingValues: {
+          ...prev.editingValues,
+          [cellKey]: undefined
+        },
+        originalValues: {
+          ...prev.originalValues,
+          [cellKey]: undefined
+        },
         cellErrors: {
           ...prev.cellErrors,
           [cellKey]: result.error || '更新に失敗しました'
@@ -423,12 +453,52 @@ export default function TablePage() {
       ...result.newEditingState
     }));
     
-    // If changes were made, save them
-    if (result.shouldSave) {
-      setStatus({ ...status, isSaving: true });
-      handleCellSave(cellEditingState.editingCell!.id, cellEditingState.editingCell!.field);
+    // If changes were made, validate before saving
+    if (result.shouldSave && cellEditingState.editingCell) {
+      const { id, field } = cellEditingState.editingCell;
+      const cellKey = `${id}-${field}`;
+      const cellError = cellEditingState.cellErrors[cellKey];
+      
+      // Don't save if there's a validation error - restore original value instead
+      if (cellError && ['lot', 'entry', 'exit', 'pips', 'profit'].includes(field)) {
+        const originalValue = cellEditingState.originalValues[cellKey];
+        
+        // Restore the original value
+        setTrades(prevTrades => 
+          prevTrades.map(trade => 
+            trade.id === id ? { ...trade, [field]: originalValue } : trade
+          )
+        );
+        
+        // Clear editing state
+        setCellEditingState(prev => ({
+          ...prev,
+          editingCell: null,
+          editingValues: {
+            ...prev.editingValues,
+            [cellKey]: undefined
+          },
+          originalValues: {
+            ...prev.originalValues,
+            [cellKey]: undefined
+          },
+          cellErrors: {
+            ...prev.cellErrors,
+            [cellKey]: ""
+          }
+        }));
+        
+        return;
+      }
+      
+      // Capture the editing cell info before it gets cleared
+      const editingCellId = cellEditingState.editingCell.id;
+      const editingCellField = cellEditingState.editingCell.field;
+      
+      setStatus(prevStatus => ({ ...prevStatus, isSaving: true }));
+      handleCellSave(editingCellId, editingCellField);
     }
-  }, [cellEditingState, status.isSaving, handleCellSave, status]);
+  }, [cellEditingState, status.isSaving, handleCellSave]);
 
   // Global click handler for emotions and tags containers
   useEffect(() => {
@@ -862,7 +932,10 @@ export default function TablePage() {
                                             onValueChange={(val) => handleCellChange(trade.id, column.id as keyof Trade, val)}
                                             onOpenChange={(open) => !open && handleCellBlur()}
                                           >
-                                            <SelectTrigger className="h-8">
+                                            <SelectTrigger className={cn(
+                                              "h-8",
+                                              cellError && "border-red-500 focus-visible:ring-red-500"
+                                            )}>
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -902,7 +975,10 @@ export default function TablePage() {
                                             onCompositionEnd={() => setIsComposing(false)}
                                             autoFocus
                                             rows={2}
-                                            className="min-w-[150px]"
+                                            className={cn(
+                                              "min-w-[150px]",
+                                              cellError && "border-red-500 focus-visible:ring-red-500"
+                                            )}
                                           />
                                         ) : column.id === "entryTime" || column.id === "exitTime" ? (
                                           <div className="flex gap-2" onBlur={(e) => {
@@ -932,7 +1008,10 @@ export default function TablePage() {
                                                     }}
                                                     onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
                                                     autoFocus
-                                                    className="h-8"
+                                                    className={cn(
+                                                      "h-8",
+                                                      cellError && "border-red-500 focus-visible:ring-red-500"
+                                                    )}
                                                     disabled={status.isSaving}
                                                   />
                                                   <Input
@@ -948,7 +1027,10 @@ export default function TablePage() {
                                                       handleCellChange(trade.id, column.id as keyof Trade, combined);
                                                     }}
                                                     onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                                    className="h-8"
+                                                    className={cn(
+                                                      "h-8",
+                                                      cellError && "border-red-500 focus-visible:ring-red-500"
+                                                    )}
                                                     disabled={status.isSaving}
                                                   />
                                                 </>
@@ -978,7 +1060,10 @@ export default function TablePage() {
                                               }}
                                               onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className="w-12 h-8 text-xs no-spinner"
+                                              className={cn(
+                                                "w-12 h-8 text-xs no-spinner",
+                                                cellError && "border-red-500 focus-visible:ring-red-500"
+                                              )}
                                               disabled={status.isSaving}
                                             />
                                             <Input
@@ -997,7 +1082,10 @@ export default function TablePage() {
                                               }}
                                               onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className="w-12 h-8 text-xs no-spinner"
+                                              className={cn(
+                                                "w-12 h-8 text-xs no-spinner",
+                                                cellError && "border-red-500 focus-visible:ring-red-500"
+                                              )}
                                               disabled={status.isSaving}
                                             />
                                             <Input
@@ -1016,7 +1104,10 @@ export default function TablePage() {
                                               }}
                                               onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className="w-12 h-8 text-xs no-spinner"
+                                              className={cn(
+                                                "w-12 h-8 text-xs no-spinner",
+                                                cellError && "border-red-500 focus-visible:ring-red-500"
+                                              )}
                                               disabled={status.isSaving}
                                             />
                                             <Input
@@ -1035,7 +1126,10 @@ export default function TablePage() {
                                               }}
                                               onWheel={(e) => e.currentTarget.blur()}
                                               onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className="w-12 h-8 text-xs no-spinner"
+                                              className={cn(
+                                                "w-12 h-8 text-xs no-spinner",
+                                                cellError && "border-red-500 focus-visible:ring-red-500"
+                                              )}
                                               disabled={status.isSaving}
                                             />
                                           </div>
@@ -1146,7 +1240,8 @@ export default function TablePage() {
                                             autoFocus
                                             className={cn(
                                               "h-8",
-                                              (column.id === "profit" || column.id === "lot" || column.id === "entry" || column.id === "exit" || column.id === "pips") && "no-spinner"
+                                              (column.id === "profit" || column.id === "lot" || column.id === "entry" || column.id === "exit" || column.id === "pips") && "no-spinner",
+                                              cellError && "border-red-500 focus-visible:ring-red-500"
                                             )}
                                             disabled={status.isSaving}
                                           />

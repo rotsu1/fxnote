@@ -3,6 +3,90 @@ import { validateCellValue, mapFieldToDatabase } from "./tableUtils"
 import { supabase } from "@/lib/supabaseClient"
 import { localDateTimeToUTC } from "./timeUtils"
 
+/**
+ * Translates technical database error messages to user-friendly Japanese messages
+ */
+function translateErrorToUserFriendly(error: any): string {
+  // Check for specific error codes and messages
+  if (error.code === '22P02') {
+    // Invalid input syntax for type numeric
+    if (error.message?.includes('numeric')) {
+      return '数値以外の文字が入力されています。正しい数値を入力してください。'
+    }
+    return '入力された値の形式が正しくありません。'
+  }
+  
+  if (error.code === '23514') {
+    // Check constraint violation
+    return '入力された値が制約条件を満たしていません。'
+  }
+  
+  if (error.code === '23505') {
+    // Unique constraint violation
+    return 'この値は既に使用されています。別の値を入力してください。'
+  }
+  
+  if (error.code === '23503') {
+    // Foreign key constraint violation
+    return '関連するデータが見つかりません。'
+  }
+  
+  if (error.code === '42P01') {
+    // Undefined table
+    return 'テーブルが見つかりません。'
+  }
+  
+  if (error.code === '42703') {
+    // Undefined column
+    return '列が見つかりません。'
+  }
+  
+  if (error.status === 400) {
+    // Bad Request - often means validation error
+    return '入力された値が正しくありません。'
+  }
+  
+  if (error.status === 401) {
+    // Unauthorized
+    return '認証が必要です。再度ログインしてください。'
+  }
+  
+  if (error.status === 403) {
+    // Forbidden
+    return 'この操作を実行する権限がありません。'
+  }
+  
+  if (error.status === 404) {
+    // Not Found
+    return 'データが見つかりません。'
+  }
+  
+  if (error.status === 500) {
+    // Internal Server Error
+    return 'サーバーエラーが発生しました。しばらく時間をおいて再度お試しください。'
+  }
+  
+  // For other errors, try to provide a meaningful message
+  if (error.message) {
+    // Check if the message contains technical details that should be translated
+    if (error.message.includes('invalid input syntax')) {
+      return '入力された値の形式が正しくありません。'
+    }
+    if (error.message.includes('numeric')) {
+      return '数値以外の文字が入力されています。'
+    }
+    if (error.message.includes('date')) {
+      return '日付の形式が正しくありません。'
+    }
+    if (error.message.includes('time')) {
+      return '時刻の形式が正しくありません。'
+    }
+  }
+  
+  // Default fallback message
+  return '更新に失敗しました。入力された値を確認してください。'
+}
+
 export interface CellSaveResult {
   success: boolean
   error?: string
@@ -29,6 +113,12 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
   
   // For datetime-local fields, keep as-is (YYYY-MM-DDTHH:MM:SS) or date-only
   let processedValue = value
+  
+  // Convert empty values to null for specific numeric fields
+  if ((field === 'lot' || field === 'entry' || field === 'exit' || field === 'pips') && 
+      (processedValue === '' || processedValue === null || processedValue === undefined)) {
+    processedValue = null;
+  }
   
   // Validate the value
   const validation = validateCellValue(field, processedValue)
@@ -126,7 +216,10 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
     
   } catch (error: any) {
     console.error("Error updating cell:", error)
-    return { success: false, error: error.message || '更新に失敗しました' }
+    
+    // Translate technical error messages to user-friendly ones
+    const userFriendlyError = translateErrorToUserFriendly(error)
+    return { success: false, error: userFriendlyError }
   }
 }
 

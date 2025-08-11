@@ -6,6 +6,8 @@ const FIELD_MAPPING: Record<keyof Trade, string> = {
   date: 'entry_date',
   time: 'entry_time',
   entryTime: 'entry_time',
+  entryDate: 'entry_date',
+  exitDate: 'exit_date',
   exitTime: 'exit_time',
   pair: 'symbol',
   type: 'trade_type',
@@ -38,6 +40,14 @@ export function isFieldEditable(field: keyof Trade): boolean {
  * Validate cell value based on field type
  */
 export function validateCellValue(field: keyof Trade, value: any): { isValid: boolean; error?: string } {
+  // Allow empty values for specific numeric fields
+  if (field === 'lot' || field === 'entry' || field === 'exit' || field === 'pips') {
+    // Allow empty string, null, or undefined
+    if (value === '' || value === null || value === undefined) {
+      return { isValid: true };
+    }
+  }
+  
   // Basic validation rules
   if (field === 'lot' || field === 'entry' || field === 'exit' || field === 'pips' || field === 'profit') {
     const numValue = Number(value);
@@ -64,6 +74,55 @@ export function validateCellValue(field: keyof Trade, value: any): { isValid: bo
 }
 
 /**
+ * Validate numeric input for real-time validation (prevents invalid patterns)
+ */
+export function validateNumericInput(field: keyof Trade, value: string): { isValid: boolean; error?: string } {
+  // Only validate numeric fields
+  if (!['lot', 'entry', 'exit', 'pips', 'profit'].includes(field)) {
+    return { isValid: true };
+  }
+  
+  // Allow empty values
+  if (value === '' || value === null || value === undefined) {
+    return { isValid: true };
+  }
+  
+  // Check for invalid patterns like --1, 1-1, 1--1, etc.
+  const invalidPatterns = [
+    /^-+/,           // Starts with multiple dashes
+    /-+$/,           // Ends with multiple dashes
+    /-{2,}/,         // Contains multiple consecutive dashes
+    /^-?\d+-/,       // Number followed by dash
+    /-\d+-/,         // Dash followed by number followed by dash
+    /^-?\d*\.\d*-/,  // Decimal number followed by dash
+    /-\d*\.\d*-/,    // Dash followed by decimal followed by dash
+  ];
+  
+  for (const pattern of invalidPatterns) {
+    if (pattern.test(value)) {
+      return { isValid: false, error: '無効な数値形式です' };
+    }
+  }
+  
+  // Check if it's a valid number
+  const numValue = Number(value);
+  if (isNaN(numValue)) {
+    return { isValid: false, error: '数値を入力してください' };
+  }
+  
+  // Additional field-specific validation
+  if (field === 'lot' && numValue <= 0) {
+    return { isValid: false, error: 'ロットは0より大きい値を入力してください' };
+  }
+  
+  if ((field === 'entry' || field === 'exit') && numValue <= 0) {
+    return { isValid: false, error: '価格は0より大きい値を入力してください' };
+  }
+  
+  return { isValid: true };
+}
+
+/**
  * Map frontend field names to database column names
  */
 export function mapFieldToDatabase(field: keyof Trade, value: any) {
@@ -82,6 +141,11 @@ export function mapFieldToDatabase(field: keyof Trade, value: any) {
   if (field === 'date' || field === 'time') {
     // Handle date/time updates - this is complex and might need special handling
     return { field: dbField, value, needsSpecialHandling: true };
+  }
+  
+  // For numeric fields that can be null, ensure null is preserved
+  if ((field === 'lot' || field === 'entry' || field === 'exit' || field === 'pips') && value === null) {
+    return { field: dbField, value: null };
   }
   
   return { field: dbField, value };
@@ -106,6 +170,16 @@ export function getColumnValue(trade: Trade, columnId: string, allColumns: any[]
   }
   if (column.id === "pips" && typeof value === "number") {
     return `${value} pips`;
+  }
+  // Return empty string for null/undefined values in specific columns
+  if ((column.id === "lot" || column.id === "pips" || column.id === "entry" || column.id === "exit")) {
+    if (value === null || value === undefined || value === "") {
+      return "";
+    }
+    // For lot and pips, also return empty string if the value is 0 (which might indicate no data)
+    if ((column.id === "lot" || column.id === "pips") && value === 0) {
+      return "";
+    }
   }
   if (column.id === "holdingTime" && typeof value === "number") {
     const totalSeconds = value;
@@ -179,10 +253,10 @@ export function transformTradeData(trade: any, tagsByTradeId: Record<number, str
     exitTime: toLocalInputString(localExit, !!trade.exit_time),
     pair: trade.symbols?.symbol || "",
     type: (trade.trade_type === 0 ? "買い" : "売り") as "買い" | "売り",
-    lot: trade.lot_size || 0,
+    lot: trade.lot_size,
     entry: trade.entry_price,
     exit: trade.exit_price,
-    pips: trade.pips || 0,
+    pips: trade.pips,
     profit: trade.profit_loss,
     emotion: emotionsByTradeId[trade.id] || [],
     holdingTime: trade.hold_time || 0,
