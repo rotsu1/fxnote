@@ -74,55 +74,6 @@ export function validateCellValue(field: keyof Trade, value: any): { isValid: bo
 }
 
 /**
- * Validate numeric input for real-time validation (prevents invalid patterns)
- */
-export function validateNumericInput(field: keyof Trade, value: string): { isValid: boolean; error?: string } {
-  // Only validate numeric fields
-  if (!['lot', 'entry', 'exit', 'pips', 'profit'].includes(field)) {
-    return { isValid: true };
-  }
-  
-  // Allow empty values
-  if (value === '' || value === null || value === undefined) {
-    return { isValid: true };
-  }
-  
-  // Check for invalid patterns like --1, 1-1, 1--1, etc.
-  const invalidPatterns = [
-    /^-+/,           // Starts with multiple dashes
-    /-+$/,           // Ends with multiple dashes
-    /-{2,}/,         // Contains multiple consecutive dashes
-    /^-?\d+-/,       // Number followed by dash
-    /-\d+-/,         // Dash followed by number followed by dash
-    /^-?\d*\.\d*-/,  // Decimal number followed by dash
-    /-\d*\.\d*-/,    // Dash followed by decimal followed by dash
-  ];
-  
-  for (const pattern of invalidPatterns) {
-    if (pattern.test(value)) {
-      return { isValid: false, error: '無効な数値形式です' };
-    }
-  }
-  
-  // Check if it's a valid number
-  const numValue = Number(value);
-  if (isNaN(numValue)) {
-    return { isValid: false, error: '数値を入力してください' };
-  }
-  
-  // Additional field-specific validation
-  if (field === 'lot' && numValue <= 0) {
-    return { isValid: false, error: 'ロットは0より大きい値を入力してください' };
-  }
-  
-  if ((field === 'entry' || field === 'exit') && numValue <= 0) {
-    return { isValid: false, error: '価格は0より大きい値を入力してください' };
-  }
-  
-  return { isValid: true };
-}
-
-/**
  * Map frontend field names to database column names
  */
 export function mapFieldToDatabase(field: keyof Trade, value: any) {
@@ -165,13 +116,8 @@ export function getColumnValue(trade: Trade, columnId: string, allColumns: any[]
     return value.replace('T', ' ');
   }
 
-  if (column.id === "profit" && typeof value === "number") {
-    return `¥${value.toLocaleString()}`;
-  }
-  if (column.id === "pips" && typeof value === "number") {
-    return `${value} pips`;
-  }
-  // Return empty string for null/undefined values in specific columns
+  // Return empty string for null/undefined values in specific columns FIRST
+  // This must come before the pips formatting to ensure null values return empty string instead of "0 pips"
   if ((column.id === "lot" || column.id === "pips" || column.id === "entry" || column.id === "exit")) {
     if (value === null || value === undefined || value === "") {
       return "";
@@ -180,6 +126,13 @@ export function getColumnValue(trade: Trade, columnId: string, allColumns: any[]
     if ((column.id === "lot" || column.id === "pips") && value === 0) {
       return "";
     }
+  }
+  
+  if (column.id === "profit" && typeof value === "number") {
+    return `¥${value.toLocaleString()}`;
+  }
+  if (column.id === "pips" && typeof value === "number") {
+    return `${value} pips`;
   }
   if (column.id === "holdingTime" && typeof value === "number") {
     const totalSeconds = value;

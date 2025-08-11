@@ -8,11 +8,11 @@ export interface Trade {
     exitDate?: string
     pair: string
     type: "買い" | "売り"
-    entry: number
-    exit: number
-    lot?: number
-    pips: number
-    profit: number
+    entry: number | null
+    exit: number | null
+    lot?: number | null
+    pips: number | null
+    profit: number | null
     emotion: string[]
     holdingTime: number
     holdingDays?: number

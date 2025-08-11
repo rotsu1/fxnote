@@ -76,7 +76,7 @@ import {
 import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
 
 import { Trade } from "@/utils/types"
-import { isFieldEditable, getColumnValue, transformTradeData, validateNumericInput } from "@/utils/tableUtils"
+import { isFieldEditable, getColumnValue, transformTradeData } from "@/utils/tableUtils"
 import { loadTags, loadSymbolsForTable, loadEmotionsForTable } from "@/utils/dataLoadingUtils"
 import { filterAndSortTrades } from "@/utils/tableFilterUtils"
 import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/cellEditingUtils"
@@ -350,24 +350,11 @@ export default function TablePage() {
   const handleCellChange = useCallback((id: number, field: keyof Trade, value: any) => {
     const cellKey = `${id}-${field}`;
     
-    // Real-time validation for numeric fields
-    let validationError = "";
-    if (['lot', 'entry', 'exit', 'pips', 'profit'].includes(field)) {
-      const validation = validateNumericInput(field, String(value));
-      if (!validation.isValid) {
-        validationError = validation.error || "";
-      }
-    }
-    
     const newState = handleHoldingTimeChange(id, field, value, cellEditingState);
     
     setCellEditingState(prev => ({
       ...prev,
       ...newState,
-      cellErrors: {
-        ...prev.cellErrors,
-        [cellKey]: validationError
-      }
     }));
   }, [cellEditingState]);
 
