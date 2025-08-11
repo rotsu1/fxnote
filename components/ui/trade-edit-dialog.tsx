@@ -640,18 +640,14 @@ export function TradeEditDialog({
       const parsedPips = parseNullableNumber(formData.pips)
       const parsedProfit = formData.profit !== undefined && formData.profit !== null ? Number.parseFloat(String(formData.profit)) : 0
       
-      // Build combined datetime strings once so they are available for both save and calculations
-      // If time is not provided, use just the date (will be treated as midnight)
-      const entryCombined = formData.entryDate
-        ? formData.entryTime 
-          ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
-          : `${formData.entryDate}T00:00:00`
-        : "";
-      const exitCombined = formData.exitDate
-        ? formData.exitTime 
-          ? `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`
-          : `${formData.exitDate}T00:00:00`
-        : "";
+      // Build combined datetime strings only when both date and time are provided
+      // If time is not provided, keep it as null to avoid defaulting to midnight
+      const entryCombined = formData.entryDate && formData.entryTime && formData.entryTime.trim()
+        ? `${formData.entryDate}T${ensureTimeWithSeconds(formData.entryTime)}`
+        : null;
+      const exitCombined = formData.exitDate && formData.exitTime && formData.exitTime.trim()
+        ? `${formData.exitDate}T${ensureTimeWithSeconds(formData.exitTime)}`
+        : null;
 
       // Calculate holding time in seconds. If any manual holding input is provided, use it. Otherwise, use entry/exit datetime difference if available.
       let holdingTimeInSeconds: number | null = null;
@@ -671,9 +667,18 @@ export function TradeEditDialog({
         const s = Number(formData.holdingSeconds) || 0;
         holdingTimeInSeconds = d * 24 * 60 * 60 + h * 60 * 60 + m * 60 + s;
       } else if (entryCombined && exitCombined) {
-        // Calculate from entry/exit if both dates are provided (times are optional)
+        // Calculate from entry/exit if both full datetimes are provided
         const entryDate = new Date(entryCombined);
         const exitDate = new Date(exitCombined);
+        if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
+          const timeDiff = exitDate.getTime() - entryDate.getTime();
+          holdingTimeInSeconds = Math.max(0, Math.floor(timeDiff / 1000));
+        }
+      } else if (formData.entryDate && formData.exitDate && !formData.entryTime && !formData.exitTime) {
+        // If only dates are provided (no times), calculate holding time based on date difference
+        // This will give us the number of days between entry and exit dates
+        const entryDate = new Date(formData.entryDate);
+        const exitDate = new Date(formData.exitDate);
         if (!isNaN(entryDate.getTime()) && !isNaN(exitDate.getTime())) {
           const timeDiff = exitDate.getTime() - entryDate.getTime();
           holdingTimeInSeconds = Math.max(0, Math.floor(timeDiff / 1000));
