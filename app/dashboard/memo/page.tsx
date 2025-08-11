@@ -549,10 +549,6 @@ export default function MemoPage() {
                       <Plus className="mr-2 h-4 w-4" />
                       新規メモ
                     </Button>
-                    <Button variant="outline" onClick={() => setIsLayoutSettingsOpen(true)}>
-                      <Grid3X3 className="mr-2 h-4 w-4" />
-                      設定
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -620,13 +616,6 @@ export default function MemoPage() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-        <LayoutSettingsDialog
-          isOpen={isLayoutSettingsOpen}
-          onClose={() => setIsLayoutSettingsOpen(false)}
-          columns={columns}
-          onColumnsChange={setColumns}
-        />
 
         <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
           <AlertDialogContent>
