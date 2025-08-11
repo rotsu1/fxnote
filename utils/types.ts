@@ -22,3 +22,13 @@ export interface Trade {
     notes?: string
     tags: string[]
 }
+
+export interface Profile {
+    id: string
+    first_name?: string
+    last_name?: string
+    timezone: string
+    preferred_currency: string
+    created_at?: string
+    updated_at?: string
+}

@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useState, FormEvent, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
-import { supabase } from "@/lib/supabaseClient"
+import { supabase, signInWithGoogle } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation";
+import { Profile } from "@/utils/types";
 
 export default function Component() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function Component() {
   const [isLoading, setIsLoading] = useState(false);
   const [showConfirmationMessage, setShowConfirmationMessage] = useState(false);
   const [confirmationEmail, setConfirmationEmail] = useState("");
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   // Check if user is returning from email confirmation
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function Component() {
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single();
+          .single() as { data: Profile | null };
 
         if (!profile) {
           // User is confirmed but no profile exists, create one
@@ -203,7 +205,22 @@ export default function Component() {
       setIsLoading(false);
     }
   };
-  
+
+  const handleGoogleSignUp = async () => {
+    setIsGoogleLoading(true);
+    try {
+      const { error } = await signInWithGoogle();
+      if (error) {
+        console.error("Google signup error:", error);
+        setMessage("Googleでのサインアップに失敗しました");
+      }
+    } catch (error) {
+      console.error("Google signup error:", error);
+      setMessage("Googleでのサインアップに失敗しました");
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
 
   return (
     <main className="relative flex flex-col min-h-screen items-center justify-center overflow-hidden bg-white dark:bg-gray-900">
@@ -386,10 +403,16 @@ export default function Component() {
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <Button type="button" className="w-1/2 flex items-center justify-center gap-2" variant="outline">
+                    <Button 
+                      type="button" 
+                      className="w-1/2 flex items-center justify-center gap-2" 
+                      variant="outline"
+                      onClick={handleGoogleSignUp}
+                      disabled={isGoogleLoading}
+                    >
                       {/* Google Icon (optional) */}
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5" fill="none"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.97 32.833 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c11.045 0 19.824-8.955 19.824-20 0-1.341-.138-2.651-.213-3.917z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.084 19.002 13 24 13c2.803 0 5.377.99 7.413 2.626l6.293-6.293C34.583 6.053 29.555 4 24 4c-7.732 0-14.41 4.41-17.694 10.691z"/><path fill="#FBBC05" d="M24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C34.418 32.833 29.418 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44c5.318 0 10.13-1.82 13.857-4.945l-6.414-5.264C29.418 36 24 36 24 36c-5.418 0-9.97-3.167-11.303-8.083l-6.57 5.081C9.59 39.59 16.268 44 24 44z"/></g></svg>
-                      Googleでサインイン
+                      {isGoogleLoading ? "処理中..." : "Googleでサインアップ"}
                     </Button>
                     <Button type="submit" className="w-1/2" disabled={isLoading}>
                       {isLoading ? "登録中..." : "新規登録"}
