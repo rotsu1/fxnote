@@ -125,18 +125,46 @@ function MemoEditDialog({
 
   // Sync formData when memo prop changes
   useEffect(() => {
-    setFormData(
-      memo ? {
+    if (memo) {
+      // Editing existing memo
+      setFormData({
         title: memo.title || "",
         content: memo.content || "",
         note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
-      } : {
+      });
+    } else {
+      // Creating new memo - ensure form is completely empty
+      setFormData({
         title: "",
         content: "",
         note_date: new Date(),
-      },
-    )
+      });
+    }
   }, [memo])
+
+  // Reset form when dialog closes
+  useEffect(() => {
+    if (!isOpen) {
+      // Reset form data when dialog closes
+      setFormData({
+        title: "",
+        content: "",
+        note_date: new Date(),
+      });
+    }
+  }, [isOpen])
+
+  // Cleanup effect to reset form when component unmounts or memo changes
+  useEffect(() => {
+    return () => {
+      // Reset form data when component unmounts
+      setFormData({
+        title: "",
+        content: "",
+        note_date: new Date(),
+      });
+    };
+  }, [])
 
   // Check if form has been modified
   const hasFormChanged = () => {
@@ -166,6 +194,12 @@ function MemoEditDialog({
     if (hasFormChanged()) {
       setShowExitWarning(true);
     } else {
+      // Reset form data before closing
+      setFormData({
+        title: "",
+        content: "",
+        note_date: new Date(),
+      });
       onClose();
     }
   };
@@ -386,18 +420,31 @@ export default function MemoPage() {
   };
 
   const handleAddMemo = () => {
+    // Reset all form-related state when adding a new memo
     setEditingMemo(null);
     setOriginalFormData({
       title: "",
       content: "",
       note_date: new Date(),
     });
+    setShowExitWarning(false);
     setIsMemoDialogOpen(true);
   };
 
   const handleResetForm = () => {
-    // This function will be called when the form needs to be reset
-    // The actual reset is handled inside the MemoEditDialog component
+    // Reset form state when needed
+    if (editingMemo) {
+      // Reset to original memo data
+      setEditingMemo({
+        ...editingMemo,
+        title: originalFormData?.title || "",
+        content: originalFormData?.content || "",
+        note_date: originalFormData?.note_date || new Date(),
+      });
+    } else {
+      // Reset to empty form for new memo
+      setEditingMemo(null);
+    }
   };
 
   const handleSaveMemo = async (memoData: any) => {
@@ -455,6 +502,8 @@ export default function MemoPage() {
       }
       setIsMemoDialogOpen(false);
       setEditingMemo(null);
+      setOriginalFormData(null);
+      setShowExitWarning(false);
     } catch (error: any) {
       console.error("Error saving memo:", error);
       console.error("Error details:", {
@@ -575,9 +624,15 @@ export default function MemoPage() {
 
         {/* Dialogs */}
         <MemoEditDialog
+          key={editingMemo ? `edit-${editingMemo.id}` : 'create-new'}
           memo={editingMemo}
           isOpen={isMemoDialogOpen}
-          onClose={() => setIsMemoDialogOpen(false)}
+          onClose={() => {
+            setIsMemoDialogOpen(false);
+            setEditingMemo(null);
+            setOriginalFormData(null);
+            setShowExitWarning(false);
+          }}
           onSave={handleSaveMemo}
           showExitWarning={showExitWarning}
           setShowExitWarning={setShowExitWarning}
