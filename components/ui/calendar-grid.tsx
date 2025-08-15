@@ -1,4 +1,4 @@
-import { getPLColor } from "@/utils/performanceUtils"
+import { getPLBackgroundColor } from "@/utils/performanceUtils"
 
 export function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { currentDate: Date; onDateClick: (date: string) => void; groupedTrades: Record<string, any[]> }) {
     const year = currentDate.getFullYear();
@@ -43,25 +43,20 @@ export function CalendarGrid({ currentDate, onDateClick, groupedTrades }: { curr
             const isCurrentMonth = day.getMonth() === month;
             const dailyPL = getDailyPL(dateStr, groupedTrades);
             const tradeCount = (groupedTrades[dateStr] || []).length;
-            const colorClass = isCurrentMonth && tradeCount > 0 ? getPLColor(dailyPL) : "";
   
             return (
               <div
                 key={index}
-                className={`min-h-[80px] p-2 border-r border-b cursor-pointer transition-colors ${
-                  !isCurrentMonth 
-                    ? "text-gray-400 bg-gray-50" 
-                    : colorClass 
-                      ? colorClass 
-                      : "hover:bg-gray-50"
-                }`}
-                style={colorClass ? { backgroundColor: colorClass.includes('green') ? '#10b981' : colorClass.includes('red') ? '#ef4444' : '#6b7280' } : {}}
+                className={`min-h-[80px] p-2 border-r border-b cursor-pointer transition-colors`}
+                style={{ 
+                  backgroundColor: tradeCount > 0 ? getPLBackgroundColor(dailyPL) : undefined
+                }}
                 onClick={() => isCurrentMonth && onDateClick(dateStr)}
               >
                 <div className="text-sm font-medium mb-1">{day.getDate()}</div>
                 {isCurrentMonth && tradeCount > 0 && (
                   <div className="text-xs space-y-1">
-                    <div className={`font-medium ${dailyPL > 0 ? "text-green-800" : "text-red-800"}`}>
+                    <div className="font-medium">
                       {dailyPL > 0 ? "+" : ""}¥{dailyPL.toLocaleString()}
                     </div>
                     <div className="text-gray-600">{tradeCount}件</div>
