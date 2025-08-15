@@ -822,7 +822,7 @@ export default function TradingDashboard() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex items-center gap-2">
@@ -831,7 +831,7 @@ export default function TradingDashboard() {
           </div>
         </header>
 
-        <main className="flex-1 space-y-6 p-4 md:p-6">
+        <main className="flex-1 space-y-6 px-4 md:px-6 pt-6">
           {/* P/L Summary Cards */}
           <section>
             <h2 className="text-xl font-semibold mb-4">損益サマリーカード</h2>

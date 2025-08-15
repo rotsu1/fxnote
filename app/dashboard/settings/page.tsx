@@ -567,7 +567,7 @@ export default function SettingsPage() {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex items-center gap-2">
@@ -575,7 +575,7 @@ export default function SettingsPage() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">
+        <main className="flex-1 px-4 md:px-6 pt-6">
           <div className="max-w-4xl mx-auto">
             <Tabs defaultValue="account" className="space-y-6">
               <TabsList className="grid w-full grid-cols-2">

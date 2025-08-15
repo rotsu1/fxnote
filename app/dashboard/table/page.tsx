@@ -67,7 +67,8 @@ import {
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
-  AppSidebar
+  AppSidebar,
+  useSidebar
 } from "@/components/ui/sidebar"
 import {
   TableSettingsDialog,
@@ -89,8 +90,24 @@ import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 
-export default function TablePage() {
+function TableContent() {
   const user = useAuth();
+  const { state: sidebarState, isMobile } = useSidebar();
+  
+  // Calculate dynamic width based on sidebar state and screen size
+  const getTableWidth = () => {
+    if (isMobile) {
+      // On mobile, sidebar is completely hidden, use full viewport width
+      return "w-full max-w-[calc(100vw)]";
+    } else if (sidebarState === "collapsed") {
+      // On desktop, sidebar is collapsed but still visible (showing icons)
+      return "w-full max-w-[calc(100vw-50px)]";
+    } else {
+      // On desktop, sidebar is expanded
+      return "w-full max-w-[calc(100vw-250px)]";
+    }
+  };
+
   // Grouped cell editing states
   const [cellEditingState, setCellEditingState] = useState({
     editingCell: null as { id: number; field: keyof Trade } | null,
@@ -758,10 +775,8 @@ export default function TablePage() {
   };
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
+    <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex items-center gap-2">
@@ -769,7 +784,7 @@ export default function TablePage() {
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 w-full max-w-[calc(100vw-350px)] overflow-hidden responsive-main">
+        <main className={cn("flex-1 px-4 md:px-6 pt-6", getTableWidth())}>
           {status.loading ? (
             <div className="text-center py-10">読み込み中...</div>
           ) : status.error ? (
@@ -1377,6 +1392,14 @@ export default function TablePage() {
           </AlertDialogContent>
         </AlertDialog>
       </SidebarInset>
+  );
+}
+
+export default function TablePage() {
+  return (
+    <SidebarProvider>
+      <AppSidebar />
+      <TableContent />
     </SidebarProvider>
   );
 }
