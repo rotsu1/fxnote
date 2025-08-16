@@ -34,20 +34,64 @@ import { useRouter } from "next/navigation";
 const sampleBillingData = {
   currentPlan: {
     name: "FXNote Pro",
-    price: "¥2,980",
+    price: "¥490",
     period: "月額",
     features: ["無制限の取引記録", "高度な分析ツール", "カスタムタグ", "データエクスポート"]
   },
+  subscription: {
+    status: "active", // "active", "trial", "cancelled", "expired"
+    nextPaymentDate: "2024-02-15",
+    trialEndDate: "2024-01-31",
+    expireDate: "2024-02-15",
+    isTrial: false,
+    isCancelled: false
+  },
   billingHistory: [
-    { id: 1, date: "2024-01-15", amount: "¥2,980", status: "完了", description: "FXNote Pro - 1月分" },
-    { id: 2, date: "2023-12-15", amount: "¥2,980", status: "完了", description: "FXNote Pro - 12月分" },
-    { id: 3, date: "2023-11-15", amount: "¥2,980", status: "完了", description: "FXNote Pro - 11月分" },
+    { id: 1, date: "2024-01-15", amount: "¥490", status: "完了", description: "FXNote Pro - 1月分" },
+    { id: 2, date: "2023-12-15", amount: "¥490", status: "完了", description: "FXNote Pro - 12月分" },
+    { id: 3, date: "2023-11-15", amount: "¥490", status: "完了", description: "FXNote Pro - 12月分" },
   ],
   paymentMethod: {
     type: "クレジットカード",
     last4: "****1234",
     expiry: "12/25",
     brand: "Visa"
+  }
+}
+
+// Sample data variations for different subscription statuses
+const subscriptionVariations = {
+  active: {
+    status: "active",
+    nextPaymentDate: "2024-02-15",
+    trialEndDate: "2024-01-31",
+    expireDate: "2024-02-15",
+    isTrial: false,
+    isCancelled: false
+  },
+  trial: {
+    status: "trial",
+    nextPaymentDate: "2024-02-15",
+    trialEndDate: "2024-01-31",
+    expireDate: "2024-01-31",
+    isTrial: true,
+    isCancelled: false
+  },
+  cancelled: {
+    status: "cancelled",
+    nextPaymentDate: "2024-02-15",
+    trialEndDate: "2024-01-31",
+    expireDate: "2024-02-15",
+    isTrial: false,
+    isCancelled: true
+  },
+  expired: {
+    status: "expired",
+    nextPaymentDate: "2024-01-15",
+    trialEndDate: "2024-01-31",
+    expireDate: "2024-01-15",
+    isTrial: false,
+    isCancelled: false
   }
 }
 
@@ -409,7 +453,77 @@ function PasswordManagement() {
 }
 
 function CurrentPlan() {
+  const [currentSubscription, setCurrentSubscription] = useState(sampleBillingData.subscription);
   const { currentPlan } = sampleBillingData
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('ja-JP', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }
+
+  const getStatusBadge = () => {
+    if (currentSubscription.isCancelled) {
+      return (
+        <Badge variant="secondary" className="bg-orange-100 text-orange-800">
+          キャンセル済み
+        </Badge>
+      );
+    }
+    if (currentSubscription.isTrial) {
+      return (
+        <Badge variant="default" className="bg-purple-100 text-purple-800">
+          トライアル中
+        </Badge>
+      );
+    }
+    if (currentSubscription.status === "expired") {
+      return (
+        <Badge variant="destructive" className="bg-red-100 text-red-800">
+          期限切れ
+        </Badge>
+      );
+    }
+    return (
+      <Badge variant="default" className="bg-blue-100 text-blue-800">
+        アクティブ
+      </Badge>
+    );
+  }
+
+  const getDateInfo = () => {
+    if (currentSubscription.isCancelled) {
+      return {
+        label: "サービス終了日",
+        date: currentSubscription.expireDate,
+        description: "キャンセル後もこの日までサービスをご利用いただけます"
+      };
+    }
+    if (currentSubscription.isTrial) {
+      return {
+        label: "トライアル終了日",
+        date: currentSubscription.trialEndDate,
+        description: "この日まで無料でお試しいただけます"
+      };
+    }
+    if (currentSubscription.status === "expired") {
+      return {
+        label: "有効期限",
+        date: currentSubscription.expireDate,
+        description: "サービスが終了しました"
+      };
+    }
+    return {
+      label: "次回支払い日",
+      date: currentSubscription.nextPaymentDate,
+      description: "次回の自動更新日です"
+    };
+  }
+
+  const dateInfo = getDateInfo();
 
   return (
     <Card>
@@ -433,9 +547,7 @@ function CurrentPlan() {
               </p>
             </div>
           </div>
-          <Badge variant="default" className="bg-blue-100 text-blue-800">
-            アクティブ
-          </Badge>
+          {getStatusBadge()}
         </div>
 
         <div className="space-y-2">
@@ -450,90 +562,61 @@ function CurrentPlan() {
           </ul>
         </div>
 
-        <Button variant="outline" className="w-full">
-          プランを変更
-        </Button>
-      </CardContent>
-    </Card>
-  )
-}
-
-function BillingHistory() {
-  const { billingHistory } = sampleBillingData
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Receipt className="h-5 w-5 text-green-600" />
-          請求履歴
-        </CardTitle>
-        <CardDescription>過去の支払い履歴</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-3">
-          {billingHistory.map((item) => (
-            <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
-              <div className="flex-1">
-                <p className="font-medium">{item.description}</p>
-                <p className="text-sm text-muted-foreground">{item.date}</p>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="font-semibold">{item.amount}</span>
-                <Badge variant="outline" className="text-xs">
-                  {item.status}
-                </Badge>
-              </div>
-            </div>
-          ))}
+        <div className="p-4 bg-gray-50 rounded-lg border">
+          <div className="flex items-center gap-2 mb-2">
+            <Receipt className="h-4 w-4 text-gray-600" />
+            <span className="font-medium text-sm">{dateInfo.label}</span>
+          </div>
+          <p className="text-lg font-semibold text-gray-900">
+            {formatDate(dateInfo.date)}
+          </p>
+          <p className="text-sm text-gray-600 mt-1">
+            {dateInfo.description}
+          </p>
         </div>
-        
-        <div className="mt-4 pt-4 border-t">
-          <Button variant="outline" className="w-full">
-            請求書をダウンロード
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
-function PaymentMethod() {
-  const { paymentMethod } = sampleBillingData
-
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CreditCard className="h-5 w-5 text-purple-600" />
-          支払い方法
-        </CardTitle>
-        <CardDescription>現在の支払い方法を管理します</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="p-4 border rounded-lg bg-gray-50">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-white rounded border">
-              <CreditCard className="h-5 w-5 text-gray-600" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">{paymentMethod.brand} •••• {paymentMethod.last4}</p>
-              <p className="text-sm text-muted-foreground">有効期限: {paymentMethod.expiry}</p>
-            </div>
-            <Badge variant="default" className="bg-green-100 text-green-800">
-              デフォルト
-            </Badge>
+        {/* Demo section for testing different subscription statuses */}
+        <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+          <h4 className="font-medium text-sm text-yellow-800 mb-3">デモ: サブスクリプション状態の切り替え</h4>
+          <div className="flex flex-wrap gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setCurrentSubscription(subscriptionVariations.active)}
+              className="text-xs"
+            >
+              アクティブ
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setCurrentSubscription(subscriptionVariations.trial)}
+              className="text-xs"
+            >
+              トライアル
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setCurrentSubscription(subscriptionVariations.cancelled)}
+              className="text-xs"
+            >
+              キャンセル済み
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => setCurrentSubscription(subscriptionVariations.expired)}
+              className="text-xs"
+            >
+              期限切れ
+            </Button>
           </div>
         </div>
 
-        <div className="space-y-3">
-          <Button variant="outline" className="w-full">
-            支払い方法を更新
-          </Button>
-          <Button variant="outline" className="w-full">
-            新しいカードを追加
-          </Button>
-        </div>
+        <Button variant="outline" className="w-full">
+          プランを変更
+        </Button>
       </CardContent>
     </Card>
   )
@@ -586,8 +669,6 @@ export default function SettingsPage() {
 
               <TabsContent value="billing" className="space-y-6">
                 <CurrentPlan />
-                <BillingHistory />
-                <PaymentMethod />
               </TabsContent>
             </Tabs>
 
