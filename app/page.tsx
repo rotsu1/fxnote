@@ -54,14 +54,14 @@ export default function Component() {
         const { data: { session }, error } = await supabase.auth.getSession()
         
         if (error) {
-          console.error("Session check error:", error)
+          // Session check error - silently handle
         } else if (session) {
           // User is authenticated, redirect to dashboard
           router.push("/dashboard")
           return
         }
       } catch (error) {
-        console.error("Unexpected error during session check:", error)
+        // Unexpected error - silently handle
       } finally {
         setIsLoading(false)
       }
