@@ -4,7 +4,7 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
+  title: 'FXNote',
   description: 'Created with v0',
   generator: 'v0.dev',
   icons: {
