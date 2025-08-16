@@ -754,8 +754,8 @@ function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-4 py-2 group-data-[state=collapsed]:justify-center">
-          <img src="/logo.svg" alt="Unbalancer" width={16} height={16} className="h-4 w-4 shrink-0 min-w-4" />
-          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">Unbalancer</span>
+          <img src="/logo.svg" alt="FXNote" width={16} height={16} className="h-4 w-4 shrink-0 min-w-4" />
+          <span className="font-bold text-lg group-data-[collapsible=icon]:hidden">FXNote</span>
         </div>
       </SidebarHeader>
       <SidebarContent>

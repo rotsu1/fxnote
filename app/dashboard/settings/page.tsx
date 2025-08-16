@@ -30,16 +30,6 @@ import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 
-// Sample user data
-const initialUserData = {
-  email: "trader@example.com",
-  emailVerified: true,
-  displayName: "田中太郎",
-  bio: "FXトレーダー歴5年。主にUSD/JPYとEUR/USDを取引しています。",
-  avatar: "/placeholder.svg?height=100&width=100",
-  twoFactorEnabled: false,
-}
-
 // Sample billing data
 const sampleBillingData = {
   currentPlan: {
