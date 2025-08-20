@@ -30,7 +30,7 @@ const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 // Menu items
 const menuItems = [
-  { title: "ダッシュボード", icon: Home, url: "/dashboard", isActive: false },
+  { title: "ダッシュボード", icon: Home, url: "/dashboard/overview", isActive: false },
   { title: "カレンダー", icon: Calendar, url: "/dashboard/calendar", isActive: false },
   { title: "テーブル", icon: Table, url: "/dashboard/table", isActive: false },
   { title: "メモ", icon: FileText, url: "/dashboard/memo", isActive: false },

@@ -83,12 +83,12 @@ export default function AuthCallback() {
           }
 
           // Redirect to dashboard
-          router.push("/dashboard");
+          router.push("/dashboard/overview");
         } else {
           // Try to listen for auth state change
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
-              router.push("/dashboard");
+              router.push("/dashboard/overview");
             }
           });
 
@@ -137,13 +137,13 @@ export default function AuthCallback() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button 
-              onClick={() => router.push("/login")} 
+              onClick={() => router.push("/auth/login")} 
               className="w-full"
             >
               ログインページに戻る
             </Button>
             <Button 
-              onClick={() => router.push("/signup")} 
+              onClick={() => router.push("/auth/signup")} 
               variant="outline" 
               className="w-full"
             >

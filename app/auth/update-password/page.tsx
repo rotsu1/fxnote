@@ -95,7 +95,7 @@ export default function UpdatePasswordPage() {
         }
       } else {
         // Success - redirect to login with success message
-        router.push("/login?message=パスワードが正常に更新されました");
+        router.push("/auth/login?message=パスワードが正常に更新されました");
       }
     } catch (error) {
       console.error("Update password error:", error);
@@ -132,7 +132,7 @@ export default function UpdatePasswordPage() {
               </Alert>
             </CardContent>
             <CardFooter className="text-center text-sm">
-              <Link href="/reset-password" className="underline">
+              <Link href="/auth/reset-password" className="underline">
                 パスワード再設定を再度行う
               </Link>
             </CardFooter>
@@ -261,7 +261,7 @@ export default function UpdatePasswordPage() {
           </form>
 
           <CardFooter className="text-center text-sm">
-            <Link href="/login" className="underline">
+            <Link href="/auth/login" className="underline">
               ログインページに戻る
             </Link>
           </CardFooter>

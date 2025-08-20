@@ -632,7 +632,7 @@ export default function SettingsPage() {
       toast({ title: "ログアウト失敗", description: error.message });
     } else {
       toast({ title: "ログアウトしました" });
-      router.push("/login");
+      router.push("/auth/login");
     }
   };
 

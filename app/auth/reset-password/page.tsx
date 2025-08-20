@@ -50,7 +50,7 @@ export default function ResetPasswordPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/update-password`
+        redirectTo: `${window.location.origin}/auth/update-password`
       });
 
       if (error) {
@@ -157,7 +157,7 @@ export default function ResetPasswordPage() {
           </form>
 
           <CardFooter className="text-center text-sm">
-            <Link href="/login" className="underline">
+            <Link href="/auth/login" className="underline">
               ログインページに戻る
             </Link>
           </CardFooter>

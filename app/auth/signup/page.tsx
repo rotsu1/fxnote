@@ -61,7 +61,7 @@ export default function Component() {
         }
 
         // Redirect to dashboard
-        router.push("/dashboard");
+        router.push("/dashboard/overview");
       }
     };
 
@@ -196,7 +196,7 @@ export default function Component() {
       }
     
       setMessage("サインアップに成功しました。");
-      router.push("/dashboard");
+      router.push("/dashboard/overview");
     } catch (error) {
       setMessage("サインアップに失敗しました");
     } finally {
@@ -287,7 +287,7 @@ export default function Component() {
                 >
                   別のメールアドレスで登録
                 </Button>
-                <Link href="/login" className="w-full">
+                <Link href="/auth/login" className="w-full">
                   <Button variant="ghost" className="w-full">
                     ログインページに戻る
                   </Button>
@@ -417,7 +417,7 @@ export default function Component() {
                 </CardContent>
               </form>
               <CardFooter className="text-center text-sm">
-                <Link href="/login" className="underline">
+                <Link href="/auth/login" className="underline">
                   サインイン
                 </Link>
               </CardFooter>

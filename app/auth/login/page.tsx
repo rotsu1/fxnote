@@ -91,7 +91,7 @@ export default function Component() {
         }
       } else {
         // Login successful
-        router.push("/dashboard");
+        router.push("/dashboard/overview");
       }
     } catch (error) {
       setAuthError("ログインに失敗しました");
@@ -186,7 +186,7 @@ export default function Component() {
               <div className="grid gap-2">
                 <div className="flex items-center">
                   <Label htmlFor="password">パスワード</Label>
-                  <Link href="/reset-password" className="ml-auto inline-block text-sm underline">
+                  <Link href="/auth/reset-password" className="ml-auto inline-block text-sm underline">
                     パスワードを忘れた場合
                   </Link>
                 </div>
@@ -235,7 +235,7 @@ export default function Component() {
             </CardContent>
           </form>
           <CardFooter className="text-center text-sm">
-            <Link href="/signup" className="underline">
+            <Link href="/auth/signup" className="underline">
               新規登録
             </Link>
           </CardFooter>

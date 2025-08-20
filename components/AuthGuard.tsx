@@ -14,7 +14,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
     if (user !== undefined) {
       setIsLoading(false);
       if (user === null) {
-        router.push("/login");
+        router.push("/auth/login");
       }
     }
   }, [user, router]);
