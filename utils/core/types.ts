@@ -32,3 +32,16 @@ export interface Profile {
     created_at?: string
     updated_at?: string
 }
+
+export interface Metric {
+    key: string;
+    title: string;
+    format: (value: any) => string;
+    color: (value: any) => string;
+}
+  
+export interface KeyStatsGridProps {
+    selectedYear: number | "指定しない";
+    selectedMonth: number | "指定しない";
+    selectedDay: number | "指定しない";
+}

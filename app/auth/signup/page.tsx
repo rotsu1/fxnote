@@ -14,7 +14,7 @@ import { supabase, signInWithGoogle } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation";
 import { Profile } from "@/utils/core/types";
 
-export default function Component() {
+export default function Signup() {
   const router = useRouter();
 
   const [firstName, setFirstName] = useState("");

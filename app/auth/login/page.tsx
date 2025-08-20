@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase, signInWithGoogle } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation";
 
-export default function Component() {
+export default function Login() {
   const router = useRouter();
 
   const [email, setEmail] = useState("")

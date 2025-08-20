@@ -5,22 +5,13 @@ import {
   FileText,
   Plus,
   Search,
-  Edit,
-  Trash2,
-  Grid3X3,
-  MoreHorizontal,
-  CalendarIcon,
   Filter,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,320 +22,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/business/common/alert-dialog"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Separator } from "@/components/ui/separator"
-import { Calendar } from "@/components/ui/calendar"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
-import { format } from "date-fns";
-import { ja } from "date-fns/locale";
+import { MemoCard } from "@/components/business/memo/memo-card";
+import { MemoEditDialog } from "@/components/business/memo/memo-edit-dialog";
 
-function MemoCard({
-  memo,
-  onEdit,
-  onDelete,
-}: {
-  memo: any
-  onEdit: (memo: any) => void
-  onDelete: (id: number) => void
-}) {
-  const truncateContent = (content: string, maxLength = 120) => {
-    return content.length > maxLength ? content.substring(0, maxLength) + "..." : content
-  }
-
-  return (
-    <Card className="h-full hover:shadow-md transition-shadow">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <CardTitle className="text-sm font-medium line-clamp-2">{memo.title}</CardTitle>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => onEdit(memo)}>
-                <Edit className="mr-2 h-4 w-4" />
-                編集
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onDelete(memo.id)} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                削除
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        <div className="text-xs text-muted-foreground">
-          {memo.note_date ? format(new Date(memo.note_date), "yyyy/MM/dd", { locale: ja }) : memo.date}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <p className="text-sm text-muted-foreground line-clamp-4">{truncateContent(memo.content)}</p>
-      </CardContent>
-    </Card>
-  )
-}
-
-function MemoEditDialog({
-  memo,
-  isOpen,
-  onClose,
-  onSave,
-  showExitWarning,
-  setShowExitWarning,
-  originalFormData,
-  onResetForm,
-}: {
-  memo: any
-  isOpen: boolean
-  onClose: () => void
-  onSave: (memo: any) => void
-  showExitWarning: boolean
-  setShowExitWarning: (show: boolean) => void
-  originalFormData: any
-  onResetForm: () => void
-}) {
-  const [formData, setFormData] = useState<{
-    title: string;
-    content: string;
-    note_date: Date | undefined;
-  }>(
-    memo ? {
-      title: memo.title || "",
-      content: memo.content || "",
-      note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
-    } : {
-      title: "",
-      content: "",
-      note_date: new Date(),
-    },
-  )
-
-  // Sync formData when memo prop changes
-  useEffect(() => {
-    if (memo) {
-      // Editing existing memo
-      setFormData({
-        title: memo.title || "",
-        content: memo.content || "",
-        note_date: memo.note_date ? new Date(memo.note_date) : new Date(),
-      });
-    } else {
-      // Creating new memo - ensure form is completely empty
-      setFormData({
-        title: "",
-        content: "",
-        note_date: new Date(),
-      });
-    }
-  }, [memo])
-
-  // Reset form when dialog closes
-  useEffect(() => {
-    if (!isOpen) {
-      // Reset form data when dialog closes
-      setFormData({
-        title: "",
-        content: "",
-        note_date: new Date(),
-      });
-    }
-  }, [isOpen])
-
-  // Cleanup effect to reset form when component unmounts or memo changes
-  useEffect(() => {
-    return () => {
-      // Reset form data when component unmounts
-      setFormData({
-        title: "",
-        content: "",
-        note_date: new Date(),
-      });
-    };
-  }, [])
-
-  // Check if form has been modified
-  const hasFormChanged = () => {
-    if (!originalFormData) return false;
-    
-    // For new memos, check if user has entered any content
-    if (!memo) {
-      return (
-        formData.title.trim() !== "" ||
-        formData.content.trim() !== ""
-      );
-    }
-    
-    // For existing memos, check if values have changed
-    return (
-      formData.title !== originalFormData.title ||
-      formData.content !== originalFormData.content ||
-      (formData.note_date && originalFormData.note_date && 
-       formData.note_date.getTime() !== originalFormData.note_date.getTime()) ||
-      (!formData.note_date && originalFormData.note_date) ||
-      (formData.note_date && !originalFormData.note_date)
-    );
-  };
-
-  // Handle close with warning if changes were made
-  const handleClose = () => {
-    if (hasFormChanged()) {
-      setShowExitWarning(true);
-    } else {
-      // Reset form data before closing
-      setFormData({
-        title: "",
-        content: "",
-        note_date: new Date(),
-      });
-      onClose();
-    }
-  };
-
-  // Reset form data to original state
-  const resetFormData = () => {
-    if (originalFormData) {
-      setFormData({
-        title: originalFormData.title,
-        content: originalFormData.content,
-        note_date: originalFormData.note_date,
-      });
-    }
-    onResetForm();
-  };
-
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{memo ? "メモ編集" : "新規メモ"}</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div>
-            <Label htmlFor="title">タイトル</Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-              placeholder="メモのタイトルを入力"
-            />
-          </div>
-
-          <div>
-            <Label htmlFor="date">日付</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full justify-start text-left font-normal"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.note_date instanceof Date ? (
-                    format(formData.note_date, "PPP", { locale: ja })
-                  ) : (
-                    <span>日付を選択</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={formData.note_date instanceof Date ? formData.note_date : undefined}
-                  onSelect={(date) => setFormData({ ...formData, note_date: date })}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-          </div>
-
-          <div>
-            <Label htmlFor="content">内容</Label>
-            <Textarea
-              id="content"
-              value={formData.content}
-              onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-              placeholder="メモの内容を入力"
-              rows={8}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={handleClose}>
-            キャンセル
-          </Button>
-          <Button onClick={() => onSave(formData)}>保存</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function LayoutSettingsDialog({
-  isOpen,
-  onClose,
-  columns,
-  onColumnsChange,
-}: {
-  isOpen: boolean
-  onClose: () => void
-  columns: number
-  onColumnsChange: (columns: number) => void
-}) {
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>表示設定</DialogTitle>
-          <DialogDescription>メモ一覧の表示方法を設定します</DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          <div>
-            <Label>列数</Label>
-            <Select value={columns.toString()} onValueChange={(value) => onColumnsChange(Number.parseInt(value))}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="1">1列</SelectItem>
-                <SelectItem value="2">2列</SelectItem>
-                <SelectItem value="3">3列</SelectItem>
-                <SelectItem value="4">4列</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={onClose}>
-            キャンセル
-          </Button>
-          <Button onClick={onClose}>保存</Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-export default function MemoPage() {
+export default function Memo() {
   const user = useAuth();
   const [memos, setMemos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<string>("updated_at_desc");
-  const [columns, setColumns] = useState(3);
   const [editingMemo, setEditingMemo] = useState<any>(null);
   const [isMemoDialogOpen, setIsMemoDialogOpen] = useState(false);
-  const [isLayoutSettingsOpen, setIsLayoutSettingsOpen] = useState(false);
-  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
-  const [showExitWarning, setShowExitWarning] = useState(false);
   const [originalFormData, setOriginalFormData] = useState<any>(null);
-
-
+  const [showExitWarning, setShowExitWarning] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
@@ -539,23 +233,6 @@ export default function MemoPage() {
     }
   };
 
-
-
-  const getGridColumns = () => {
-    switch (columns) {
-      case 1:
-        return "grid-cols-1";
-      case 2:
-        return "grid-cols-1 md:grid-cols-2";
-      case 3:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
-      case 4:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
-      default:
-        return "grid-cols-1 md:grid-cols-2 lg:grid-cols-3";
-    }
-  };
-
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -603,7 +280,7 @@ export default function MemoPage() {
               </div>
 
               {/* Memo Grid */}
-              <div className={`grid gap-4 ${getGridColumns()}`}>
+              <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
                 {sortedMemos.map((memo) => (
                   <MemoCard key={memo.id} memo={memo} onEdit={handleEditMemo} onDelete={handleDeleteMemo} />
                 ))}

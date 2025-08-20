@@ -44,7 +44,7 @@ import { loadTrades as loadTradesData } from "@/utils/data/dataLoadingUtils"
 
 import { useAuth } from "@/hooks/useAuth";
 
-export default function CalendarPage() {
+export default function Calendar() {
   const user = useAuth();
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [selectedDate, setSelectedDate] = useState<string>("");
