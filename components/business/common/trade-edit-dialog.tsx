@@ -13,16 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/business/common/alert-dialog"
+import { ConfirmDialog } from "@/components/business/common/alert-dialog"
 import { Trade } from "@/utils/core/types"
 import { TagEditDialog } from "./tag-edit-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -1183,93 +1174,67 @@ export function TradeEditDialog({
         />
 
         {/* Tag Delete Warning Dialog */}
-        <AlertDialog open={tagToDelete !== null} onOpenChange={() => setTagToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>タグを削除しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                <span className="mb-2 block">
-                  <strong>「{tagToDelete}」</strong> タグを削除しようとしています。
-                </span>
-                <span className="text-red-600 block">
-                  ⚠️ このタグは、このタグを使用しているすべての取引から削除されます。
-                </span>
-                <span className="text-sm text-muted-foreground mt-2 block">
-                  この操作は取り消すことができません。
-                </span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={deleteTagFromDatabase}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                削除
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={tagToDelete !== null}
+          onOpenChange={() => setTagToDelete(null)}
+          title="タグを削除しますか？"
+          description={
+            <>
+              <span className="mb-2 block">
+                <strong>「{tagToDelete}」</strong> タグを削除しようとしています。
+              </span>
+              <span className="text-red-600 block">
+                ⚠️ このタグは、このタグを使用しているすべての取引から削除されます。
+              </span>
+              <span className="text-sm text-muted-foreground mt-2 block">
+                この操作は取り消すことができません。
+              </span>
+            </>
+          }
+          onConfirm={deleteTagFromDatabase}
+        />
 
         {/* Emotion Delete Warning Dialog */}
-        <AlertDialog open={emotionToDelete !== null} onOpenChange={() => setEmotionToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>感情を削除しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                <span className="mb-2 block">
-                  <strong>「{emotionToDelete}」</strong> 感情を削除しようとしています。
-                </span>
-                <span className="text-red-600 block">
-                  ⚠️ この感情は、この感情を使用しているすべての取引から削除されます。
-                </span>
-                <span className="text-sm text-muted-foreground mt-2 block">
-                  この操作は取り消すことができません。
-                </span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={deleteEmotionFromDatabase}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                削除
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={emotionToDelete !== null}
+          onOpenChange={() => setEmotionToDelete(null)}
+          title="感情を削除しますか？"
+          description={
+            <>
+              <span className="mb-2 block">
+                <strong>「{emotionToDelete}」</strong> 感情を削除しようとしています。
+              </span>
+              <span className="text-red-600 block">
+                ⚠️ この感情は、この感情を使用しているすべての取引から削除されます。
+              </span>
+              <span className="text-sm text-muted-foreground mt-2 block">
+                この操作は取り消すことができません。
+              </span>
+            </>
+          }
+          onConfirm={deleteEmotionFromDatabase}
+        />
 
         {/* Discard Changes Warning Dialog */}
-        <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                <span className="mb-2 block">
-                  保存されていない変更があります。
-                </span>
-                <span className="text-red-600 block">
-                  ⚠️ 現在入力されているデータは破棄されます。
-                </span>
-                <span className="text-sm text-muted-foreground mt-2 block">
-                  この操作は取り消すことができません。
-                </span>
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowDiscardWarning(false)}>
-                キャンセル
-              </AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDiscard}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                破棄
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={showDiscardWarning}
+          onOpenChange={setShowDiscardWarning}
+          title="変更を破棄しますか？"
+          description={
+            <>
+              <span className="mb-2 block">
+                保存されていない変更があります。
+              </span>
+              <span className="text-red-600 block">
+                ⚠️ 現在入力されているデータは破棄されます。
+              </span>
+              <span className="text-sm text-muted-foreground mt-2 block">
+                この操作は取り消すことができません。
+              </span>
+            </>
+          }
+          onConfirm={handleDiscard}
+        />
       </>
     )
   }

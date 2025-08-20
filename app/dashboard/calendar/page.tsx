@@ -2,16 +2,7 @@
 
 import { useState, useEffect } from "react"
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/business/common/alert-dialog"
+import { ConfirmDialog } from "@/components/business/common/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { 
   SidebarInset,
@@ -95,16 +86,6 @@ export default function Calendar() {
     }
   };
 
-  useEffect(() => {
-    loadTrades();
-    if (!user) return;
-    const loadTags = async () => {
-      const tags = await loadUserTags(user.id);
-      setTradeData(prev => ({ ...prev, availableTags: tags }));
-    };
-    loadTags();
-  }, [user]);
-
   // Function to load trades
   const loadTrades = async () => {
     if (!user) return;
@@ -125,13 +106,6 @@ export default function Calendar() {
       setStatus(prev => ({ ...prev, loading: false }));
     }
   };
-
-  // Load display settings when user changes
-  useEffect(() => {
-    loadDisplaySettingsFromDB();
-  }, [user]);
-
-  const groupedTrades = groupTradesByDate(tradeData.trades);
 
   const handleDateClick = (date: string) => {
     setSelectedDate(date);
@@ -200,27 +174,37 @@ export default function Calendar() {
     }
   };
 
-  const handleSaveDisplaySettings = async (settings: DisplaySettings) => {
+  const handleSaveDisplaySettings = async (settings: Record<string, boolean>) => {
     if (!user) return;
     
     try {
-      const success = await saveDisplaySettings(user.id, settings);
+      const displaySettings = convertToDisplaySettings(settings);
+      const success = await saveDisplaySettings(user.id, displaySettings);
       
       if (success) {
         // Update local state
-        setDisplaySettings(settings);
+        setDisplaySettings(displaySettings);
       }
     } catch (error) {
       console.error("Error saving display settings:", error);
     }
   };
 
-  // Wrapper function to handle type conversion for DisplaySettingsDialog
-  const handleSaveDisplaySettingsWrapper = (settings: Record<string, boolean>) => {
-    const displaySettings = convertToDisplaySettings(settings);
-    handleSaveDisplaySettings(displaySettings);
-  };
+  useEffect(() => {
+    if (!user) return;
+    
+    // Load everything when user changes
+    loadDisplaySettingsFromDB();
+    loadTrades();
+    
+    const loadTags = async () => {
+      const tags = await loadUserTags(user.id);
+      setTradeData(prev => ({ ...prev, availableTags: tags }));
+    };
+    loadTags();
+  }, [user]);
 
+  const groupedTrades = groupTradesByDate(tradeData.trades);
   const selectedTrades = groupedTrades[selectedDate] || [];
 
   return (
@@ -279,22 +263,15 @@ export default function Calendar() {
           isOpen={dialogs.isDisplaySettingsOpen} 
           onClose={() => setDialogs(prev => ({ ...prev, isDisplaySettingsOpen: false }))}
           displaySettings={displaySettings}
-          onSaveSettings={handleSaveDisplaySettingsWrapper}
+          onSaveSettings={handleSaveDisplaySettings}
         />
-        <AlertDialog open={tradeData.deleteTradeId !== null} onOpenChange={() => setTradeData(prev => ({ ...prev, deleteTradeId: null }))}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>取引を削除しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                この操作は取り消すことができません。取引データが完全に削除されます。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete}>削除</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={tradeData.deleteTradeId !== null}
+          onOpenChange={() => setTradeData(prev => ({ ...prev, deleteTradeId: null }))}
+          title="取引を削除しますか？"
+          description="この操作は取り消すことができません。取引データが完全に削除されます。"
+          onConfirm={confirmDelete}
+        />
       </SidebarInset>
     </SidebarProvider>
   );

@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
-import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction } from "@/components/business/common/alert-dialog"
+import { ConfirmDialog } from "@/components/business/common/alert-dialog"
 
 export function DisplaySettingsDialog({ 
   isOpen, 
@@ -105,35 +105,25 @@ export function DisplaySettingsDialog({
     </Dialog>
 
       {/* Discard Changes Warning Dialog */}
-      <AlertDialog open={showDiscardWarning} onOpenChange={setShowDiscardWarning}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>設定を破棄しますか？</AlertDialogTitle>
-            <AlertDialogDescription>
-              <span className="mb-2">
-                保存されていない設定変更があります。
-              </span>
-              <span className="text-red-600">
-                ⚠️ 現在の設定変更は破棄されます。
-              </span>
-              <span className="text-sm text-muted-foreground mt-2">
-                この操作は取り消すことができません。
-              </span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowDiscardWarning(false)}>
-              キャンセル
-            </AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleDiscard}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              破棄
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={showDiscardWarning}
+        onOpenChange={setShowDiscardWarning}
+        title="設定を破棄しますか？"
+        description={
+          <>
+            <span className="mb-2">
+              保存されていない設定変更があります。
+            </span>
+            <span className="text-red-600">
+              ⚠️ 現在の設定変更は破棄されます。
+            </span>
+            <span className="text-sm text-muted-foreground mt-2">
+              この操作は取り消すことができません。
+            </span>
+          </>
+        }
+        onConfirm={handleDiscard}
+      />
     </>
   )
 }

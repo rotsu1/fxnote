@@ -37,16 +37,7 @@ import {
   SelectTrigger,
   SelectValue
 } from "@/components/ui/select"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/business/common/alert-dialog"
+import { ConfirmDialog } from "@/components/business/common/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { 
@@ -1355,42 +1346,25 @@ function TableContent() {
           draggedColumn={tableConfig.draggedColumn}
         />
 
-        <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {deleteConfirmId === -1 ? "選択された取引を削除しますか？" : "取引を削除しますか？"}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {deleteConfirmId === -1 
-                  ? `${selectedTrades.size}件の取引を削除します。この操作は取り消すことができません。`
-                  : "この操作は取り消すことができません。取引データが完全に削除されます。"
-                }
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete}>削除</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={deleteConfirmId !== null}
+          onOpenChange={() => setDeleteConfirmId(null)}
+          title={deleteConfirmId === -1 ? "選択された取引を削除しますか？" : "取引を削除しますか？"}
+          description={deleteConfirmId === -1 
+            ? `${selectedTrades.size}件の取引を削除します。この操作は取り消すことができません。`
+            : "この操作は取り消すことができません。取引データが完全に削除されます。"
+          }
+          onConfirm={confirmDelete}
+        />
 
-        <AlertDialog open={dialogState.showDiscardWarning} onOpenChange={(open) => setDialogState({ ...dialogState, showDiscardWarning: open })}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                保存されていない変更があります。変更を破棄すると、元の設定に戻ります。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleCancelDiscard}>キャンセル</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDiscardChanges} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-                破棄
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={dialogState.showDiscardWarning}
+          onOpenChange={(open: boolean) => setDialogState({ ...dialogState, showDiscardWarning: open })}
+          title="変更を破棄しますか？"
+          description="保存されていない変更があります。変更を破棄すると、元の設定に戻ります。"
+          onConfirm={handleDiscardChanges}
+          onCancel={handleCancelDiscard}
+        />
       </SidebarInset>
   );
 }

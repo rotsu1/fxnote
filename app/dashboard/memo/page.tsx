@@ -12,16 +12,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/business/common/alert-dialog"
+import { ConfirmDialog } from "@/components/business/common/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/components/ui/sidebar"
 import { supabase } from "@/lib/supabaseClient";
@@ -318,51 +309,22 @@ export default function Memo() {
         />
 
         {/* Exit Warning Dialog */}
-        <AlertDialog open={showExitWarning} onOpenChange={setShowExitWarning}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>変更を破棄しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                保存されていない変更があります。この変更を破棄しますか？
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setShowExitWarning(false)}>
-                キャンセル
-              </AlertDialogCancel>
-              <AlertDialogAction onClick={() => {
-                setShowExitWarning(false);
-                // Reset form data to original state before closing
-                if (originalFormData) {
-                  setEditingMemo({
-                    ...editingMemo,
-                    title: originalFormData.title,
-                    content: originalFormData.content,
-                    note_date: originalFormData.note_date,
-                  });
-                }
-                setIsMemoDialogOpen(false);
-              }}>
-                破棄
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={showExitWarning}
+          onOpenChange={setShowExitWarning}
+          title="変更を破棄しますか？"
+          description="保存されていない変更があります。この変改を破棄しますか？"
+          onConfirm={() => setShowExitWarning(false)}
+          onCancel={() => setShowExitWarning(false)}
+        />
 
-        <AlertDialog open={deleteConfirmId !== null} onOpenChange={() => setDeleteConfirmId(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>メモを削除しますか？</AlertDialogTitle>
-              <AlertDialogDescription>
-                この操作は取り消すことができません。メモが完全に削除されます。
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>キャンセル</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDelete}>削除</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <ConfirmDialog
+          open={deleteConfirmId !== null}
+          onOpenChange={() => setDeleteConfirmId(null)}
+          title="メモを削除しますか？"
+          description="この操作は取り消すことができません。メモが完全に削除されます。"
+          onConfirm={confirmDelete}
+        />
       </SidebarInset>
     </SidebarProvider>
   );

@@ -126,16 +126,57 @@ const AlertDialogCancel = React.forwardRef<
 ))
 AlertDialogCancel.displayName = AlertDialogPrimitive.Cancel.displayName
 
-export {
-  AlertDialog,
-  AlertDialogPortal,
-  AlertDialogOverlay,
-  AlertDialogTrigger,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogFooter,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogAction,
-  AlertDialogCancel,
+// components/ui/alert-dialog.tsx
+
+interface ConfirmDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: React.ReactNode;
+  onConfirm: () => void;
+  onCancel?: () => void;  // Optional cancel handler
+  confirmText?: string;
+  cancelText?: string;
+  variant?: "default" | "destructive";
+}
+
+export function ConfirmDialog({
+  open,
+  onOpenChange,
+  title,
+  description,
+  onConfirm,
+  onCancel,  // Optional
+  confirmText = "削除",
+  cancelText = "キャンセル",
+  variant = "default"
+}: ConfirmDialogProps) {
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel();  // Custom cancel logic
+    }
+    onOpenChange(false);  // Always close dialog
+  };
+
+  return (
+    <AlertDialog open={open} onOpenChange={onOpenChange}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={handleCancel}>
+            {cancelText}
+          </AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={onConfirm}
+            className={variant === "destructive" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+          >
+            {confirmText}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
 }
