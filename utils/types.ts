@@ -25,8 +25,6 @@ export interface Trade {
 
 export interface Profile {
     id: string
-    first_name?: string
-    last_name?: string
     timezone: string
     preferred_currency: string
     created_at?: string

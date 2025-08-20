@@ -64,15 +64,6 @@ export default function AuthCallback() {
                 id: session.user.id,
                 timezone: "Asia/Tokyo",
                 preferred_currency: "JPY",
-                // Extract name from user metadata if available
-                first_name: session.user.user_metadata?.full_name?.split(' ')[0] || 
-                           session.user.user_metadata?.first_name || 
-                           session.user.user_metadata?.name?.split(' ')[0] || 
-                           "",
-                last_name: session.user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || 
-                          session.user.user_metadata?.last_name || 
-                          session.user.user_metadata?.name?.split(' ').slice(1).join(' ') || 
-                          "",
               },
             ]);
 
