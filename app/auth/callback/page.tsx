@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import { Profile } from "@/utils/types";
+import { Profile } from "@/utils/core/types";
 
 export default function AuthCallback() {
   const router = useRouter();

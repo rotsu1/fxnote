@@ -12,7 +12,7 @@ import { useState, FormEvent, useEffect } from "react"
 import { Eye, EyeOff } from "lucide-react"
 import { supabase, signInWithGoogle } from "@/lib/supabaseClient"
 import { useRouter } from "next/navigation";
-import { Profile } from "@/utils/types";
+import { Profile } from "@/utils/core/types";
 
 export default function Component() {
   const router = useRouter();

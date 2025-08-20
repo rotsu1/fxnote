@@ -11,7 +11,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/business/common/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { 
   SidebarInset,
@@ -19,28 +19,28 @@ import {
   SidebarTrigger,
   AppSidebar
 } from "@/components/ui/sidebar"
-import { MonthlyNavigation } from "@/components/ui/monthly-navigation"
-import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
-import { CalendarGrid } from "@/components/ui/calendar-grid"
-import { RightSidebar } from "@/components/ui/right-sidebar"
-import { CSVImportDialog } from "@/components/ui/csv-import-dialog"
-import { DisplaySettingsDialog } from "@/components/ui/display-settings-dialog"
+import { MonthlyNavigation } from "@/components/business/calendar/monthly-navigation"
+import { CalendarGrid } from "@/components/business/calendar/calendar-grid"
+import { TradeEditDialog } from "@/components/business/common/trade-edit-dialog"
+import { RightSidebar } from "@/components/business/calendar/right-sidebar"
+import { CSVImportDialog } from "@/components/business/common/csv-import-dialog"
+import { DisplaySettingsDialog } from "@/components/business/common/display-settings-dialog"
 
-import { saveTrade } from "@/utils/tradeUtils"
-import { groupTradesByDate } from "@/utils/timeUtils"
-import { Trade } from "@/utils/types"
+import { saveTrade } from "@/utils/trading/tradeUtils"
+import { groupTradesByDate } from "@/utils/ui/timeUtils"
+import { Trade } from "@/utils/core/types"
 import { 
   loadDisplaySettings,
   saveDisplaySettings,
   convertToDisplaySettings,
   type DisplaySettings
-} from "@/utils/displaySettingsUtils"
+} from "@/utils/ui/displaySettingsUtils"
 import {
   transformTradeForEditing,
   deleteTrade,
   loadUserTags
-} from "@/utils/tradeCrudUtils"
-import { loadTrades as loadTradesData } from "@/utils/dataLoadingUtils"
+} from "@/utils/trading/tradeCrudUtils"
+import { loadTrades as loadTradesData } from "@/utils/data/dataLoadingUtils"
 
 import { useAuth } from "@/hooks/useAuth";
 

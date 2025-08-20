@@ -46,7 +46,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/business/common/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { 
@@ -73,18 +73,18 @@ import {
 import {
   TableSettingsDialog,
   allColumns
-} from "@/components/ui/table-settings-dialog"
-import { TradeEditDialog } from "@/components/ui/trade-edit-dialog"
+} from "@/components/business/table/table-settings-dialog"
+import { TradeEditDialog } from "@/components/business/common/trade-edit-dialog"
 
-import { Trade } from "@/utils/types"
-import { isFieldEditable, getColumnValue, transformTradeData } from "@/utils/tableUtils"
-import { loadTags, loadSymbolsForTable, loadEmotionsForTable } from "@/utils/dataLoadingUtils"
-import { filterAndSortTrades } from "@/utils/tableFilterUtils"
-import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/cellEditingUtils"
-import { saveCellValue } from "@/utils/cellSaveUtils"
-import { handleTradeSelection, handleSelectAllTrades as handleSelectAllTradesUtil, handleTradeSave, handleTradeDeletion } from "@/utils/tradeManagementUtils"
-import { handleColumnToggle, handleColumnDragStart, handleColumnDrop, saveColumnPreferences as saveColumnPreferencesUtil } from "@/utils/columnManagementUtils"
-import { handlePreviousDay as handlePreviousDayUtil, handleNextDay as handleNextDayUtil } from "@/utils/dateNavigationUtils"
+import { Trade } from "@/utils/core/types"
+import { isFieldEditable, getColumnValue, transformTradeData } from "@/utils/table/tableUtils"
+import { loadTags, loadSymbolsForTable, loadEmotionsForTable } from "@/utils/data/dataLoadingUtils"
+import { filterAndSortTrades } from "@/utils/table/tableFilterUtils"
+import { handleCellClickLogic, handleHoldingTimeChange, handleCellEscape, handleCellBlurLogic } from "@/utils/table/cellEditingUtils"
+import { saveCellValue } from "@/utils/table/cellSaveUtils"
+import { handleTradeSelection, handleSelectAllTrades as handleSelectAllTradesUtil, handleTradeSave, handleTradeDeletion } from "@/utils/trading/tradeManagementUtils"
+import { handleColumnToggle, handleColumnDragStart, handleColumnDrop, saveColumnPreferences as saveColumnPreferencesUtil } from "@/utils/table/columnManagementUtils"
+import { handlePreviousDay as handlePreviousDayUtil, handleNextDay as handleNextDayUtil } from "@/utils/ui/dateNavigationUtils"
 
 import { cn } from "@/lib/utils"
 import { supabase } from "@/lib/supabaseClient";
@@ -907,7 +907,7 @@ function TableContent() {
                                 const column = allColumns.find((c) => c.id === colId);
                                 if (!column) return null;
 
-                                const isEditing = cellEditingState.editingCell?.id === trade.id && cellEditingState.editingCell.field === column.id;
+                                const isEditing = cellEditingState.editingCell?.id === trade.id && cellEditingState.editingCell?.field === column.id;
                                 const cellKey = `${trade.id}-${column.id}`;
                                 const editingValue = cellEditingState.editingValues[cellKey];
                                 const isSaving = cellEditingState.savingCells.has(cellKey);
