@@ -45,6 +45,7 @@ export async function upsertSubscriptionFromStripe(
         current_period_end: unixToIso((subscription as any).current_period_end),
         trial_start: unixToIso(subscription.trial_start),
         trial_end: unixToIso(subscription.trial_end),
+        cancel_at_period_end: subscription.cancel_at_period_end || false,
         cancel_at: unixToIso(subscription.cancel_at),
         canceled_at: unixToIso(subscription.canceled_at),
         ended_at: unixToIso(subscription.ended_at),
