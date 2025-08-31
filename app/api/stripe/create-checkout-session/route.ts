@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     // 1) Bearer トークンを取得
@@ -54,10 +57,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4) 価格IDとURL
-    const priceId = process.env.STRIPE_PRICE_ID; // 例: price_xxx（JPY/¥490/月）
+    // 4) 価格IDとURL（productIdにも対応）
+    const priceEnv = process.env.STRIPE_PRICE_ID; // 例: price_xxx（推奨） or prod_xxx（製品IDも可）
+    if (!priceEnv) {
+      return NextResponse.json({ error: 'Missing STRIPE_PRICE_ID (expected price_... or prod_...)' }, { status: 500 });
+    }
+
+    let priceId: string | null = null;
+    if (priceEnv.startsWith('price_')) {
+      priceId = priceEnv;
+    } else if (priceEnv.startsWith('prod_')) {
+      // プロダクトIDが指定された場合、アクティブな月額の価格を探索
+      const prices = await stripe.prices.list({ product: priceEnv, active: true, limit: 10 });
+      const monthly = prices.data.find(p => (p.recurring?.interval === 'month'));
+      priceId = (monthly || prices.data[0])?.id || null;
+    }
     if (!priceId) {
-      return NextResponse.json({ error: 'Missing STRIPE_PRICE_ID' }, { status: 500 });
+      return NextResponse.json({ error: 'Could not resolve a Stripe Price for STRIPE_PRICE_ID' }, { status: 500 });
     }
 
     const origin =
