@@ -15,7 +15,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CheckoutRespo
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL || req.headers.get('origin') || ''
+  const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
   if (!process.env.STRIPE_PRICE_ID) {
     console.error('[checkout] STRIPE_PRICE_ID missing')
     return NextResponse.json({ error: 'Server config error' }, { status: 500 })
@@ -103,10 +103,14 @@ export async function POST(req: NextRequest): Promise<NextResponse<CheckoutRespo
     console.log('[checkout] Created session', session.id)
     return NextResponse.json({ url: session.url || undefined })
   } catch (e: any) {
-    const msg = e?.message || String(e)
-    console.error('[checkout] Unexpected error', msg, e)
-    // Surface a slightly more descriptive error for debugging, without leaking secrets
-    const isStripeErr = e && typeof e === 'object' && 'type' in e && 'raw' in e
-    return NextResponse.json({ error: isStripeErr ? 'Stripe error' : 'Internal error' }, { status: 500 })
+    // Stripe-specific surface for easier debugging
+    const stripeCode = e?.code || e?.raw?.code
+    const stripeMessage = e?.message || e?.raw?.message
+    if (stripeMessage) {
+      console.error('[checkout] Stripe error:', stripeCode || 'unknown_code', stripeMessage)
+      return NextResponse.json({ error: `Stripe error: ${stripeMessage}` }, { status: 400 })
+    }
+    console.error('[checkout] Unexpected error', e)
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
