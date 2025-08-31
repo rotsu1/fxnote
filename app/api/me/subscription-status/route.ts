@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // 2) 最新の購読レコードを取得（更新の新しい順に1件）
     const { data: subs, error: subsErr } = await supabaseAdmin
       .from('subscriptions')
-      .select('status,current_period_end,cancel_at,ended_at,updated_at')
+      .select('status,current_period_end,trial_end,cancel_at,ended_at,updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(1);
@@ -44,11 +44,23 @@ export async function GET(req: NextRequest) {
     let status: string | undefined;
 
     if (hasHistory) {
-      const s = subs![0];
+      const s: any = subs![0];
       status = s.status ?? undefined;
 
-      const periodOk =
-        s.current_period_end ? new Date(s.current_period_end) > now : false;
+      // trialing の場合は trial_end を優先して判定
+      let periodOk = false;
+      if (status === 'trialing') {
+        if (s.trial_end) {
+          periodOk = new Date(s.trial_end) > now;
+        } else if (s.current_period_end) {
+          periodOk = new Date(s.current_period_end) > now;
+        } else {
+          // trialing だが期限が不明な場合は一時的に有効扱い（Webhookで補完される想定）
+          periodOk = true;
+        }
+      } else {
+        periodOk = s.current_period_end ? new Date(s.current_period_end) > now : false;
+      }
 
       const notEnded = !s.ended_at;
       // 期末解約予約(cancel_at)が将来ならその時点までは有効扱い
