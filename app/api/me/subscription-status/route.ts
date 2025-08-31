@@ -61,15 +61,22 @@ export async function GET(req: NextRequest) {
     }
 
     const now = new Date()
-    const currentEnd = row.current_period_end ? new Date(row.current_period_end) : null
-    const endedAt = row.ended_at ? new Date(row.ended_at) : null
+    const parse = (s?: string | null) => (s ? new Date(s) : null)
+    const currentEnd = parse(row.current_period_end)
+    const trialEnd = parse(row.trial_end)
+    const endedAt = parse(row.ended_at)
     const status = String(row.status)
 
-    const isWithinPeriod = currentEnd ? currentEnd > now : false
+    const withinCurrent = currentEnd ? currentEnd > now : false
+    const withinTrial = trialEnd ? trialEnd > now : false
     const notEnded = !endedAt
+
+    // Active if:
+    // - status active OR trialing AND (current_period_end in future OR trial_end in future) AND not ended
+    // - status canceled BUT current_period_end in the future
     const isActive = (
-      ((status === 'active' || status === 'trialing') && isWithinPeriod && notEnded) ||
-      (status === 'canceled' && isWithinPeriod)
+      ((status === 'active' || status === 'trialing') && (withinCurrent || withinTrial) && notEnded) ||
+      (status === 'canceled' && withinCurrent)
     )
 
     let res: SubscriptionStatusResponse
@@ -101,4 +108,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
-

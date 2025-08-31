@@ -2,10 +2,12 @@
 
 import AuthGuard from "@/components/layout/AuthGuard";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [access, setAccess] = useState<string | null>(null)
+  const pathname = usePathname()
 
   useEffect(() => {
     try {
@@ -14,7 +16,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [])
 
-  const showOverlay = access === 'limited'
+  const showOverlay = access === 'limited' && !(pathname?.startsWith('/dashboard/settings'))
 
   return (
     <AuthGuard>
