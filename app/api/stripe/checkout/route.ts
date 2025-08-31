@@ -34,7 +34,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CheckoutRespo
       .from('profiles')
       .select('stripe_customer_id')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
     if (profileErr) {
       console.error('[checkout] profile fetch error', profileErr)
       return NextResponse.json({ error: 'Profile fetch error' }, { status: 500 })
@@ -102,9 +102,11 @@ export async function POST(req: NextRequest): Promise<NextResponse<CheckoutRespo
 
     console.log('[checkout] Created session', session.id)
     return NextResponse.json({ url: session.url || undefined })
-  } catch (e) {
-    console.error('[checkout] Unexpected error', e)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  } catch (e: any) {
+    const msg = e?.message || String(e)
+    console.error('[checkout] Unexpected error', msg, e)
+    // Surface a slightly more descriptive error for debugging, without leaking secrets
+    const isStripeErr = e && typeof e === 'object' && 'type' in e && 'raw' in e
+    return NextResponse.json({ error: isStripeErr ? 'Stripe error' : 'Internal error' }, { status: 500 })
   }
 }
-
