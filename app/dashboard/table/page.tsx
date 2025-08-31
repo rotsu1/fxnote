@@ -3,49 +3,19 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react"
 
 import {
-  CalendarIcon,
-  Settings,
-  Plus,
-  Edit,
-  Trash2,
-  ChevronLeft,
-  ChevronRight,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  Loader2
 } from "lucide-react"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 
 import { CardDescription } from "@/components/ui/card"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger
-} from "@/components/ui/tooltip"
-import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@/components/ui/select"
 import { ConfirmDialog } from "@/components/business/common/alert-dialog"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import { 
-  Popover,
-  PopoverContent,
-  PopoverTrigger
-} from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
 import { 
   Table,
   TableBody,
@@ -66,6 +36,8 @@ import {
   allColumns
 } from "@/components/business/table/table-settings-dialog"
 import { TradeEditDialog } from "@/components/business/common/trade-edit-dialog"
+import { TableActions } from "@/components/business/table/table-header"
+import { TradeTableRow } from "@/components/business/table/table-row"
 
 import { Trade } from "@/utils/core/types"
 import { isFieldEditable, getColumnValue, transformTradeData } from "@/utils/table/tableUtils"
@@ -136,187 +108,6 @@ function TableContent() {
   const [availableSymbols, setAvailableSymbols] = useState<string[]>([]);
   const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<{ id: number, tag_name: string }[]>([]);
-  const [isComposing, setIsComposing] = useState(false);
-
-  // Load all initial data when user changes
-  useEffect(() => {
-    if (!user) return;
-    
-    const initializeData = async () => {
-      setStatus({ loading: true, error: "", isSaving: false });
-      
-      try {
-        // Load all data in parallel for better performance
-        const [tagsResult, symbolsResult, emotionsResult] = await Promise.all([
-          loadTags(user.id),
-          loadSymbolsForTable(setAvailableSymbols),
-          loadEmotionsForTable(user.id, setAvailableEmotions)
-        ]);
-
-        // Handle tags loading
-        if (tagsResult.error) {
-          console.error("Error loading tags for table:", tagsResult.error);
-          setAvailableTags([]);
-        } else {
-          setAvailableTags(tagsResult.data);
-        }
-
-        // Load user's column preferences
-        const { data: preferencesData, error: preferencesError } = await supabase
-          .from("table_column_preferences")
-          .select("*")
-          .eq("user_id", user.id)
-          .single();
-
-        if (preferencesError && preferencesError.code !== 'PGRST116') {
-          console.error("Error loading preferences:", preferencesError);
-        }
-
-        // Set visible columns based on preferences or defaults
-        if (preferencesData) {
-          const orderedColumns: string[] = [];
-          const columnOrder = [
-            { key: 'pair', dbField: 'symbol' },
-            { key: 'entry', dbField: 'entry_price' },
-            { key: 'exit', dbField: 'exit_price' },
-            { key: 'entryTime', dbField: 'entry_time' },
-            { key: 'exitTime', dbField: 'exit_time' },
-            { key: 'type', dbField: 'type' },
-            { key: 'emotion', dbField: 'emotion' },
-            { key: 'tags', dbField: 'tag' },
-            { key: 'lot', dbField: 'lot' },
-            { key: 'pips', dbField: 'pips' },
-            { key: 'profit', dbField: 'profit_loss' },
-            { key: 'notes', dbField: 'note' },
-            { key: 'holdingTime', dbField: 'hold_time' },
-          ];
-
-          // Sort by order values and add visible columns
-          columnOrder
-            .sort((a, b) => {
-              const aOrder = preferencesData[a.dbField as keyof typeof preferencesData] as number;
-              const bOrder = preferencesData[b.dbField as keyof typeof preferencesData] as number;
-              if (aOrder === null && bOrder === null) return 0;
-              if (aOrder === null) return 1;
-              if (bOrder === null) return -1;
-              return aOrder - bOrder;
-            })
-            .forEach(({ key }) => {
-              const order = preferencesData[columnOrder.find(c => c.key === key)?.dbField as keyof typeof preferencesData] as number;
-              if (order !== null) {
-                orderedColumns.push(key);
-              }
-            });
-
-          setTableConfig({ ...tableConfig, visibleColumns: orderedColumns, originalVisibleColumns: orderedColumns });
-        }
-
-        // Fetch trades with symbol information
-        const { data: tradesData, error: tradesError } = await supabase
-          .from("trades")
-          .select(`
-            *,
-            symbols!inner(symbol)
-          `)
-          .eq("user_id", user.id)
-          .order("entry_date", { ascending: true })
-          .order("entry_time", { ascending: true });
-
-        if (tradesError) {
-          setStatus({ loading: false, error: tradesError.message, isSaving: false });
-          setTrades([]);
-          return;
-        }
-
-        // Fetch tags and emotions for all trades in parallel
-        const [tagLinksResult, emotionLinksResult] = await Promise.all([
-          supabase
-            .from("trade_tag_links")
-            .select(`
-              trade_id,
-              trade_tags!inner(tag_name)
-            `),
-          supabase
-            .from("trade_emotion_links")
-            .select(`
-              trade_id,
-              emotions!inner(emotion)
-            `)
-        ]);
-
-        if (tagLinksResult.error) {
-          console.error("Error loading tags:", tagLinksResult.error);
-        }
-
-        if (emotionLinksResult.error) {
-          console.error("Error loading emotions:", emotionLinksResult.error);
-        }
-
-        // Group tags and emotions by trade_id, but only for trades that belong to the current user
-        const userTradeIds = new Set((tradesData || []).map(trade => trade.id));
-        
-        const tagsByTradeId = (tagLinksResult.data || []).reduce((acc: Record<number, string[]>, link: any) => {
-          // Only include tags for trades that belong to the current user
-          if (userTradeIds.has(link.trade_id)) {
-            if (!acc[link.trade_id]) acc[link.trade_id] = [];
-            acc[link.trade_id].push(link.trade_tags.tag_name);
-          }
-          return acc;
-        }, {});
-
-        const emotionsByTradeId = (emotionLinksResult.data || []).reduce((acc: Record<number, string[]>, link: any) => {
-          // Only include emotions for trades that belong to the current user
-          if (userTradeIds.has(link.trade_id)) {
-            if (!acc[link.trade_id]) acc[link.trade_id] = [];
-            acc[link.trade_id].push(link.emotions.emotion);
-          }
-          return acc;
-        }, {});
-
-        // Transform DB data to match Trade interface
-        const transformedTrades = (tradesData || []).map((trade: any) => 
-          transformTradeData(trade, tagsByTradeId, emotionsByTradeId)
-        ) as Trade[];
-
-        setTrades(transformedTrades);
-      } catch (error: any) {
-        console.error("Error loading data:", error);
-        setStatus({ loading: false, error: error.message || "データの読み込み中にエラーが発生しました", isSaving: false });
-      } finally {
-        setStatus({ loading: false, error: "", isSaving: false });
-      }
-    };
-
-    initializeData();
-    
-    // Listen for trade updates
-    const handleTradeUpdate = () => {
-      initializeData();
-    };
-    
-    window.addEventListener('tradeUpdated', handleTradeUpdate);
-    
-    return () => {
-      window.removeEventListener('tradeUpdated', handleTradeUpdate);
-    };
-  }, [user]);
-
-  // Cleanup effect to handle unsaved changes when component unmounts
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (cellEditingState.editingCell || Object.keys(cellEditingState.editingValues).length > 0) {
-        e.preventDefault();
-        e.returnValue = '編集中のデータがあります。ページを離れますか？';
-        return e.returnValue;
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, [cellEditingState.editingCell, cellEditingState.editingValues]);
 
   const filteredTrades = useMemo(() => {
     return filterAndSortTrades(trades, {
@@ -494,45 +285,6 @@ function TableContent() {
       handleCellSave(editingCellId, editingCellField);
     }
   }, [cellEditingState, status.isSaving, handleCellSave]);
-
-  // Global click handler for emotions and tags containers
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    const handleGlobalClick = (event: MouseEvent) => {
-      if (
-        cellEditingState.editingCell &&
-        (cellEditingState.editingCell.field === 'emotion' || cellEditingState.editingCell.field === 'tags') &&
-        !status.isSaving
-      ) {
-        const target = event.target as Element;
-        const containerSelector = cellEditingState.editingCell.field === 'emotion' 
-          ? '[data-emotions-container="true"]'
-          : '[data-tags-container="true"]';
-        const container = document.querySelector(containerSelector);
-        
-        if (container && !container.contains(target)) {
-          // Clear any existing timeout
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-          }
-          // Add a small delay to prevent multiple rapid calls
-          timeoutId = setTimeout(() => {
-            handleCellBlur();
-          }, 10);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleGlobalClick);
-    
-    return () => {
-      document.removeEventListener('mousedown', handleGlobalClick);
-      if (timeoutId) {
-        clearTimeout(timeoutId);
-      }
-    };
-  }, [cellEditingState.editingCell, handleCellBlur, status.isSaving]);
 
   const handleCellKeyDown = useCallback((e: React.KeyboardEvent, id: number, field: keyof Trade) => {
     if (e.key === 'Enter') {
@@ -765,6 +517,225 @@ function TableContent() {
     return value;
   };
 
+  // Load all initial data when user changes
+  useEffect(() => {
+      if (!user) return;
+      
+      const initializeData = async () => {
+        setStatus({ loading: true, error: "", isSaving: false });
+        
+        try {
+          // Load all data in parallel for better performance
+          const [tagsResult, symbolsResult, emotionsResult] = await Promise.all([
+            loadTags(user.id),
+            loadSymbolsForTable(setAvailableSymbols),
+            loadEmotionsForTable(user.id, setAvailableEmotions)
+          ]);
+  
+          // Handle tags loading
+          if (tagsResult.error) {
+            console.error("Error loading tags for table:", tagsResult.error);
+            setAvailableTags([]);
+          } else {
+            setAvailableTags(tagsResult.data);
+          }
+  
+          // Load user's column preferences
+          const { data: preferencesData, error: preferencesError } = await supabase
+            .from("table_column_preferences")
+            .select("*")
+            .eq("user_id", user.id)
+            .single();
+  
+          if (preferencesError && preferencesError.code !== 'PGRST116') {
+            console.error("Error loading preferences:", preferencesError);
+          }
+  
+          // Set visible columns based on preferences or defaults
+          if (preferencesData) {
+            const orderedColumns: string[] = [];
+            const columnOrder = [
+              { key: 'pair', dbField: 'symbol' },
+              { key: 'entry', dbField: 'entry_price' },
+              { key: 'exit', dbField: 'exit_price' },
+              { key: 'entryTime', dbField: 'entry_time' },
+              { key: 'exitTime', dbField: 'exit_time' },
+              { key: 'type', dbField: 'type' },
+              { key: 'emotion', dbField: 'emotion' },
+              { key: 'tags', dbField: 'tag' },
+              { key: 'lot', dbField: 'lot' },
+              { key: 'pips', dbField: 'pips' },
+              { key: 'profit', dbField: 'profit_loss' },
+              { key: 'notes', dbField: 'note' },
+              { key: 'holdingTime', dbField: 'hold_time' },
+            ];
+  
+            // Sort by order values and add visible columns
+            columnOrder
+              .sort((a, b) => {
+                const aOrder = preferencesData[a.dbField as keyof typeof preferencesData] as number;
+                const bOrder = preferencesData[b.dbField as keyof typeof preferencesData] as number;
+                if (aOrder === null && bOrder === null) return 0;
+                if (aOrder === null) return 1;
+                if (bOrder === null) return -1;
+                return aOrder - bOrder;
+              })
+              .forEach(({ key }) => {
+                const order = preferencesData[columnOrder.find(c => c.key === key)?.dbField as keyof typeof preferencesData] as number;
+                if (order !== null) {
+                  orderedColumns.push(key);
+                }
+              });
+  
+            setTableConfig({ ...tableConfig, visibleColumns: orderedColumns, originalVisibleColumns: orderedColumns });
+          }
+  
+          // Fetch trades with symbol information
+          const { data: tradesData, error: tradesError } = await supabase
+            .from("trades")
+            .select(`
+              *,
+              symbols!inner(symbol)
+            `)
+            .eq("user_id", user.id)
+            .order("entry_date", { ascending: true })
+            .order("entry_time", { ascending: true });
+  
+          if (tradesError) {
+            setStatus({ loading: false, error: tradesError.message, isSaving: false });
+            setTrades([]);
+            return;
+          }
+  
+          // Fetch tags and emotions for all trades in parallel
+          const [tagLinksResult, emotionLinksResult] = await Promise.all([
+            supabase
+              .from("trade_tag_links")
+              .select(`
+                trade_id,
+                trade_tags!inner(tag_name)
+              `),
+            supabase
+              .from("trade_emotion_links")
+              .select(`
+                trade_id,
+                emotions!inner(emotion)
+              `)
+          ]);
+  
+          if (tagLinksResult.error) {
+            console.error("Error loading tags:", tagLinksResult.error);
+          }
+  
+          if (emotionLinksResult.error) {
+            console.error("Error loading emotions:", emotionLinksResult.error);
+          }
+  
+          // Group tags and emotions by trade_id, but only for trades that belong to the current user
+          const userTradeIds = new Set((tradesData || []).map(trade => trade.id));
+          
+          const tagsByTradeId = (tagLinksResult.data || []).reduce((acc: Record<number, string[]>, link: any) => {
+            // Only include tags for trades that belong to the current user
+            if (userTradeIds.has(link.trade_id)) {
+              if (!acc[link.trade_id]) acc[link.trade_id] = [];
+              acc[link.trade_id].push(link.trade_tags.tag_name);
+            }
+            return acc;
+          }, {});
+  
+          const emotionsByTradeId = (emotionLinksResult.data || []).reduce((acc: Record<number, string[]>, link: any) => {
+            // Only include emotions for trades that belong to the current user
+            if (userTradeIds.has(link.trade_id)) {
+              if (!acc[link.trade_id]) acc[link.trade_id] = [];
+              acc[link.trade_id].push(link.emotions.emotion);
+            }
+            return acc;
+          }, {});
+  
+          // Transform DB data to match Trade interface
+          const transformedTrades = (tradesData || []).map((trade: any) => 
+            transformTradeData(trade, tagsByTradeId, emotionsByTradeId)
+          ) as Trade[];
+  
+          setTrades(transformedTrades);
+        } catch (error: any) {
+          console.error("Error loading data:", error);
+          setStatus({ loading: false, error: error.message || "データの読み込み中にエラーが発生しました", isSaving: false });
+        } finally {
+          setStatus({ loading: false, error: "", isSaving: false });
+        }
+      };
+  
+      initializeData();
+      
+      // Listen for trade updates
+      const handleTradeUpdate = () => {
+        initializeData();
+      };
+      
+      window.addEventListener('tradeUpdated', handleTradeUpdate);
+      
+      return () => {
+        window.removeEventListener('tradeUpdated', handleTradeUpdate);
+      };
+  }, [user]);
+  
+  // Cleanup effect to handle unsaved changes when component unmounts
+  useEffect(() => {
+      const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (cellEditingState.editingCell || Object.keys(cellEditingState.editingValues).length > 0) {
+          e.preventDefault();
+          e.returnValue = '編集中のデータがあります。ページを離れますか？';
+          return e.returnValue;
+        }
+      };
+  
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+  }, [cellEditingState.editingCell, cellEditingState.editingValues]);
+
+  // Global click handler for emotions and tags containers
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
+    const handleGlobalClick = (event: MouseEvent) => {
+      if (
+        cellEditingState.editingCell &&
+        (cellEditingState.editingCell.field === 'emotion' || cellEditingState.editingCell.field === 'tags') &&
+        !status.isSaving
+      ) {
+        const target = event.target as Element;
+        const containerSelector = cellEditingState.editingCell.field === 'emotion' 
+          ? '[data-emotions-container="true"]'
+          : '[data-tags-container="true"]';
+        const container = document.querySelector(containerSelector);
+        
+        if (container && !container.contains(target)) {
+          // Clear any existing timeout
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          // Add a small delay to prevent multiple rapid calls
+          timeoutId = setTimeout(() => {
+            handleCellBlur();
+          }, 10);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleGlobalClick);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleGlobalClick);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [cellEditingState.editingCell, handleCellBlur, status.isSaving]);
+
   return (
     <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 md:px-6">
@@ -782,71 +753,17 @@ function TableContent() {
             <div className="text-center text-red-600 py-10">{status.error}</div>
           ) : (
             <>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                {/* Date Navigation */}
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handlePreviousDay}
-                    disabled={!selectedDate}
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-[280px] justify-start text-left font-normal",
-                          !selectedDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : <span>日付を選択</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar mode="single" selected={selectedDate} onSelect={setSelectedDate} initialFocus locale={ja} />
-                    </PopoverContent>
-                  </Popover>
-                  
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={handleNextDay}
-                    disabled={!selectedDate}
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="flex gap-2">
-                  <Button onClick={handleAddTrade}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    取引を追加
-                  </Button>
-                  {selectedTrades.size > 0 && (
-                    <Button variant="destructive" onClick={handleDeleteSelectedTrades}>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {selectedTrades.size}件削除
-                    </Button>
-                  )}
-                  <Button variant="outline" onClick={() => {
-                    setTableConfig(prev => ({
-                      ...prev,
-                      originalVisibleColumns: prev.visibleColumns,
-                      hasUnsavedChanges: false
-                    }));
-                    setDialogState({ ...dialogState, isTableSettingsOpen: true });
-                  }}>
-                    <Settings className="h-4 w-4" />
-                    <span className="sr-only">設定</span>
-                  </Button>
-                </div>
-              </div>
+              <TableActions
+                selectedDate={selectedDate}
+                onDateChange={setSelectedDate}
+                onPreviousDay={handlePreviousDay}
+                onNextDay={handleNextDay}
+                onAddTrade={handleAddTrade}
+                handleDeleteSelectedTrades={handleDeleteSelectedTrades}
+                setTableConfig={setTableConfig}
+                selectedTrades={selectedTrades}
+                setDialogState={setDialogState}
+              ></TableActions>
 
               {/* Trade History Table */}
               <Card className="w-full">
@@ -887,422 +804,25 @@ function TableContent() {
                       <TableBody>
                         {filteredTrades.length > 0 ? (
                           filteredTrades.map((trade) => (
-                            <TableRow key={trade.id}>
-                              <TableCell className="py-2 px-4 border-b text-center min-w-[50px]">
-                                <Checkbox
-                                  checked={selectedTrades.has(trade.id)}
-                                  onCheckedChange={(checked) => handleSelectTrade(trade.id, checked as boolean)}
-                                />
-                              </TableCell>
-                              {tableConfig.visibleColumns.map((colId) => {
-                                const column = allColumns.find((c) => c.id === colId);
-                                if (!column) return null;
-
-                                const isEditing = cellEditingState.editingCell?.id === trade.id && cellEditingState.editingCell?.field === column.id;
-                                const cellKey = `${trade.id}-${column.id}`;
-                                const editingValue = cellEditingState.editingValues[cellKey];
-                                const isSaving = cellEditingState.savingCells.has(cellKey);
-                                const cellError = cellEditingState.cellErrors[cellKey];
-                                const value = isEditing && editingValue !== undefined ? editingValue : trade[column.id as keyof Trade];
-
-                                return (
-                                  <TableCell
-                                    key={column.id}
-                                    onClick={() => handleCellClick(trade.id, column.id as keyof Trade)}
-                                    className={cn(
-                                      `py-2 px-4 border-b border-r last:border-r-0 ${column.minWidth} text-left relative`,
-                                      isFieldEditable(column.id as keyof Trade) && !isSaving
-                                        ? "cursor-pointer hover:bg-muted/50" 
-                                        : "cursor-default",
-                                      isSaving && "opacity-50"
-                                    )}
-                                  >
-                                                                        {isEditing ? (
-                                      <div className="space-y-1">
-                                        {column.type === "select" ? (
-                                          <Select
-                                            value={String(value)}
-                                            onValueChange={(val) => handleCellChange(trade.id, column.id as keyof Trade, val)}
-                                            onOpenChange={(open) => !open && handleCellBlur()}
-                                          >
-                                            <SelectTrigger className={cn(
-                                              "h-8",
-                                              cellError && "border-red-500 focus-visible:ring-red-500"
-                                            )}>
-                                              <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                              {column.id === "pair" ? (
-                                                // For pair field, use symbols from database
-                                                availableSymbols.length > 0 ? (
-                                                  availableSymbols.map((symbol) => (
-                                                    <SelectItem key={symbol} value={symbol}>
-                                                      {symbol}
-                                                    </SelectItem>
-                                                  ))
-                                                ) : (
-                                                  <SelectItem value="no-symbols" disabled>シンボルがありません</SelectItem>
-                                                )
-                                              ) : (
-                                                // For other select fields, use column options
-                                                (column.options || []).map((option) => (
-                                                  <SelectItem key={option} value={option}>
-                                                    {option}
-                                                  </SelectItem>
-                                                ))
-                                              )}
-                                            </SelectContent>
-                                          </Select>
-                                        ) : column.type === "textarea" ? (
-                                          <Textarea
-                                            value={String(value)}
-                                            onChange={(e) => handleCellChange(trade.id, column.id as keyof Trade, e.target.value)}
-                                            onBlur={(e) => {
-                                              if (!isComposing) handleCellBlur();
-                                            }}
-                                            onKeyDown={(e) => {
-                                              if (isComposing) return;
-                                              handleCellKeyDown(e, trade.id, column.id as keyof Trade);
-                                            }}
-                                            onCompositionStart={() => setIsComposing(true)}
-                                            onCompositionEnd={() => setIsComposing(false)}
-                                            autoFocus
-                                            rows={2}
-                                            className={cn(
-                                              "min-w-[150px]",
-                                              cellError && "border-red-500 focus-visible:ring-red-500"
-                                            )}
-                                          />
-                                        ) : column.id === "entryTime" || column.id === "exitTime" ? (
-                                          <div className="flex gap-2" onBlur={(e) => {
-                                            // Only blur if clicking outside the entire datetime container
-                                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                              handleCellBlur();
-                                            }
-                                          }}>
-                                            {(() => {
-                                              const strVal = String(value || "");
-                                              const hasT = strVal.includes("T");
-                                              const rawDate = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
-                                              let timePart = hasT ? strVal.split("T")[1] : (strVal.split(" ")[1] || "");
-                                              // Normalize time to HH:MM:SS only if present
-                                              if (timePart && timePart.length === 5) timePart = `${timePart}:00`;
-                                              const datePart = rawDate || trade.date || "";
-                                              return (
-                                                <>
-                                                  <Input
-                                                    type="date"
-                                                    value={datePart}
-                                                    onChange={(e) => {
-                                                      const newDate = e.target.value;
-                                                      // If time missing, keep date-only; do not force 00:00:00
-                                                      const combined = newDate ? (timePart ? `${newDate}T${timePart}` : `${newDate}`) : '';
-                                                      handleCellChange(trade.id, column.id as keyof Trade, combined);
-                                                    }}
-                                                    onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                                    autoFocus
-                                                    className={cn(
-                                                      "h-8",
-                                                      cellError && "border-red-500 focus-visible:ring-red-500"
-                                                    )}
-                                                    disabled={status.isSaving}
-                                                  />
-                                                  <Input
-                                                    type="time"
-                                                    step="1"
-                                                    value={timePart || ""}
-                                                    placeholder="--:--:--"
-                                                    onChange={(e) => {
-                                                      let newTime = e.target.value;
-                                                      if (newTime && newTime.length === 5) newTime = `${newTime}:00`;
-                                                      const usedDate = datePart || trade.date || "";
-                                                      const combined = usedDate ? `${usedDate}T${newTime || ""}` : '';
-                                                      handleCellChange(trade.id, column.id as keyof Trade, combined);
-                                                    }}
-                                                    onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                                    className={cn(
-                                                      "h-8",
-                                                      cellError && "border-red-500 focus-visible:ring-red-500"
-                                                    )}
-                                                    disabled={status.isSaving}
-                                                  />
-                                                </>
-                                              );
-                                            })()}
-                                          </div>
-                                        ) : column.id === "holdingTime" ? (
-                                          <div className="flex gap-1" onBlur={(e) => {
-                                            // Only blur if clicking outside the entire holding time container
-                                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                              handleCellBlur();
-                                            }
-                                          }}>
-                                            <Input
-                                              type="number"
-                                              min="0"
-                                              max="365"
-                                              placeholder="日"
-                                              value={cellEditingState.editingValues[`${trade.id}-holdingDays`] || ""}
-                                              onChange={(e) => {
-                                                const days = e.target.value ? parseInt(e.target.value) : 0;
-                                                const hours = cellEditingState.editingValues[`${trade.id}-holdingHours`] || 0;
-                                                const minutes = cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || 0;
-                                                const seconds = cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || 0;
-                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
-                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
-                                              }}
-                                              onWheel={(e) => e.currentTarget.blur()}
-                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className={cn(
-                                                "w-12 h-8 text-xs no-spinner",
-                                                cellError && "border-red-500 focus-visible:ring-red-500"
-                                              )}
-                                              disabled={status.isSaving}
-                                            />
-                                            <Input
-                                              type="number"
-                                              min="0"
-                                              max="23"
-                                              placeholder="時"
-                                              value={cellEditingState.editingValues[`${trade.id}-holdingHours`] || ""}
-                                              onChange={(e) => {
-                                                const days = cellEditingState.editingValues[`${trade.id}-holdingDays`] || 0;
-                                                const hours = e.target.value ? parseInt(e.target.value) : 0;
-                                                const minutes = cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || 0;
-                                                const seconds = cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || 0;
-                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
-                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
-                                              }}
-                                              onWheel={(e) => e.currentTarget.blur()}
-                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className={cn(
-                                                "w-12 h-8 text-xs no-spinner",
-                                                cellError && "border-red-500 focus-visible:ring-red-500"
-                                              )}
-                                              disabled={status.isSaving}
-                                            />
-                                            <Input
-                                              type="number"
-                                              min="0"
-                                              max="59"
-                                              placeholder="分"
-                                              value={cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || ""}
-                                              onChange={(e) => {
-                                                const days = cellEditingState.editingValues[`${trade.id}-holdingDays`] || 0;
-                                                const hours = cellEditingState.editingValues[`${trade.id}-holdingHours`] || 0;
-                                                const minutes = e.target.value ? parseInt(e.target.value) : 0;
-                                                const seconds = cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || 0;
-                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
-                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
-                                              }}
-                                              onWheel={(e) => e.currentTarget.blur()}
-                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className={cn(
-                                                "w-12 h-8 text-xs no-spinner",
-                                                cellError && "border-red-500 focus-visible:ring-red-500"
-                                              )}
-                                              disabled={status.isSaving}
-                                            />
-                                            <Input
-                                              type="number"
-                                              min="0"
-                                              max="59"
-                                              placeholder="秒"
-                                              value={cellEditingState.editingValues[`${trade.id}-holdingSeconds`] || ""}
-                                              onChange={(e) => {
-                                                const days = cellEditingState.editingValues[`${trade.id}-holdingDays`] || 0;
-                                                const hours = cellEditingState.editingValues[`${trade.id}-holdingHours`] || 0;
-                                                const minutes = cellEditingState.editingValues[`${trade.id}-holdingMinutes`] || 0;
-                                                const seconds = e.target.value ? parseInt(e.target.value) : 0;
-                                                const totalSeconds = days * 24 * 60 * 60 + hours * 60 * 60 + minutes * 60 + seconds;
-                                                handleCellChange(trade.id, column.id as keyof Trade, totalSeconds);
-                                              }}
-                                              onWheel={(e) => e.currentTarget.blur()}
-                                              onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                              className={cn(
-                                                "w-12 h-8 text-xs no-spinner",
-                                                cellError && "border-red-500 focus-visible:ring-red-500"
-                                              )}
-                                              disabled={status.isSaving}
-                                            />
-                                          </div>
-                                        ) : column.type === "emotions" ? (
-                                          <div 
-                                            className="space-y-2" 
-                                            data-emotions-container="true"
-                                            tabIndex={-1}
-                                            onClick={(e) => e.stopPropagation()}
-                                            onBlur={handleCellBlur}
-                                          >
-                                            <div className="mb-2">
-                                              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
-                                                {availableEmotions.map((emotion, index) => (
-                                                  <Badge
-                                                    key={index}
-                                                    variant={Array.isArray(value) && value.includes(emotion) ? "default" : "outline"}
-                                                    className="cursor-pointer text-xs"
-                                                    onClick={(e) => {
-                                                      e.stopPropagation();
-                                                      const currentEmotions = Array.isArray(value) ? value : [];
-                                                      if (currentEmotions.includes(emotion)) {
-                                                        // Remove emotion if already selected
-                                                        const newEmotions = currentEmotions.filter((e: string) => e !== emotion);
-                                                        handleCellChange(trade.id, column.id as keyof Trade, newEmotions);
-                                                      } else {
-                                                        // Add emotion if not selected
-                                                        const newEmotions = [...currentEmotions, emotion];
-                                                        handleCellChange(trade.id, column.id as keyof Trade, newEmotions);
-                                                      }
-                                                    }}
-                                                  >
-                                                    {emotion}
-                                                  </Badge>
-                                                ))}
-                                                {availableEmotions.length === 0 && (
-                                                  <div className="text-xs text-muted-foreground">感情がありません</div>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ) : column.type === "tags" ? (
-                                          <div
-                                            className="space-y-2"
-                                            data-tags-container="true"
-                                            tabIndex={-1}
-                                            onClick={e => e.stopPropagation()}
-                                            onBlur={handleCellBlur}
-                                          >
-                                            <div className="mb-2">
-                                              <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto border rounded p-2">
-                                                {availableTags.map((tag, index) => (
-                                                  <Badge
-                                                    key={index}
-                                                    variant={Array.isArray(value) && value.includes(tag.tag_name) ? "default" : "outline"}
-                                                    className="cursor-pointer text-xs"
-                                                    onClick={e => {
-                                                      e.stopPropagation();
-                                                      const currentTags = Array.isArray(value) ? value : [];
-                                                      if (currentTags.includes(tag.tag_name)) {
-                                                        // Remove tag if already selected
-                                                        const newTags = currentTags.filter((t: string) => t !== tag.tag_name);
-                                                        handleCellChange(trade.id, column.id as keyof Trade, newTags);
-                                                      } else {
-                                                        // Add tag if not selected
-                                                        const newTags = [...currentTags, tag.tag_name];
-                                                        handleCellChange(trade.id, column.id as keyof Trade, newTags);
-                                                      }
-                                                    }}
-                                                  >
-                                                    {tag.tag_name}
-                                                  </Badge>
-                                                ))}
-                                                {availableTags.length === 0 && (
-                                                  <div className="text-xs text-muted-foreground">タグがありません</div>
-                                                )}
-                                              </div>
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <Input
-                                            type={
-                                              column.type === "number"
-                                                ? "number"
-                                                : column.type === "date"
-                                                  ? "date"
-                                                  : column.type === "time"
-                                                    ? "time"
-                                                    : column.type === "datetime-local"
-                                                      ? "datetime-local"
-                                                      : "text"
-                                            }
-                                            step={
-                                              column.type === "number"
-                                                ? column.id === "entry" || column.id === "exit"
-                                                  ? "0.0001"
-                                                  : "0.1"
-                                                : column.type === "datetime-local"
-                                                  ? "1"
-                                                  : undefined
-                                            }
-                                            value={String(value)}
-                                            onChange={(e) =>
-                                              handleCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                                            }
-                                            onBlur={handleCellBlur}
-                                            onKeyDown={(e) => handleCellKeyDown(e, trade.id, column.id as keyof Trade)}
-                                            autoFocus
-                                            className={cn(
-                                              "h-8",
-                                              (column.id === "profit" || column.id === "lot" || column.id === "entry" || column.id === "exit" || column.id === "pips") && "no-spinner",
-                                              cellError && "border-red-500 focus-visible:ring-red-500"
-                                            )}
-                                            disabled={status.isSaving}
-                                          />
-                                        )}
-                                        {status.isSaving && (
-                                          <div className="absolute inset-0 bg-background/50 flex items-center justify-center">
-                                            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                          </div>
-                                        )}
-                                        {cellError && (
-                                          <div className="text-xs text-red-500 mt-1">{cellError}</div>
-                                        )}
-                                      </div>
-                                    ) : (
-                                        <div className="flex items-center gap-2">
-                                          {(['entryTime','exitTime'].includes(column.id)) ? (
-                                            (() => {
-                                              const strVal = String(trade[column.id as keyof Trade] || "");
-                                              const hasT = strVal.includes("T");
-                                              const rawDate = hasT ? strVal.split("T")[0] : (strVal.split(" ")[0] || "");
-                                              let timePart = hasT ? strVal.split("T")[1] : (strVal.split(" ")[1] || "");
-                                              if (timePart && timePart.length === 5) timePart = `${timePart}:00`;
-                                              const datePart = rawDate || trade.date || "";
-                                              return (
-                                                <span className="block min-h-[24px] py-1 flex-1 truncate">
-                                                  {datePart}{timePart ? ` ${timePart.substring(0,8)}` : ''}
-                                                </span>
-                                              );
-                                            })()
-                                          ) : (
-                                            <span
-                                              className={cn(
-                                                column.id === "profit" &&
-                                                  (trade.profit && trade.profit > 0
-                                                    ? "text-green-600"
-                                                    : trade.profit && trade.profit < 0
-                                                      ? "text-red-600"
-                                                      : ""),
-                                                column.id === "pips" &&
-                                                  (trade.pips && trade.pips > 0
-                                                    ? "text-green-600"
-                                                    : trade.pips && trade.pips < 0
-                                                      ? "text-red-600"
-                                                      : ""),
-                                                "block min-h-[24px] py-1 flex-1",
-                                              )}
-                                            >
-                                              {getColumnDisplayValue(trade, column.id)}
-                                            </span>
-                                          )}
-                                          {!isFieldEditable(column.id as keyof Trade) && column.id !== "tags" && (
-                                            <TooltipProvider>
-                                              <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                  <Edit className="h-3 w-3 text-muted-foreground opacity-50" />
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                  <p>編集するには取引編集ダイアログを使用してください</p>
-                                                </TooltipContent>
-                                              </Tooltip>
-                                            </TooltipProvider>
-                                          )}
-                                        </div>
-                                      )}
-                                  </TableCell>
-                                );
-                              })}
-                            </TableRow>
+                            <TradeTableRow
+                              key={trade.id}
+                              trade={trade}
+                              selectedTrades={selectedTrades}
+                              tableConfig={tableConfig}
+                              allColumns={allColumns}
+                              cellEditingState={cellEditingState}
+                              availableSymbols={availableSymbols}
+                              availableEmotions={availableEmotions}
+                              availableTags={availableTags}
+                              status={status}
+                              isFieldEditable={isFieldEditable}
+                              handleSelectTrade={handleSelectTrade}
+                              handleCellClick={handleCellClick}
+                              handleCellChange={handleCellChange}
+                              handleCellBlur={handleCellBlur}
+                              handleCellKeyDown={handleCellKeyDown}
+                              getColumnDisplayValue={getColumnDisplayValue}
+                            />
                           ))
                         ) : (
                           <TableRow>
