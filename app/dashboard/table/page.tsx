@@ -747,32 +747,29 @@ function TableContent() {
         </header>
 
         <main className={cn("flex-1 px-4 md:px-6 pt-6", getTableWidth())}>
-          {status.loading ? (
-            <div className="text-center py-10">読み込み中...</div>
-          ) : status.error ? (
-            <div className="text-center text-red-600 py-10">{status.error}</div>
-          ) : (
-            <>
-              <TableActions
-                selectedDate={selectedDate}
-                onDateChange={setSelectedDate}
-                onPreviousDay={handlePreviousDay}
-                onNextDay={handleNextDay}
-                onAddTrade={handleAddTrade}
-                handleDeleteSelectedTrades={handleDeleteSelectedTrades}
-                setTableConfig={setTableConfig}
-                selectedTrades={selectedTrades}
-                setDialogState={setDialogState}
-              ></TableActions>
+          {status.error && (
+            <div className="text-center text-red-600 py-3">{status.error}</div>
+          )}
+          <TableActions
+            selectedDate={selectedDate}
+            onDateChange={setSelectedDate}
+            onPreviousDay={handlePreviousDay}
+            onNextDay={handleNextDay}
+            onAddTrade={handleAddTrade}
+            handleDeleteSelectedTrades={handleDeleteSelectedTrades}
+            setTableConfig={setTableConfig}
+            selectedTrades={selectedTrades}
+            setDialogState={setDialogState}
+          ></TableActions>
 
-              {/* Trade History Table */}
-              <Card className="w-full">
-                <CardHeader>
-                  <CardTitle>
-                    {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : "日付を選択"} の取引
-                  </CardTitle>
-                  <CardDescription>{filteredTrades.length}件の取引が見つかりました</CardDescription>
-                </CardHeader>
+          {/* Trade History Table */}
+          <Card className="w-full">
+            <CardHeader>
+              <CardTitle>
+                {selectedDate ? format(selectedDate, "yyyy年MM月dd日", { locale: ja }) : "日付を選択"} の取引
+              </CardTitle>
+              <CardDescription>{filteredTrades.length}件の取引が見つかりました</CardDescription>
+            </CardHeader>
                 <CardContent className="p-0">
                   <div className="overflow-y-auto">
                     <Table className="w-full">
