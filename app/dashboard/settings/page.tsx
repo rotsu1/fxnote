@@ -108,24 +108,6 @@ export default function Settings() {
               <TabsContent value="billing" className="space-y-6">
                 <div className="space-y-4">
                   <CurrentPlan />
-                  <div className="border rounded-lg p-4">
-                    <p className="font-medium mb-2">サブスクリプション状態</p>
-                    <div className="text-sm text-muted-foreground mb-4">現在の状態に基づき操作できます。</div>
-                    {sub ? (
-                      <div className="flex flex-col gap-2">
-                        <div className="text-sm">access: <span className="font-mono">{sub.access}</span> / status: <span className="font-mono">{sub.status ?? 'null'}</span></div>
-                        {sub.access !== 'full' ? (
-                          <Button onClick={handleResubscribe} disabled={loading}>
-                            {loading ? 'リダイレクト中...' : '再購読する'}
-                          </Button>
-                        ) : (
-                          <a className="text-blue-600 underline text-sm" href="#" onClick={(e) => e.preventDefault()}>請求の管理（準備中）</a>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-sm">読み込み中...</div>
-                    )}
-                  </div>
                 </div>
               </TabsContent>
             </Tabs>
