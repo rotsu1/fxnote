@@ -43,15 +43,20 @@ export async function POST(req: NextRequest): Promise<NextResponse<PortalRespons
       return NextResponse.json({ error: 'No Stripe customer found' }, { status: 400 })
     }
 
+    const configId = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/dashboard/settings`,
+      ...(configId ? { configuration: configId } : {}),
     })
     return NextResponse.json({ url: session.url })
   } catch (e: any) {
     console.error('[portal] Unexpected error', e)
     const msg = e?.message || 'Internal error'
+    // Common case: no default configuration set in test mode
+    if (msg.includes('default configuration has not been created')) {
+      return NextResponse.json({ error: 'Stripe Billing Portal is not configured in this mode. Create a default configuration in Stripe Dashboard (Test mode) or set STRIPE_BILLING_PORTAL_CONFIGURATION_ID.' }, { status: 400 })
+    }
     return NextResponse.json({ error: msg }, { status: 500 })
   }
 }
-
