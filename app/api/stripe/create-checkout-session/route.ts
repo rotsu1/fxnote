@@ -70,10 +70,10 @@ export async function POST(req: NextRequest) {
       // プロダクトIDが指定された場合、アクティブな月額の価格を探索
       const prices = await stripe.prices.list({ product: priceEnv, active: true, limit: 10 });
       const monthly = prices.data.find(p => (p.recurring?.interval === 'month'));
-      priceId = (monthly || prices.data[0])?.id || null;
+      priceId = (monthly)?.id || null;
     }
     if (!priceId) {
-      return NextResponse.json({ error: 'Could not resolve a Stripe Price for STRIPE_PRICE_ID' }, { status: 500 });
+      return NextResponse.json({ error: 'Could not resolve a recurring monthly Stripe Price for STRIPE_PRICE_ID' }, { status: 500 });
     }
 
     const origin =

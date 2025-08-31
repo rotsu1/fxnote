@@ -45,10 +45,17 @@ export function CurrentPlan() {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
       if (!token) return;
-      const res = await fetch('/api/me/subscription', { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` } });
       if (!res.ok) throw new Error('サブスクリプション情報の取得に失敗しました');
       const j = await res.json();
-      setSub(j.subscription);
+      setSub({
+        status: j.status,
+        trial_end: j.trial_end,
+        current_period_end: j.current_period_end,
+        cancel_at: j.cancel_at,
+        cancel_at_period_end: j.cancel_at_period_end,
+        ended_at: null,
+      });
     } catch (e: any) {
       setError(e.message ?? '読み込みに失敗しました');
     }

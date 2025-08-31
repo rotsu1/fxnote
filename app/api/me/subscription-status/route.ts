@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
     // 2) 最新の購読レコードを取得（更新の新しい順に1件）
     const { data: subs, error: subsErr } = await supabaseAdmin
       .from('subscriptions')
-      .select('status,current_period_end,trial_end,cancel_at,ended_at,updated_at')
+      .select('status,current_period_end,trial_end,cancel_at,cancel_at_period_end,ended_at,updated_at')
       .eq('user_id', user.id)
       .order('updated_at', { ascending: false })
       .limit(1);
@@ -42,10 +42,18 @@ export async function GET(req: NextRequest) {
 
     let isActive = false;
     let status: string | undefined;
+    let trial_end: string | null = null;
+    let current_period_end: string | null = null;
+    let cancel_at: string | null = null;
+    let cancel_at_period_end: boolean | null = null;
 
     if (hasHistory) {
       const s: any = subs![0];
       status = s.status ?? undefined;
+      trial_end = s.trial_end ?? null;
+      current_period_end = s.current_period_end ?? null;
+      cancel_at = s.cancel_at ?? null;
+      cancel_at_period_end = s.cancel_at_period_end ?? null;
 
       // trialing の場合は trial_end を優先して判定
       let periodOk = false;
@@ -98,6 +106,10 @@ export async function GET(req: NextRequest) {
       hasHistory,
       status: status ?? null,
       reason,
+      trial_end,
+      current_period_end,
+      cancel_at,
+      cancel_at_period_end,
     });
   } catch (e: any) {
     console.error('subscription-status error:', e);
