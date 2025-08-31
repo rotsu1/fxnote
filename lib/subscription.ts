@@ -29,8 +29,10 @@ export function mapStripeSubToRow(
     stripe_subscription_id: sub.id,
     stripe_customer_id: sub.customer as string,
     status: sub.status,
-    current_period_start: unixToIso(subscription.current_period_start),
-    current_period_end: unixToIso(subscription.current_period_end),
+    current_period_start:
+      unixToIso(subscription.current_period_start) || new Date((sub.created ?? Math.floor(Date.now()/1000)) * 1000).toISOString(),
+    current_period_end:
+      unixToIso(subscription.current_period_end) || new Date((sub.created ?? Math.floor(Date.now()/1000)) * 1000).toISOString(),
     cancel_at_period_end: sub.cancel_at_period_end || false,
   };
 }
@@ -82,7 +84,7 @@ export async function getUserSubscriptionState(userId: string): Promise<'never_s
 /**
  * Converts UNIX timestamp to ISO string
  */
-export function unixToIso(sec?: number | null): string {
-  if (!sec) return new Date().toISOString();
+export function unixToIso(sec?: number | null): string | null {
+  if (sec === null || sec === undefined) return null;
   return new Date(sec * 1000).toISOString();
 }
