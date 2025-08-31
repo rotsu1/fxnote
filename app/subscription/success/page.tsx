@@ -33,11 +33,9 @@ export default function SubscriptionSuccessPage() {
           cache: 'no-store',
         })
         const json: Status = await res.json()
-
-        // As soon as the webhook writes to DB, hasHistory becomes true.
-        // Redirect then (and access will be computed by server according to business rules).
-        if (json.hasHistory) {
-          router.replace('/dashboard')
+        // Redirect only when the server says user has full access
+        if (json.access === 'full') {
+          router.replace('/dashboard/overview')
           return
         }
       } catch (e) {

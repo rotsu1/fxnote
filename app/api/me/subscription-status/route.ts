@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type Access = 'none' | 'limited' | 'full'
-type Route = '/subscription' | '/dashboard'
+type Route = '/subscription' | '/dashboard/overview'
 type Reason = 'no_history' | 'inactive' | 'active'
 
 export type SubscriptionStatusResponse = {
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
     let res: SubscriptionStatusResponse
     if (isActive) {
       res = {
-        route: '/dashboard',
+        route: '/dashboard/overview',
         access: 'full',
         isActive: true,
         hasHistory: true,
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
     }
 
     res = {
-      route: '/dashboard',
+      route: '/dashboard/overview',
       access: 'limited',
       isActive: false,
       hasHistory: true,
