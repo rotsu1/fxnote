@@ -24,14 +24,32 @@ export async function GET(req: NextRequest) {
     }
     const user = userData.user;
 
-    // 2) 最新の購読レコードを取得（更新の新しい順に1件）
-    const { data: subs, error: subsErr } = await supabaseAdmin
-      .from('subscriptions')
-      .select('status,current_period_end,trial_end,cancel_at,cancel_at_period_end,ended_at,updated_at')
-      .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1);
-
+    // 2) 最新の購読レコードを取得（スキーマ差異に強くする）
+    let subs: any[] | null = null;
+    let subsErr: any = null;
+    try {
+      const r1 = await supabaseAdmin
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      subs = r1.data as any[] | null;
+      subsErr = r1.error;
+      if (subsErr && (subsErr.code === '42703' || (subsErr.message && subsErr.message.includes('column')))) {
+        const r2 = await supabaseAdmin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        subs = r2.data as any[] | null;
+        subsErr = r2.error;
+      }
+    } catch (e: any) {
+      console.error('subs fetch exception:', e);
+      return NextResponse.json({ error: 'Failed to fetch subscription' }, { status: 500 });
+    }
     if (subsErr) {
       console.error('subs fetch error:', subsErr);
       return NextResponse.json({ error: 'Failed to fetch subscription' }, { status: 500 });
