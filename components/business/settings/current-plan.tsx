@@ -16,6 +16,8 @@ type Status = {
   hasHistory: boolean
   status: string | null
   reason: 'no_history' | 'inactive' | 'active'
+  cancel_at?: string | null
+  canceled_at?: string | null
 }
 
 export function CurrentPlan() {
@@ -88,6 +90,7 @@ export function CurrentPlan() {
   }
 
   const isFull = status?.access === 'full'
+  const isCancelScheduled = Boolean(status?.cancel_at || status?.canceled_at)
 
   return (
     <Card>
@@ -122,21 +125,25 @@ export function CurrentPlan() {
           {isFull ? (
             <>
               <Button variant="outline" onClick={goPortal} disabled={loading}>請求の管理</Button>
-              <Dialog open={open} onOpenChange={setOpen}>
-                <DialogTrigger asChild>
-                  <Button variant="destructive" disabled={loading}>解約する</Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>解約の確認</DialogTitle>
-                    <DialogDescription>現在の請求期間の終了時にサブスクリプションが停止します。よろしいですか？</DialogDescription>
-                  </DialogHeader>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-                    <Button variant="destructive" onClick={handleCancel} disabled={loading}>{loading ? '処理中...' : '解約する'}</Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
+              {isCancelScheduled ? (
+                <Button onClick={goPortal} disabled={loading}>再購読・支払い管理へ</Button>
+              ) : (
+                <Dialog open={open} onOpenChange={setOpen}>
+                  <DialogTrigger asChild>
+                    <Button variant="destructive" disabled={loading}>解約する</Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>解約の確認</DialogTitle>
+                      <DialogDescription>現在の請求期間の終了時にサブスクリプションが停止します。よろしいですか？</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
+                      <Button variant="destructive" onClick={handleCancel} disabled={loading}>{loading ? '処理中...' : '解約する'}</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              )}
             </>
           ) : (
             <>

@@ -15,6 +15,8 @@ export type SubscriptionStatusResponse = {
   hasHistory: boolean
   status: string | null
   reason: Reason
+  cancel_at?: string | null
+  canceled_at?: string | null
 }
 
 export async function GET(req: NextRequest) {
@@ -55,6 +57,8 @@ export async function GET(req: NextRequest) {
         hasHistory: false,
         status: null,
         reason: 'no_history',
+        cancel_at: null,
+        canceled_at: null,
       }
       console.log('[me/subscription-status] no history ->', res)
       return NextResponse.json(res)
@@ -88,6 +92,8 @@ export async function GET(req: NextRequest) {
         hasHistory: true,
         status,
         reason: 'active',
+        cancel_at: row.cancel_at ?? null,
+        canceled_at: row.canceled_at ?? null,
       }
       console.log('[me/subscription-status] active ->', res)
       return NextResponse.json(res)
@@ -100,6 +106,8 @@ export async function GET(req: NextRequest) {
       hasHistory: true,
       status,
       reason: 'inactive',
+      cancel_at: row.cancel_at ?? null,
+      canceled_at: row.canceled_at ?? null,
     }
     console.log('[me/subscription-status] inactive ->', res)
     return NextResponse.json(res)
