@@ -82,13 +82,58 @@ export default function AuthCallback() {
             }
           }
 
-          // Redirect to dashboard
-          router.push("/dashboard/overview");
+          // Decide destination based on subscription status
+          try {
+            const accessToken = session.access_token;
+            if (accessToken) {
+              const res = await fetch('/api/me/subscription-status', {
+                headers: { Authorization: `Bearer ${accessToken}` },
+              });
+              if (res.ok) {
+                const j = await res.json();
+                if (j.route === '/subscription') {
+                  router.push('/subscription');
+                } else if (j.access === 'limited') {
+                  router.push('/dashboard/settings');
+                } else {
+                  router.push('/dashboard/overview');
+                }
+              } else {
+                router.push('/dashboard/overview');
+              }
+            } else {
+              router.push('/dashboard/overview');
+            }
+          } catch {
+            router.push('/dashboard/overview');
+          }
         } else {
           // Try to listen for auth state change
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
             if (event === 'SIGNED_IN' && session) {
-              router.push("/dashboard/overview");
+              // On eventual sign-in, also respect subscription status
+              (async () => {
+                try {
+                  const accessToken = session.access_token;
+                  if (accessToken) {
+                    const res = await fetch('/api/me/subscription-status', {
+                      headers: { Authorization: `Bearer ${accessToken}` },
+                    });
+                    if (res.ok) {
+                      const j = await res.json();
+                      if (j.route === '/subscription') {
+                        router.push('/subscription');
+                      } else if (j.access === 'limited') {
+                        router.push('/dashboard/settings');
+                      } else {
+                        router.push('/dashboard/overview');
+                      }
+                      return;
+                    }
+                  }
+                } catch {}
+                router.push('/dashboard/overview');
+              })();
             }
           });
 

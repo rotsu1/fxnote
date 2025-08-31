@@ -90,8 +90,35 @@ export default function Login() {
           setAuthError("ログインに失敗しました");
         }
       } else {
-        // Login successful
-        router.push("/dashboard/overview");
+        // Login successful -> check subscription status to decide destination
+        const accessToken = data.session?.access_token;
+        try {
+          if (accessToken) {
+            const res = await fetch('/api/me/subscription-status', {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (res.ok) {
+              const j = await res.json();
+              // route: '/subscription' | '/dashboard'
+              // access: 'none' | 'limited' | 'full'
+              if (j.route === '/subscription') {
+                router.push('/subscription');
+              } else if (j.access === 'limited') {
+                router.push('/dashboard/settings');
+              } else {
+                router.push('/dashboard/overview');
+              }
+            } else {
+              // Fallback on failure
+              router.push('/dashboard/overview');
+            }
+          } else {
+            // No token? Fallback to dashboard; AuthGuard will handle
+            router.push('/dashboard/overview');
+          }
+        } catch {
+          router.push('/dashboard/overview');
+        }
       }
     } catch (error) {
       setAuthError("ログインに失敗しました");
