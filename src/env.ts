@@ -10,7 +10,7 @@ const EnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   STRIPE_SECRET_KEY: z.string().min(10),
   STRIPE_WEBHOOK_SECRET: z.string().min(10),
-  STRIPE_PRICE_ID_BASIC: z.string().min(5).optional(),
+  STRIPE_PRICE_ID: z.string().min(5).optional(),
 
   // Optional integrations
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
@@ -29,7 +29,7 @@ const parsed = EnvSchema.safeParse({
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY,
   STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
-  STRIPE_PRICE_ID_BASIC: process.env.STRIPE_PRICE_ID_BASIC,
+  STRIPE_PRICE_ID: process.env.STRIPE_PRICE_ID,
   UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
   UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
   TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
