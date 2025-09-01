@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Crown } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+// Dialog no longer used for inline cancel; management goes via Stripe Portal
 
 type Status = {
   route: '/subscription' | '/dashboard'
@@ -23,7 +23,6 @@ type Status = {
 export function CurrentPlan() {
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(false)
-  const [open, setOpen] = useState(false)
   const { toast } = useToast()
 
   const plan = { name: 'FXNote Pro', price: '¥490', period: '月額' }
@@ -64,23 +63,19 @@ export function CurrentPlan() {
     }
   }
 
-  const handleCancel = async () => {
+  // For inactive users: start Checkout to re-subscribe
+  const goCheckout = async () => {
     setLoading(true)
     try {
       const { data: s } = await supabase.auth.getSession()
       const token = s.session?.access_token
       if (!token) return
-      const res = await fetch('/api/stripe/cancel', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch('/api/stripe/checkout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
       const json = await res.json()
-      if (!res.ok) {
-        toast({ title: '解約に失敗', description: json.error || 'エラー' })
+      if (json.url) {
+        window.location.href = json.url
       } else {
-        toast({ title: '解約を受け付けました', description: '現在の期間終了までは利用できます。' })
-        setOpen(false)
-        // Refresh status
-        const res2 = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-        const json2: Status = await res2.json()
-        setStatus(json2)
+        toast({ title: '開始できませんでした', description: json.error || 'エラー' })
       }
     } catch (e: any) {
       toast({ title: 'エラー', description: String(e?.message || e) })
@@ -90,7 +85,7 @@ export function CurrentPlan() {
   }
 
   const isFull = status?.access === 'full'
-  const isCancelScheduled = Boolean(status?.cancel_at || status?.canceled_at)
+  // When active, management goes through Stripe Billing Portal
 
   return (
     <Card>
@@ -123,36 +118,15 @@ export function CurrentPlan() {
 
         <div className="flex gap-2">
           {isFull ? (
-            <>
-              <Button variant="outline" onClick={goPortal} disabled={loading}>請求の管理</Button>
-              {isCancelScheduled ? (
-                <Button onClick={goPortal} disabled={loading}>再購読・支払い管理へ</Button>
-              ) : (
-                <Dialog open={open} onOpenChange={setOpen}>
-                  <DialogTrigger asChild>
-                    <Button variant="destructive" disabled={loading}>解約する</Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>解約の確認</DialogTitle>
-                      <DialogDescription>現在の請求期間の終了時にサブスクリプションが停止します。よろしいですか？</DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-                      <Button variant="destructive" onClick={handleCancel} disabled={loading}>{loading ? '処理中...' : '解約する'}</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              )}
-            </>
+            // Active: open Billing Portal for cancel, payment methods, invoices
+            <Button onClick={goPortal} disabled={loading} className="w-full">支払い管理・解約・請求書を見る</Button>
           ) : (
-            <>
-              <Button onClick={goPortal} disabled={loading} className="w-full">再購読・支払い管理へ</Button>
-            </>
+            // Inactive: start Checkout to re-subscribe (Billing Portal cannot create new subscriptions)
+            <Button onClick={goCheckout} disabled={loading} className="w-full">再購読する</Button>
           )}
         </div>
 
-        <p className="text-xs text-muted-foreground">トライアル中の解約も同様に、期間終了までご利用いただけます。</p>
+        <p className="text-xs text-muted-foreground">トライアル/アクティブ期間中の解約は、期間終了までご利用いただけます。</p>
       </CardContent>
     </Card>
   )
