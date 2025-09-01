@@ -297,28 +297,15 @@ export default function Component() {
               </div>
             </div>
             <div className="mx-auto max-w-xl py-8">
-              <div className="space-y-6 p-8 bg-gradient-to-br from-white via-purple-50/50 to-pink-50/50 dark:from-gray-900 dark:via-purple-950/30 dark:to-pink-950/30 rounded-2xl border border-purple-200 shadow-lg">
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">お問い合わせフォーム</h3>
-                <form className="space-y-4">
-                  <div className="grid gap-2">
-                    <Input type="text" placeholder="お名前" className="border-purple-200 focus:border-purple-400 focus:ring-purple-400" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Input type="email" placeholder="メールアドレス" className="border-purple-200 focus:border-purple-400 focus:ring-purple-400" />
-                  </div>
-                  <div className="grid gap-2">
-                    <Input type="text" placeholder="件名" className="border-purple-200 focus:border-purple-400 focus:ring-purple-400" />
-                  </div>
-                  <div className="grid gap-2">
-                    <textarea 
-                      placeholder="お問い合わせ内容"
-                      className="min-h-[100px] w-full rounded-md border border-purple-200 bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    />
-                  </div>
-                  <Button type="submit" className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transition-all duration-300">
-                    送信
-                  </Button>
-                </form>
+              <div className="space-y-4 p-8 bg-gradient-to-br from-white via-purple-50/50 to-pink-50/50 dark:from-gray-900 dark:via-purple-950/30 dark:to-pink-950/30 rounded-2xl border border-purple-200 shadow-lg text-center">
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">お問い合わせ先</h3>
+                <p className="text-muted-foreground">ご連絡は以下のメールアドレスまでお願いします。</p>
+                <a
+                  href="mailto:support@fxnote.app"
+                  className="inline-block text-lg font-semibold text-purple-700 dark:text-purple-300 underline underline-offset-4 hover:text-purple-800 dark:hover:text-purple-200"
+                >
+                  support@fxnote.app
+                </a>
               </div>
             </div>
           </div>
