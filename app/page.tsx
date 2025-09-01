@@ -105,7 +105,7 @@ export default function Component() {
           <span className="ml-2 font-bold text-lg">FXNote</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4">
+          <Link href="/coming-soon" className="text-sm font-medium hover:underline underline-offset-4">
             ログイン / 新規登録
           </Link>
           <button 
@@ -148,7 +148,7 @@ export default function Component() {
                 </div>
                 <div className="flex flex-col gap-2 min-[400px]:flex-row">
                   <Link
-                    href="/auth/signup"
+                    href="/coming-soon"
                     className="inline-flex h-10 items-center justify-center rounded-md bg-gradient-to-r from-blue-600 to-purple-600 px-8 text-sm font-medium text-white shadow-lg transition-all duration-300 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 disabled:pointer-events-none disabled:opacity-50"
                   >
                     今すぐ始める
@@ -274,7 +274,7 @@ export default function Component() {
                     </li>
                   </ul>
                   <Link
-                    href="/auth/signup"
+                    href="/coming-soon"
                     className="mt-6 inline-flex h-12 items-center justify-center rounded-xl bg-gradient-to-r from-blue-600 to-purple-600 px-8 text-sm font-medium text-white shadow-lg transition-all duration-300 hover:from-blue-700 hover:to-purple-700 hover:shadow-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
                   >
                     今すぐ始める
