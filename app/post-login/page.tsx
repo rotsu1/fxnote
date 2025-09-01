@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 type Status = {
-  route: '/subscription' | '/dashboard'
+  route: '/subscription' | '/dashboard/overview'
   access: 'none' | 'limited' | 'full'
   isActive: boolean
   hasHistory: boolean
@@ -36,7 +36,7 @@ export default function PostLogin() {
         router.replace(json.route)
       } catch (e) {
         console.error('[post-login] failed', e)
-        router.replace('/dashboard')
+        router.replace('/dashboard/overview')
       }
     }
     run()
