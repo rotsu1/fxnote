@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { stripe } from '@/lib/stripe'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { mapStripeToRow } from '@/lib/stripeHelpers'
+import { env } from '@/src/env'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest) {
   const sig = req.headers.get('stripe-signature')
-  const whSecret = process.env.STRIPE_WEBHOOK_SECRET
+  const whSecret = env.STRIPE_WEBHOOK_SECRET
   if (!sig || !whSecret) {
     console.error('[webhook] Missing signature or secret')
     return NextResponse.json({ error: 'Bad Request' }, { status: 400 })

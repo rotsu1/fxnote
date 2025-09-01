@@ -1,62 +1,33 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabaseAdmin'
 import { stripe } from '@/lib/stripe'
+import { env } from '@/src/env'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-type PortalResponse = { url?: string; error?: string }
-
-export async function POST(req: NextRequest): Promise<NextResponse<PortalResponse>> {
+export async function POST(req: NextRequest) {
   const auth = req.headers.get('authorization') || ''
   const token = auth.startsWith('Bearer ') ? auth.slice('Bearer '.length).trim() : ''
   if (!token) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const origin = process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin
+  const { data: u, error } = await supabaseAdmin.auth.getUser(token)
+  if (error || !u?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = u.user.id
 
-  try {
-    const { data: userRes, error: userErr } = await supabaseAdmin.auth.getUser(token)
-    if (userErr || !userRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    const userId = userRes.user.id
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('stripe_customer_id')
+    .eq('id', userId)
+    .maybeSingle()
 
-    // Prefer profile link to customer id
-    let customerId: string | null = null
-    const { data: profile } = await supabaseAdmin
-      .from('profiles')
-      .select('stripe_customer_id')
-      .eq('id', userId)
-      .maybeSingle()
-    customerId = (profile?.stripe_customer_id as string | null) ?? null
+  const customerId = (profile?.stripe_customer_id as string | null) || null
+  if (!customerId) return NextResponse.json({ error: 'No Stripe customer' }, { status: 400 })
 
-    if (!customerId) {
-      // Try to find via subscriptions
-      const { data: subs } = await supabaseAdmin
-        .from('subscriptions')
-        .select('stripe_customer_id')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-      customerId = subs?.[0]?.stripe_customer_id ?? null
-    }
-
-    if (!customerId) {
-      return NextResponse.json({ error: 'No Stripe customer found' }, { status: 400 })
-    }
-
-    const configId = process.env.STRIPE_BILLING_PORTAL_CONFIGURATION_ID
-    const session = await stripe.billingPortal.sessions.create({
-      customer: customerId,
-      return_url: `${origin}/dashboard/settings`,
-      ...(configId ? { configuration: configId } : {}),
-    })
-    return NextResponse.json({ url: session.url })
-  } catch (e: any) {
-    console.error('[portal] Unexpected error', e)
-    const msg = e?.message || 'Internal error'
-    // Common case: no default configuration set in test mode
-    if (msg.includes('default configuration has not been created')) {
-      return NextResponse.json({ error: 'Stripe Billing Portal is not configured in this mode. Create a default configuration in Stripe Dashboard (Test mode) or set STRIPE_BILLING_PORTAL_CONFIGURATION_ID.' }, { status: 400 })
-    }
-    return NextResponse.json({ error: msg }, { status: 500 })
-  }
+  const session = await stripe.billingPortal.sessions.create({
+    customer: customerId,
+    return_url: `${env.APP_URL}/dashboard/settings`,
+  })
+  return NextResponse.json({ url: session.url })
 }
+
