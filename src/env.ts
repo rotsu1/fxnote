@@ -10,7 +10,7 @@ const EnvSchema = z.object({
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(20),
   STRIPE_SECRET_KEY: z.string().min(10),
   STRIPE_WEBHOOK_SECRET: z.string().min(10),
-  STRIPE_PRICE_ID_BASIC: z.string().min(5),
+  STRIPE_PRICE_ID_BASIC: z.string().min(5).optional(),
 
   // Optional integrations
   UPSTASH_REDIS_REST_URL: z.string().url().optional(),
@@ -19,7 +19,7 @@ const EnvSchema = z.object({
   HCAPTCHA_SECRET: z.string().optional(),
 
   // App URL (origin)
-  APP_URL: z.string().url(),
+  APP_URL: z.string().url().optional(),
 })
 
 // Validate at import time; throws with a helpful error if invalid
@@ -50,4 +50,3 @@ export const publicEnv = {
   NEXT_PUBLIC_SUPABASE_URL: parsed.data.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: parsed.data.NEXT_PUBLIC_SUPABASE_ANON_KEY,
 }
-

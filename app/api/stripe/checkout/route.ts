@@ -44,8 +44,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       await supabaseAdmin.from('profiles').update({ stripe_customer_id: customerId }).eq('id', user.id).is('stripe_customer_id', null)
     }
 
-    const origin = env.APP_URL
+    const origin = env.APP_URL || new URL(req.url).origin
     const price = env.STRIPE_PRICE_ID_BASIC
+    if (!price) return NextResponse.json({ error: 'Server config error (price missing)' }, { status: 500 })
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId!,
@@ -62,4 +63,3 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
-

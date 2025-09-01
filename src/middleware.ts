@@ -39,7 +39,8 @@ export async function middleware(req: NextRequest) {
   if (isApi) {
     const res = NextResponse.next()
     res.headers.set('Vary', 'Origin')
-    res.headers.set('Access-Control-Allow-Origin', env.APP_URL)
+    const allow = env.APP_URL || req.headers.get('origin') || '*'
+    res.headers.set('Access-Control-Allow-Origin', allow)
     res.headers.set('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
     res.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
     if (req.method === 'OPTIONS') return res
