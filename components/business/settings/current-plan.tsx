@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 // Dialog no longer used for inline cancel; management goes via Stripe Portal
 
 type Status = {
-  route: '/subscription' | '/dashboard'
+  route: '/subscription' | '/dashboard/overview'
   access: 'none' | 'limited' | 'full'
   isActive: boolean
   hasHistory: boolean

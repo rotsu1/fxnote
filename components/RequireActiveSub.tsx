@@ -28,12 +28,12 @@ export default function RequireActiveSub({ children }: { children: React.ReactNo
         if (json.access === 'full') setOk(true)
         else {
           setOk(false)
-          router.replace('/dashboard')
+          router.replace('/dashboard/overview')
         }
       } catch (e) {
         console.error('[RequireActiveSub] error', e)
         setOk(false)
-        router.replace('/dashboard')
+        router.replace('/dashboard/overview')
       }
     }
     run()

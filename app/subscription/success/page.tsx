@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 type Status = {
-  route: '/subscription' | '/dashboard'
+  route: '/subscription' | '/dashboard/overview'
   access: 'none' | 'limited' | 'full'
   isActive: boolean
   hasHistory: boolean
@@ -61,9 +61,6 @@ export default function SubscriptionSuccessPage() {
         <h1 className="text-2xl font-semibold">ありがとうございます！</h1>
         <p className="text-sm text-muted-foreground">{state.message}</p>
         <p className="text-xs text-muted-foreground">数秒〜十数秒かかる場合があります。そのままお待ちください。</p>
-        <div className="text-xs">
-          進まない場合は <a href="/dashboard" className="text-blue-600 underline">こちら</a> をクリック
-        </div>
       </div>
     </div>
   )
