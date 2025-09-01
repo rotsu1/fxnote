@@ -153,7 +153,13 @@ export async function POST(req: NextRequest) {
       case 'invoice.payment_succeeded':
       case 'invoice.payment_failed': {
         const invoice = event.data.object as import('stripe').Stripe.Invoice
-        const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
+        const invAny = event.data.object as any
+        let subId: string | null = null
+        if (typeof invAny.subscription === 'string') {
+          subId = invAny.subscription
+        } else if (invAny.subscription && typeof invAny.subscription === 'object') {
+          subId = (invAny.subscription as any).id ?? null
+        }
         if (subId) {
           // Prefer full upsert using the current subscription snapshot to keep status in sync
           try {
@@ -174,7 +180,10 @@ export async function POST(req: NextRequest) {
 
             // Resolve user via profiles by customer id when possible
             let userId: string | null = null
-            const customerId = (invoice.customer ? String(invoice.customer) : (sub.customer ? String(sub.customer) : null))
+            let customerId: string | null = null
+            if (typeof invoice.customer === 'string') customerId = invoice.customer
+            else if (invoice.customer && typeof invoice.customer === 'object') customerId = (invoice.customer as any).id ?? null
+            else if (sub.customer) customerId = String(sub.customer)
             if (customerId) {
               const { data: prof } = await supabaseAdmin
                 .from('profiles')
