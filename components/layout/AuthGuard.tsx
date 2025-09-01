@@ -6,7 +6,7 @@ import { ReactNode, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 type SubStatus = {
-  route: '/subscription' | '/dashboard'
+  route: '/subscription' | '/dashboard/overview'
   access: 'none' | 'limited' | 'full'
   reason: 'no_history' | 'inactive' | 'active'
 }
@@ -42,7 +42,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
 
           // If user has no subscription history and is trying to access dashboard, send to subscription page
           if (json.reason === 'no_history' && pathname?.startsWith('/dashboard')) {
-            router.replace('/subscription')
+            router.replace('/dashboard/overview')
             setIsLoading(false)
             return
           }
@@ -58,9 +58,8 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
     check()
   }, [user, router, pathname])
 
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
+  // Avoid rendering a blocking loading UI; render nothing during brief checks
+  if (isLoading) return null;
 
   if (user) {
     return <>{children}</>;

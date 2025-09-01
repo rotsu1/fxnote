@@ -219,16 +219,20 @@ export default function Calendar() {
           </div>
         </header>
         <main className="flex-1 px-4 md:px-6 pt-6">
-          {status.loading ? (
-            <div className="text-center py-10">読み込み中...</div>
-          ) : status.error ? (
-            <div className="text-center text-red-600 py-10">{status.error}</div>
-          ) : (
-            <>
-              <MonthlyNavigation currentDate={currentDate} onDateChange={setCurrentDate} trades={tradeData.trades} onImportCSV={() => setDialogs(prev => ({ ...prev, isCSVDialogOpen: true }))} />
-              <CalendarGrid currentDate={currentDate} onDateClick={handleDateClick} groupedTrades={groupedTrades} />
-            </>
+          {status.error && (
+            <div className="text-center text-red-600 py-4">{status.error}</div>
           )}
+          <MonthlyNavigation
+            currentDate={currentDate}
+            onDateChange={setCurrentDate}
+            trades={tradeData.trades}
+            onImportCSV={() => setDialogs(prev => ({ ...prev, isCSVDialogOpen: true }))}
+          />
+          <CalendarGrid
+            currentDate={currentDate}
+            onDateClick={handleDateClick}
+            groupedTrades={groupedTrades}
+          />
         </main>
         <RightSidebar
           isOpen={dialogs.isRightSidebarOpen}
