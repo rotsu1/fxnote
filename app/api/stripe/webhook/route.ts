@@ -155,13 +155,58 @@ export async function POST(req: NextRequest) {
         const invoice = event.data.object as import('stripe').Stripe.Invoice
         const subId = typeof invoice.subscription === 'string' ? invoice.subscription : invoice.subscription?.id
         if (subId) {
-          const { error: upErr } = await supabaseAdmin
-            .from('subscriptions')
-            .update({ latest_invoice_id: invoice.id, currency: invoice.currency ?? null, updated_at: new Date().toISOString() })
-            .eq('stripe_subscription_id', subId)
-          if (upErr) {
-            console.error('[webhook] invoice update failed', upErr)
-            throw upErr
+          // Prefer full upsert using the current subscription snapshot to keep status in sync
+          try {
+            const sub = await stripe.subscriptions.retrieve(subId)
+
+            // Try to capture a fresh invoice reference
+            let latestInvoice: import('stripe').Stripe.Invoice | null = null
+            try {
+              if (sub.latest_invoice && typeof sub.latest_invoice === 'string') {
+                latestInvoice = await stripe.invoices.retrieve(sub.latest_invoice)
+              } else if (sub.latest_invoice && typeof sub.latest_invoice !== 'string') {
+                latestInvoice = sub.latest_invoice as any
+              }
+            } catch (e) {
+              // Non-fatal; fall back to the event's invoice
+              latestInvoice = invoice
+            }
+
+            // Resolve user via profiles by customer id when possible
+            let userId: string | null = null
+            const customerId = (invoice.customer ? String(invoice.customer) : (sub.customer ? String(sub.customer) : null))
+            if (customerId) {
+              const { data: prof } = await supabaseAdmin
+                .from('profiles')
+                .select('id')
+                .eq('stripe_customer_id', customerId)
+                .maybeSingle()
+              userId = prof?.id ?? null
+            }
+
+            const row = mapStripeToRow(sub, latestInvoice ?? invoice, userId)
+            const { error: upErr } = await supabaseAdmin
+              .from('subscriptions')
+              .upsert(row, { onConflict: 'stripe_subscription_id' })
+            if (upErr) {
+              console.error('[webhook] invoice upsert failed', upErr)
+              // Fallback to minimal update to not lose invoice linkage
+              const { error: updErr } = await supabaseAdmin
+                .from('subscriptions')
+                .update({ latest_invoice_id: invoice.id, currency: invoice.currency ?? null, updated_at: new Date().toISOString() })
+                .eq('stripe_subscription_id', subId)
+              if (updErr) throw updErr
+            }
+          } catch (e) {
+            console.warn('[webhook] invoice handler fallback (no sub fetch)', e)
+            const { error: upErr } = await supabaseAdmin
+              .from('subscriptions')
+              .update({ latest_invoice_id: invoice.id, currency: invoice.currency ?? null, updated_at: new Date().toISOString() })
+              .eq('stripe_subscription_id', subId)
+            if (upErr) {
+              console.error('[webhook] invoice update failed', upErr)
+              throw upErr
+            }
           }
         }
         break
