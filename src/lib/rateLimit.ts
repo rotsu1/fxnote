@@ -9,13 +9,14 @@ export async function rateLimit(req: NextRequest, key: string, limit = 5, window
   try {
     // Attempt Upstash when env present and module is available at runtime
     if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-      const { Ratelimit } = await import('@upstash/ratelimit')
-      const { Redis } = await import('@upstash/redis')
-      const redis = new Redis({
+      // Use dynamic import with any to avoid TS type resolution when package is not installed
+      const mod1: any = await import('@upstash/ratelimit')
+      const mod2: any = await import('@upstash/redis')
+      const redis = new mod2.Redis({
         url: process.env.UPSTASH_REDIS_REST_URL!,
         token: process.env.UPSTASH_REDIS_REST_TOKEN!,
       })
-      const limiter = new Ratelimit({ redis, limiter: Ratelimit.slidingWindow(limit, `${windowMs} ms`) })
+      const limiter = new mod1.Ratelimit({ redis, limiter: mod1.Ratelimit.slidingWindow(limit, `${windowMs} ms`) })
       const id = key
       const { success, reset } = await limiter.limit(id)
       if (!success) {
@@ -42,4 +43,3 @@ export async function rateLimit(req: NextRequest, key: string, limit = 5, window
   b.count += 1
   return { success: true }
 }
-

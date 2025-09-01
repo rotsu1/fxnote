@@ -6,7 +6,6 @@ if (!key) {
 }
 
 export const stripe = new Stripe(key, {
-  apiVersion: '2024-06-20',
+  // Use package default API version to match installed types
   typescript: true,
 })
-

@@ -4,7 +4,8 @@ import { supabaseServer } from '@/src/lib/supabaseServer'
 
 // Read current user using the Supabase service client and the access token from cookies
 export async function requireUser() {
-  const token = cookies().get('sb-access-token')?.value
+  const store = await cookies()
+  const token = store.get('sb-access-token')?.value
   if (!token) {
     throw Object.assign(new Error('Unauthorized'), { status: 401 })
   }
@@ -14,4 +15,3 @@ export async function requireUser() {
   }
   return data.user
 }
-

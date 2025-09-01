@@ -53,7 +53,7 @@ export async function middleware(req: NextRequest) {
     pathname.startsWith('/api/stripe/')
 
   if (shouldLimit) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.ip || 'unknown'
+    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
     const ok = rateLimit(`${pathname}:${ip}`)
     if (!ok) {
       return new NextResponse(JSON.stringify({ error: 'Too many requests' }), {
@@ -74,4 +74,3 @@ export async function middleware(req: NextRequest) {
 
   return NextResponse.next()
 }
-
