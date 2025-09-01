@@ -836,8 +836,6 @@ function TableContent() {
                   </div>
                 </CardContent>
               </Card>
-            </>
-          )}
         </main>
 
         {/* Modals */}
