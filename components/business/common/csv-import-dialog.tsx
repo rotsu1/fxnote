@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { importHiroseTradesFromFile } from '@/utils/parser/hiroseParser';
+import { supabase } from "@/lib/supabaseClient";
 
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
     const [isCustomBrokerOpen, setIsCustomBrokerOpen] = useState(false);
@@ -80,10 +80,32 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
       setImportSuccess("");
       
       try {
-        setImportProgress("CSVファイルを処理中...");
-        
-        // Use the utility function from hiroseParser
-        const { successCount, errorCount } = await importHiroseTradesFromFile(file, user.id);
+        setImportProgress("CSVファイルをアップロード中...");
+        const { data: s } = await supabase.auth.getSession();
+        const token = s.session?.access_token;
+        if (!token) {
+          setImportProgress("");
+          setImportError("認証が必要です。再ログインしてください。");
+          return;
+        }
+
+        const fd = new FormData();
+        fd.append('file', file);
+
+        const res = await fetch('/api/import-trades', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+          body: fd,
+        });
+
+        const json = await res.json();
+        if (!res.ok) {
+          setImportProgress("");
+          setImportError(json?.error || "インポートに失敗しました");
+          return;
+        }
+
+        const { successCount, errorCount } = json as { successCount: number; errorCount: number };
         
         setImportProgress("");
         setImportSuccess(`${successCount}件の取引をインポートしました。${errorCount > 0 ? ` (${errorCount}件エラー)` : ''}`);
