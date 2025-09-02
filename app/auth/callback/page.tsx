@@ -82,8 +82,22 @@ export default function AuthCallback() {
             }
           }
 
-          // Redirect to dashboard
-          router.push("/dashboard/overview");
+          // Decide where to send the user based on subscription status
+          try {
+            const token = session.access_token
+            const res = await fetch('/api/me/subscription-status', {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            const json = await res.json() as { route: string; access: string; reason: string }
+            try {
+              sessionStorage.setItem('fxnote.access', json.access)
+              sessionStorage.setItem('fxnote.subReason', json.reason)
+            } catch {}
+            router.push(json.route)
+          } catch (e) {
+            // Fallback if status check fails
+            router.push('/dashboard/overview')
+          }
         } else {
           // Try to listen for auth state change
           const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {

@@ -42,7 +42,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
 
           // If user has no subscription history and is trying to access dashboard, send to subscription page
           if (json.reason === 'no_history' && pathname?.startsWith('/dashboard')) {
-            router.replace('/dashboard/overview')
+            router.replace('/subscription')
             setIsLoading(false)
             return
           }
