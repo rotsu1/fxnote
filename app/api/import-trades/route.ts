@@ -34,15 +34,34 @@ export async function POST(req: NextRequest): Promise<NextResponse<ImportResult 
     const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
     if (file.size > MAX_BYTES) return badRequest('File too large (max 5MB)')
     const nameOk = file.name?.toLowerCase().endsWith('.csv')
-    const typeOk = (file.type || '').includes('csv')
-    if (!nameOk || !typeOk) return badRequest('Invalid file type (expect .csv, text/csv)')
+    const mime = (file.type || '').toLowerCase()
+    const typeOk = mime.includes('csv') || mime === '' || mime === 'application/vnd.ms-excel'
+    if (!nameOk && !typeOk) return badRequest('Invalid file type (expect .csv)')
 
     // Read file text. Try as UTF-8 first; fallback is omitted for brevity
-    const text = await file.text()
+    let text = await file.text()
 
-    // Robust header detection: find the row with expected columns (Japanese headers)
-    const lines = text.split(/\r?\n/)
-    const headerIdx = lines.findIndex((l, i) => i < 20 && /決済約定日時/.test(l) && /通貨ペア/.test(l))
+    // Robust header detection with fallback
+    const findHeader = (t: string) => {
+      const ls = t.split(/\r?\n/)
+      const idx = ls.findIndex((l, i) => i < 200 && /決済約定日時/.test(l) && /通貨ペア/.test(l))
+      return { idx, ls }
+    }
+    let { idx: headerIdx, ls: lines } = findHeader(text)
+
+    // Attempt Shift_JIS decode fallback if header missing
+    if (headerIdx === -1) {
+      try {
+        const buf = await file.arrayBuffer()
+        // @ts-ignore - some Node runtimes may not support shift-jis
+        const decoder = new TextDecoder('shift-jis')
+        const sjis = decoder.decode(new Uint8Array(buf))
+        const r = findHeader(sjis)
+        headerIdx = r.idx
+        lines = r.ls
+      } catch {}
+    }
+
     if (headerIdx === -1) return badRequest('Could not locate header row')
     const sliced = lines.slice(headerIdx).join('\n')
 
@@ -153,4 +172,3 @@ export async function POST(req: NextRequest): Promise<NextResponse<ImportResult 
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
-
