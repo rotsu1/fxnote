@@ -346,13 +346,14 @@ const handleSymbolUpdate = async (id: number, symbolName: string, user: any) => 
       .from("symbols")
       .select("id")
       .eq("symbol", symbolName)
+      .eq('user_id', user.id)
       .single()
     
     if (symbolError && symbolError.code === 'PGRST116') {
       // Symbol doesn't exist, create it
       const { data: newSymbol, error: createError } = await supabase
         .from("symbols")
-        .insert([{ symbol: symbolName }])
+        .insert([{ symbol: symbolName, user_id: user.id }])
         .select()
         .single()
       

@@ -17,11 +17,15 @@ export interface TradeData {
   tradeEmotions: string[];
 }
 
-export const loadSymbols = async (): Promise<{ data: string[]; error?: string }> => {
+export const loadSymbols = async (userId: string): Promise<{ data: string[]; error?: string }> => {
+  if (!userId) {
+    return { data: [], error: 'User not authenticated' }
+  }
   try {
     const { data, error } = await supabase
       .from("symbols")
       .select("symbol")
+      .eq('user_id', userId)
       .order("symbol")
     
     if (error) {
@@ -157,10 +161,11 @@ export const loadDataForTable = async <T>(
  * Load symbols for table editing
  */
 export const loadSymbolsForTable = async (
+  userId: string,
   setAvailableSymbols: (symbols: string[]) => void
 ): Promise<void> => {
   await loadDataForTable(
-    loadSymbols,
+    () => loadSymbols(userId),
     setAvailableSymbols,
     "Error loading symbols for table:"
   );

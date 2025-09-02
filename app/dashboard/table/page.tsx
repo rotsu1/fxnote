@@ -528,7 +528,7 @@ function TableContent() {
           // Load all data in parallel for better performance
           const [tagsResult, symbolsResult, emotionsResult] = await Promise.all([
             loadTags(user.id),
-            loadSymbolsForTable(setAvailableSymbols),
+            loadSymbolsForTable(user.id, setAvailableSymbols),
             loadEmotionsForTable(user.id, setAvailableEmotions)
           ]);
   

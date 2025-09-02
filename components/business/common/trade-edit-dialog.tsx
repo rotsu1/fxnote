@@ -264,6 +264,7 @@ export function TradeEditDialog({
         const { data, error } = await supabase
           .from("symbols")
           .select("symbol")
+          .eq("user_id", user.id)
           .order("symbol")
         
         if (error) {
@@ -792,30 +793,44 @@ export function TradeEditDialog({
                         <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="pair">シンボル</Label>
-                <Select
-                  value={formData.pair}
-                  onValueChange={(value) => handleFormChange({ pair: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="シンボルを選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {loadingSymbols ? (
-                      <SelectItem value="loading" disabled>読み込み中...</SelectItem>
-                    ) : availableSymbols.length > 0 ? (
-                      availableSymbols.map((symbol) => (
-                        <SelectItem key={symbol} value={symbol}>
-                          {symbol}
-                        </SelectItem>
-                      ))
-                    ) : (
-                      <SelectItem value="no-symbols" disabled>シンボルがありません</SelectItem>
-                    )}
-                  </SelectContent>
-                </Select>
+                <Input
+                  id="pair"
+                  placeholder="シンボルを入力 (例: USDJPY)"
+                  value={formData.pair || ""}
+                  onChange={(e) => handleFormChange({ pair: e.target.value })}
+                />
                 {validationError && validationError.includes("シンボル") && (
                   <div className="text-red-600 text-sm mt-1">{validationError}</div>
                 )}
+                <div className="mt-2 border rounded p-2 max-h-28 overflow-y-auto">
+                  {loadingSymbols ? (
+                    <div className="text-xs text-muted-foreground">読み込み中...</div>
+                  ) : (
+                    (() => {
+                      const q = (formData.pair || '').toLowerCase();
+                      const list = Array.from(new Set(availableSymbols))
+                        .filter(s => !q || s.toLowerCase().includes(q))
+                        .slice(0, 30);
+                      if (list.length === 0) {
+                        return <div className="text-xs text-muted-foreground">過去のシンボルはありません</div>;
+                      }
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {list.map((s) => (
+                            <Badge
+                              key={s}
+                              variant={formData.pair === s ? "default" : "outline"}
+                              className="cursor-pointer text-xs"
+                              onClick={() => handleFormChange({ pair: s })}
+                            >
+                              {s}
+                            </Badge>
+                          ))}
+                        </div>
+                      );
+                    })()
+                  )}
+                </div>
               </div>
               <div>
                 <Label htmlFor="type">取引種別</Label>

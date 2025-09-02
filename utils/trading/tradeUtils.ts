@@ -47,13 +47,14 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade |
           .from("symbols")
           .select("id")
           .eq("symbol", tradeData.pair)
+          .eq("user_id", user.id)
           .single();
         
         if (symbolError && symbolError.code === 'PGRST116') {
           // Symbol doesn't exist, create it
           const { data: newSymbol, error: createError } = await supabase
             .from("symbols")
-            .insert([{ symbol: tradeData.pair }])
+            .insert([{ symbol: tradeData.pair, user_id: user.id }])
             .select()
             .single();
           

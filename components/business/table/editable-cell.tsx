@@ -51,6 +51,58 @@ export function EditableCell({
   return (
     <div className="space-y-1">
       {column.type === "select" ? (
+        column.id === "pair" ? (
+          // Custom single-select with free input and suggestions for symbol
+          <div
+            className="relative"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                onCellBlur();
+              }
+            }}
+          >
+            <Input
+              value={String(value || "")}
+              placeholder="シンボルを入力"
+              onChange={(e) => onCellChange(trade.id, column.id as keyof Trade, e.target.value)}
+              onKeyDown={(e) => onCellKeyDown(e, trade.id, column.id as keyof Trade)}
+              autoFocus
+              className={cn(
+                "h-8",
+                cellError && "border-red-500 focus-visible:ring-red-500"
+              )}
+            />
+            {availableSymbols.length > 0 && (
+              <div className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-background shadow">
+                {(() => {
+                  const q = String(value || "").toLowerCase();
+                  const list = Array.from(new Set(availableSymbols))
+                    .filter((s) => !q || s.toLowerCase().includes(q))
+                    .slice(0, 20);
+                  if (list.length === 0) {
+                    return (
+                      <div className="px-2 py-1 text-xs text-muted-foreground">候補がありません</div>
+                    );
+                  }
+                  return list.map((s) => (
+                    <button
+                      type="button"
+                      key={s}
+                      className="w-full text-left px-2 py-1 text-sm hover:bg-muted"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onCellChange(trade.id, column.id as keyof Trade, s);
+                        onCellBlur();
+                      }}
+                    >
+                      {s}
+                    </button>
+                  ));
+                })()}
+              </div>
+            )}
+          </div>
+        ) : (
         <Select
           value={String(value)}
           onValueChange={(val) => onCellChange(trade.id, column.id as keyof Trade, val)}
@@ -63,18 +115,7 @@ export function EditableCell({
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {column.id === "pair" ? (
-              // For pair field, use symbols from database
-              availableSymbols.length > 0 ? (
-                availableSymbols.map((symbol) => (
-                  <SelectItem key={symbol} value={symbol}>
-                    {symbol}
-                  </SelectItem>
-                ))
-              ) : (
-                <SelectItem value="no-symbols" disabled>シンボルがありません</SelectItem>
-              )
-            ) : (
+            {(
               // For other select fields, use column options
               (column.options || []).map((option: string) => (
                 <SelectItem key={option} value={option}>
@@ -84,6 +125,7 @@ export function EditableCell({
             )}
           </SelectContent>
         </Select>
+        )
       ) : column.type === "textarea" ? (
         <Textarea
           value={String(value)}
