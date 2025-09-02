@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +54,15 @@ export function EditableCell({
       {column.type === "select" ? (
         column.id === "pair" ? (
           // Custom single-select with free input and suggestions for symbol
-          <div className="relative">
+          <div
+            className="relative"
+            onBlur={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setIsSymbolListOpen(false);
+                onCellBlur();
+              }
+            }}
+          >
             <Input
               value={String(value || "")}
               placeholder="シンボルを入力"
@@ -65,7 +72,6 @@ export function EditableCell({
                 onCellChange(trade.id, column.id as keyof Trade, e.target.value)
                 setIsSymbolListOpen(true)
               }}
-              onBlur={() => setIsSymbolListOpen(false)}
               onKeyDown={(e) => onCellKeyDown(e, trade.id, column.id as keyof Trade)}
               autoFocus
               className={cn(
@@ -94,6 +100,7 @@ export function EditableCell({
                       onClick={() => {
                         onCellChange(trade.id, column.id as keyof Trade, s);
                         setIsSymbolListOpen(false);
+                        onCellBlur();
                       }}
                     >
                       {s}
@@ -102,29 +109,6 @@ export function EditableCell({
                 })()}
               </div>
             )}
-            <div className="mt-2 flex gap-2">
-              <Button
-                size="sm"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  // Trigger save via blur handler in parent
-                  onCellBlur();
-                }}
-              >
-                保存
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  // Simulate Escape key to cancel edit and restore original
-                  onCellKeyDown({ key: 'Escape', preventDefault: () => {} } as any, trade.id, column.id as keyof Trade)
-                }}
-              >
-                キャンセル
-              </Button>
-            </div>
           </div>
         ) : (
         <Select
