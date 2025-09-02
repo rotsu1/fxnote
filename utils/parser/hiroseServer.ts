@@ -29,6 +29,18 @@ export function sanitizeCell(value: string | null | undefined): string {
   return v
 }
 
+// Trim helper without formula-guard (for numeric parsing and identifiers)
+function clean(value: string | null | undefined): string {
+  return String(value ?? '').trim()
+}
+
+// Robust numeric parser: strips commas and spaces
+function toNumber(value: string | null | undefined): number {
+  const s = clean(value).replace(/,/g, '')
+  const n = Number.parseFloat(s)
+  return n
+}
+
 export function parseJapaneseDateTime(dateTimeStr: string): string {
   const raw = sanitizeCell(dateTimeStr)
   const parts = raw.split(' ')
@@ -61,14 +73,14 @@ export function isoToUTCDateAndTime(iso: string): { date: string; time: string }
 }
 
 export function convertLotSize(lotSizeStr: string): number {
-  const n = Number.parseFloat(sanitizeCell(lotSizeStr))
+  const n = toNumber(lotSizeStr)
   if (!isFinite(n)) throw new Error(`Invalid lot size: ${lotSizeStr}`)
   // Hirose: 1 lot = 1,000; standardize to 10,000
   return n / 10
 }
 
 export function convertTradeType(buySellStr: string): number {
-  const s = sanitizeCell(buySellStr)
+  const s = clean(buySellStr)
   // 売 (sell) in their column means opening sell? Keep consistent with previous util (0 buy, 1 sell)
   return s === '売' ? 0 : 1
 }
@@ -82,15 +94,15 @@ export function calculateHoldTime(entryIso: string, exitIso: string): number {
 
 // Map a parsed CSV row to our DB trade shape (without symbol id resolution)
 export function mapHiroseRow(row: HiroseCsvRow): MappedTrade | null {
-  const currency = sanitizeCell(row['通貨ペア'])
-  const entryStr = sanitizeCell(row['新規約定日時'])
-  const exitStr = sanitizeCell(row['決済約定日時'])
-  const pnlStr = sanitizeCell(row['売買損益'])
-  const entryPriceStr = sanitizeCell(row['新規約定値'])
-  const exitPriceStr = sanitizeCell(row['決済約定値'])
-  const pipsStr = sanitizeCell(row['pip損益'])
-  const lotStr = sanitizeCell(row['Lot数'])
-  const buySell = sanitizeCell(row['売買'])
+  const currency = clean(row['通貨ペア'])
+  const entryStr = clean(row['新規約定日時'])
+  const exitStr = clean(row['決済約定日時'])
+  const pnlStr = clean(row['売買損益'])
+  const entryPriceStr = clean(row['新規約定値'])
+  const exitPriceStr = clean(row['決済約定値'])
+  const pipsStr = clean(row['pip損益'])
+  const lotStr = clean(row['Lot数'])
+  const buySell = clean(row['売買'])
 
   if (!currency || !entryStr || !exitStr) return null
 
@@ -100,10 +112,10 @@ export function mapHiroseRow(row: HiroseCsvRow): MappedTrade | null {
   const { date: exit_date, time: exit_time } = isoToUTCDateAndTime(exitIso)
   const lot_size = convertLotSize(lotStr)
   const trade_type = convertTradeType(buySell)
-  const entry_price = Number.parseFloat(entryPriceStr)
-  const exit_price = Number.parseFloat(exitPriceStr)
-  const profit_loss = Number.parseFloat(pnlStr)
-  const pips = (Number.parseFloat(pipsStr) || 0) / 10
+  const entry_price = toNumber(entryPriceStr)
+  const exit_price = toNumber(exitPriceStr)
+  const profit_loss = toNumber(pnlStr)
+  const pips = (toNumber(pipsStr) || 0) / 10
   const hold_time = calculateHoldTime(entryIso, exitIso)
 
   const numericChecks = [entry_price, exit_price, profit_loss, pips, lot_size]
@@ -125,4 +137,3 @@ export function mapHiroseRow(row: HiroseCsvRow): MappedTrade | null {
     hold_time,
   }
 }
-
