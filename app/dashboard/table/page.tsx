@@ -595,7 +595,7 @@ function TableContent() {
             .from("trades")
             .select(`
               *,
-              symbols!inner(symbol)
+              symbols(symbol)
             `)
             .eq("user_id", user.id)
             .order("entry_date", { ascending: true })

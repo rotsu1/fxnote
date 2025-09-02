@@ -105,7 +105,7 @@ export const loadTrades = async (userId: string): Promise<{ data: TradeData[]; e
       .from("trades")
       .select(`
         *,
-        symbols!inner(symbol),
+        symbols(symbol),
         trade_tag_links(
           trade_tags(tag_name)
         ),
