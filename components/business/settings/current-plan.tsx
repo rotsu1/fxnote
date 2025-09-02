@@ -87,6 +87,9 @@ export function CurrentPlan() {
   const isFull = status?.access === 'full'
   // When active, management goes through Stripe Billing Portal
 
+  // Avoid rendering until status is known to prevent incorrect CTA flash
+  if (status === null) return null
+
   return (
     <Card>
       <CardHeader>

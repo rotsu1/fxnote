@@ -1,9 +1,6 @@
 "use client"
 
-import {
-  CreditCard,
-  User,
-} from "lucide-react"
+import { CreditCard, User } from "lucide-react"
 
 import { Button } from "@/components/ui/button" 
 import { Separator } from "@/components/ui/separator"
@@ -12,8 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/hooks/use-toast";
-import { EmailManagement } from "@/components/business/settings/email-management"
-import { PasswordManagement } from "@/components/business/settings/password-management"
+// Email and Password management are removed for Google OAuth-only
 import { CurrentPlan } from "@/components/business/settings/current-plan"
 import { useEffect, useState } from "react";
 
@@ -101,8 +97,7 @@ export default function Settings() {
               </TabsList>
 
               <TabsContent value="account" className="space-y-6">
-                <EmailManagement />
-                <PasswordManagement />
+                {/* Intentionally left blank: email/password management removed */}
               </TabsContent>
 
               <TabsContent value="billing" className="space-y-6">
