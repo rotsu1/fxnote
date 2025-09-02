@@ -43,7 +43,6 @@ export function EditableCell({
   onCellKeyDown,
 }: EditableCellProps) {
   const [isComposing, setIsComposing] = useState(false);
-  const [isSymbolListOpen, setIsSymbolListOpen] = useState(false);
 
   if (!isEditing) {
     return null;
@@ -58,7 +57,6 @@ export function EditableCell({
             className="relative"
             onBlur={(e) => {
               if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                setIsSymbolListOpen(false);
                 onCellBlur();
               }
             }}
@@ -66,11 +64,8 @@ export function EditableCell({
             <Input
               value={String(value || "")}
               placeholder="シンボルを入力"
-              onFocus={() => setIsSymbolListOpen(true)}
-              onClick={() => setIsSymbolListOpen(true)}
               onChange={(e) => {
                 onCellChange(trade.id, column.id as keyof Trade, e.target.value)
-                setIsSymbolListOpen(true)
               }}
               onKeyDown={(e) => onCellKeyDown(e, trade.id, column.id as keyof Trade)}
               autoFocus
@@ -79,36 +74,6 @@ export function EditableCell({
                 cellError && "border-red-500 focus-visible:ring-red-500"
               )}
             />
-            {isSymbolListOpen && availableSymbols.length > 0 && (
-              <div className="absolute z-50 mt-1 max-h-40 w-full overflow-auto rounded-md border bg-background shadow">
-                {(() => {
-                  const q = String(value || "").toLowerCase();
-                  const list = Array.from(new Set(availableSymbols))
-                    .filter((s) => !q || s.toLowerCase().includes(q))
-                    .slice(0, 20);
-                  if (list.length === 0) {
-                    return (
-                      <div className="px-2 py-1 text-xs text-muted-foreground">候補がありません</div>
-                    );
-                  }
-                  return list.map((s) => (
-                    <button
-                      type="button"
-                      key={s}
-                      className="w-full text-left px-2 py-1 text-sm hover:bg-muted"
-                      onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => {
-                        onCellChange(trade.id, column.id as keyof Trade, s);
-                        setIsSymbolListOpen(false);
-                        onCellBlur();
-                      }}
-                    >
-                      {s}
-                    </button>
-                  ));
-                })()}
-              </div>
-            )}
           </div>
         ) : (
         <Select
