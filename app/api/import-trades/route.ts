@@ -73,6 +73,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ImportResult 
     }) as Array<Record<string, string>>
 
     if (!records.length) return badRequest('No data rows found')
+    const MAX_ROWS = 10000
+    if (records.length > MAX_ROWS) return badRequest(`Row limit exceeded (${records.length}). Max ${MAX_ROWS}. Split file and retry.`)
 
     // Map to internal shape; collect symbol names
     const mapped: MappedTrade[] = []
