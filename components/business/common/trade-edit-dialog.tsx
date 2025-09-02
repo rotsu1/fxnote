@@ -119,6 +119,7 @@ export function TradeEditDialog({
     const [holdingTimeValidationError, setHoldingTimeValidationError] = useState("")
     const [availableSymbols, setAvailableSymbols] = useState<string[]>([])
     const [loadingSymbols, setLoadingSymbols] = useState(false)
+    const [isSymbolListOpen, setIsSymbolListOpen] = useState(false)
   
     useEffect(() => {
       const defaultDateStrLocal = defaultDate || new Date().toISOString().split("T")[0];
@@ -793,42 +794,60 @@ export function TradeEditDialog({
                         <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="pair">シンボル</Label>
-                <Input
-                  id="pair"
-                  placeholder="シンボルを入力 (例: USDJPY)"
-                  value={formData.pair || ""}
-                  onChange={(e) => handleFormChange({ pair: e.target.value })}
-                />
-                {validationError && validationError.includes("シンボル") && (
-                  <div className="text-red-600 text-sm mt-1">{validationError}</div>
-                )}
-                <div className="mt-2 border rounded p-2 max-h-28 overflow-y-auto">
-                  {loadingSymbols ? (
-                    <div className="text-xs text-muted-foreground">読み込み中...</div>
-                  ) : (
-                    (() => {
-                      const q = (formData.pair || '').toLowerCase();
-                      const list = Array.from(new Set(availableSymbols))
-                        .filter(s => !q || s.toLowerCase().includes(q))
-                        .slice(0, 30);
-                      if (list.length === 0) {
-                        return <div className="text-xs text-muted-foreground">過去のシンボルはありません</div>;
-                      }
-                      return (
-                        <div className="flex flex-wrap gap-1">
-                          {list.map((s) => (
-                            <Badge
+                <div
+                  className="relative"
+                  onBlur={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                      setIsSymbolListOpen(false)
+                    }
+                  }}
+                >
+                  <Input
+                    id="pair"
+                    placeholder="シンボルを入力 (例: USDJPY)"
+                    value={formData.pair || ""}
+                    onFocus={() => setIsSymbolListOpen(true)}
+                    onClick={() => setIsSymbolListOpen(true)}
+                    onChange={(e) => {
+                      handleFormChange({ pair: e.target.value })
+                      setIsSymbolListOpen(true)
+                    }}
+                  />
+                  {validationError && validationError.includes("シンボル") && (
+                    <div className="text-red-600 text-sm mt-1">{validationError}</div>
+                  )}
+                  {isSymbolListOpen && (
+                    <div className="absolute z-50 mt-1 w-full max-h-60 overflow-auto rounded-md border bg-background shadow">
+                      {loadingSymbols ? (
+                        <div className="px-3 py-2 text-xs text-muted-foreground">読み込み中...</div>
+                      ) : (
+                        (() => {
+                          const q = (formData.pair || '').toLowerCase()
+                          const list = Array.from(new Set(availableSymbols))
+                            .filter(s => !q || s.toLowerCase().includes(q))
+                            .slice(0, 100)
+                          if (list.length === 0) {
+                            return (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">候補がありません</div>
+                            )
+                          }
+                          return list.map((s) => (
+                            <button
+                              type="button"
                               key={s}
-                              variant={formData.pair === s ? "default" : "outline"}
-                              className="cursor-pointer text-xs"
-                              onClick={() => handleFormChange({ pair: s })}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-muted focus:bg-muted"
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => {
+                                handleFormChange({ pair: s })
+                                setIsSymbolListOpen(false)
+                              }}
                             >
                               {s}
-                            </Badge>
-                          ))}
-                        </div>
-                      );
-                    })()
+                            </button>
+                          ))
+                        })()
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
