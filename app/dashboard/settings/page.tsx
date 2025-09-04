@@ -84,21 +84,13 @@ export default function Settings() {
 
         <main className="flex-1 px-4 md:px-6 pt-6">
           <div className="max-w-4xl mx-auto">
-            <Tabs defaultValue="account" className="space-y-6">
+            <Tabs defaultValue="billing" className="space-y-6">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="account" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  アカウント & プロフィール
-                </TabsTrigger>
                 <TabsTrigger value="billing" className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4" />
                   請求 & サブスクリプション
                 </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="account" className="space-y-6">
-                {/* Intentionally left blank: email/password management removed */}
-              </TabsContent>
 
               <TabsContent value="billing" className="space-y-6">
                 <div className="space-y-4">
