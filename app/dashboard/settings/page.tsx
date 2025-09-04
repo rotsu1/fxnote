@@ -85,7 +85,7 @@ export default function Settings() {
         <main className="flex-1 px-4 md:px-6 pt-6">
           <div className="max-w-4xl mx-auto">
             <Tabs defaultValue="billing" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-1">
                 <TabsTrigger value="billing" className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4" />
                   請求 & サブスクリプション
