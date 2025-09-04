@@ -1,12 +1,42 @@
 "use client"
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
 export default function SubscriptionPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [checking, setChecking] = useState(true)
+
+  // Enforce consent before viewing subscription page
+  useEffect(() => {
+    const run = async () => {
+      const { data: s } = await supabase.auth.getSession()
+      const uid = s.session?.user.id
+      if (!uid) {
+        setChecking(false)
+        router.replace('/auth/login')
+        return
+      }
+      try {
+        const { data: row } = await supabase
+          .from('profiles')
+          .select('is_concent')
+          .eq('id', uid)
+          .single()
+        if (!row || row.is_concent !== true) {
+          router.replace('/auth/consent')
+          return
+        }
+      } finally {
+        setChecking(false)
+      }
+    }
+    run()
+  }, [router])
 
   const handleCheckout = async () => {
     setError(null)
@@ -44,6 +74,8 @@ export default function SubscriptionPage() {
       setLoading(false)
     }
   }
+
+  if (checking) return null
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center p-6">

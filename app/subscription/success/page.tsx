@@ -28,6 +28,23 @@ export default function SubscriptionSuccessPage() {
           router.replace('/auth/login')
           return
         }
+        // Consent gate: if not consented, go to consent page
+        try {
+          const uid = s.session?.user.id
+          if (!uid) {
+            router.replace('/auth/login')
+            return
+          }
+          const { data: row } = await supabase
+            .from('profiles')
+            .select('is_concent')
+            .eq('id', uid)
+            .single()
+          if (!row || row.is_concent !== true) {
+            router.replace('/auth/consent')
+            return
+          }
+        } catch {}
         const res = await fetch('/api/me/subscription-status', {
           headers: { Authorization: `Bearer ${token}` },
           cache: 'no-store',

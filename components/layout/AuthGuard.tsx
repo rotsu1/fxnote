@@ -27,6 +27,32 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
         return
       }
 
+      // Consent must be granted before any subscription/dashboard routing
+      try {
+        const { data: s } = await supabase.auth.getSession()
+        const uid = s.session?.user.id
+        if (!uid) {
+          setIsLoading(false)
+          router.replace('/auth/login')
+          return
+        }
+        const { data: consentRow } = await supabase
+          .from('profiles')
+          .select('is_concent')
+          .eq('id', uid)
+          .single()
+        if (!consentRow || consentRow.is_concent !== true) {
+          setIsLoading(false)
+          router.replace('/auth/consent')
+          return
+        }
+      } catch (e) {
+        // If we cannot verify consent, be safe and send to consent page
+        setIsLoading(false)
+        router.replace('/auth/consent')
+        return
+      }
+
       try {
         const { data: s } = await supabase.auth.getSession()
         const token = s.session?.access_token
