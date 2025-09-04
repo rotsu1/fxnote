@@ -93,18 +93,53 @@ export default function ConsentPage() {
                 <label htmlFor="terms" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   利用規約を読みました
                 </label>
-                <Link href="/terms" className="ml-auto text-xs underline underline-offset-4">全文を別タブで開く</Link>
               </div>
-              <div className="border rounded-md p-4 h-48 overflow-y-auto text-sm space-y-3 bg-muted/30">
-                <p className="font-semibold">概要</p>
-                <p>本サービスはトレード記録・可視化・分析のためのツールであり、投資助言や売買推奨は行いません。ユーザーは自身の責任で本サービスを利用します。</p>
-                <p className="font-semibold">料金</p>
-                <p>1ヶ月無料の後、月額¥490（変更の可能性あり）。解約は次回更新から反映、返金は行いません。</p>
-                <p className="font-semibold">禁止事項</p>
-                <p>権利侵害、不正アクセス、過度な負荷、趣旨に反する利用等。</p>
-                <p className="font-semibold">免責</p>
-                <p>本サービスは現状有姿で提供され、当社は間接損害・逸失利益等に責任を負いません。</p>
-                <p className="text-xs text-muted-foreground">詳細はページ下部のリンクまたは「全文を別タブで開く」をご覧ください。</p>
+              <div className="border rounded-md p-4 h-64 overflow-y-auto text-sm space-y-3 bg-muted/30">
+                <h3 className="text-base font-semibold">1. 適用</h3>
+                <p>この利用規約（以下「本規約」）は、FXNote（以下「本サービス」）の提供条件およびユーザーの利用条件を定めます。当社は必要に応じて本規約を変更でき、変更後は本ページ掲載時に効力を生じます。</p>
+                <h3 className="text-base font-semibold">2. 本サービスの内容</h3>
+                <p>本サービスは、FX・暗号資産・株式等のトレードに関する記録、可視化、分析、学習のためのノート機能等を提供するツールであり、投資助言や売買の推奨は行いません。</p>
+                <h3 className="text-base font-semibold">3. アカウント</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>正確かつ最新の情報で登録すること。</li>
+                  <li>ログイン情報の管理はユーザーの責任。</li>
+                  <li>不正利用・規約違反時はアカウント停止等の措置。</li>
+                </ul>
+                <h3 className="text-base font-semibold">4. 料金・支払い・解約</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>1ヶ月無料後は月額¥490（変更あり）。</li>
+                  <li>料金・プランの変更あり。最新はアプリ表示が優先。</li>
+                  <li>解約は次回更新から反映。日割り返金なし。</li>
+                  <li>不履行時は提供停止や制限の可能性。</li>
+                </ul>
+                <h3 className="text-base font-semibold">5. ユーザーコンテンツとデータ</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>保存データの所有権はユーザーに帰属。</li>
+                  <li>運営・品質向上・サポート目的で適切に取扱い。</li>
+                  <li>合理的なセキュリティ対策を講じるが完全保証はしない。バックアップはユーザー責任。</li>
+                </ul>
+                <h3 className="text-base font-semibold">6. 禁止事項</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>法令・公序良俗違反</li>
+                  <li>権利侵害（知的財産・プライバシー等）</li>
+                  <li>不正アクセス、リバースエンジニアリング、過度な負荷</li>
+                  <li>本サービス趣旨に反する不当な利用・再販等</li>
+                </ul>
+                <h3 className="text-base font-semibold">7. 投資助言等に関する免責</h3>
+                <p>本サービスは投資助言、勧誘、売買推奨、パフォーマンスの保証を行いません。トレードは自己判断・自己責任で行ってください。</p>
+                <h3 className="text-base font-semibold">8. 保障の否認および責任制限</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>「現状有姿」での提供。無欠陥・特定目的適合性は保証しません。</li>
+                  <li>間接損害・逸失利益・データ消失等の責任を負いません。</li>
+                </ul>
+                <h3 className="text-base font-semibold">9. サービスの変更・停止</h3>
+                <p>保守・セキュリティ・運用上の理由により、事前通知なく変更・中断・終了する場合があります。</p>
+                <h3 className="text-base font-semibold">10. 規約の変更</h3>
+                <p>必要に応じて本規約を変更します。重要な変更はアプリ内で通知に努めます。変更後の利用により同意とみなされます。</p>
+                <h3 className="text-base font-semibold">11. 準拠法および管轄</h3>
+                <p>日本法に準拠。当社所在地を管轄する裁判所を第一審の専属的合意管轄とします。</p>
+                <h3 className="text-base font-semibold">12. お問い合わせ</h3>
+                <p>support@fxnote.app までご連絡ください。</p>
               </div>
             </section>
 
@@ -114,17 +149,36 @@ export default function ConsentPage() {
                 <label htmlFor="privacy" className="text-sm leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
                   プライバシーポリシーを読みました
                 </label>
-                <Link href="/privacy" className="ml-auto text-xs underline underline-offset-4">全文を別タブで開く</Link>
               </div>
-              <div className="border rounded-md p-4 h-48 overflow-y-auto text-sm space-y-3 bg-muted/30">
-                <p className="font-semibold">基本方針</p>
-                <p>データはサービス提供・維持・セキュリティ確保の目的に限定して保存・利用し、マーケティング・広告・販売や目的外共有は行いません。</p>
-                <p className="font-semibold">取得情報</p>
-                <p>アカウント情報、ユーザーが保存するデータ、運用に必要な技術情報等。</p>
-                <p className="font-semibold">第三者提供</p>
-                <p>法令を除き第三者提供なし。委託先は目的限定で取り扱い。</p>
-                <p className="font-semibold">ユーザーの権利</p>
-                <p>データの閲覧・修正・削除が可能。お問い合わせ: support@fxnote.app</p>
+              <div className="border rounded-md p-4 h-64 overflow-y-auto text-sm space-y-3 bg-muted/30">
+                <h3 className="text-base font-semibold">1. 基本方針</h3>
+                <p>ユーザーデータ（トレード履歴、ノート、設定、アカウント情報等）は安全に保管し、サービス提供・維持・セキュリティ確保に必要な範囲を超えて利用しません。マーケティング、広告、外部への販売・共有は行いません。</p>
+                <h3 className="text-base font-semibold">2. 取得する情報</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>アカウント情報（メールアドレス、認証情報 等）</li>
+                  <li>ユーザーが保存するデータ（トレード記録、ノート、タグ、設定 等）</li>
+                  <li>運用に必要な技術情報（エラーログ、アクセス時刻、IPアドレス等）</li>
+                </ul>
+                <h3 className="text-base font-semibold">3. 利用目的</h3>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>サービスの提供（データ保存・表示・同期）</li>
+                  <li>アカウント作成・認証・セキュリティ</li>
+                  <li>障害対応・品質向上のための最小限の運用解析</li>
+                </ul>
+                <h3 className="text-base font-semibold">4. 第三者提供・共同利用</h3>
+                <p>法令に基づく場合を除き同意なく第三者に提供しません。委託先（例：Supabase等）は契約に基づき目的外利用を禁止します。</p>
+                <h3 className="text-base font-semibold">5. 保存期間・削除</h3>
+                <p>ユーザーデータは削除またはアカウント削除まで保存。削除後もバックアップに一定期間残存する場合があります。</p>
+                <h3 className="text-base font-semibold">6. セキュリティ</h3>
+                <p>適切な技術的・組織的安全管理措置を講じますが、100%の安全性は保証できません。</p>
+                <h3 className="text-base font-semibold">7. クッキー等</h3>
+                <p>ログイン維持やセキュリティのため最小限のクッキー・ローカルストレージ等を使用。広告目的のトラッキングは行いません。</p>
+                <h3 className="text-base font-semibold">8. ユーザーの権利</h3>
+                <p>データの閲覧・修正・削除が可能です。連絡先：support@fxnote.app</p>
+                <h3 className="text-base font-semibold">9. 改定</h3>
+                <p>法令やサービス内容の変更に応じて改定される場合があります。重要な変更はアプリ内で通知します。</p>
+                <h3 className="text-base font-semibold">10. お問い合わせ</h3>
+                <p>support@fxnote.app までご連絡ください。</p>
               </div>
             </section>
 
@@ -140,7 +194,7 @@ export default function ConsentPage() {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              この操作により、<Link href="/terms" className="underline">利用規約</Link> と <Link href="/privacy" className="underline">プライバシーポリシー</Link> に同意したものとみなされます。
+              この操作により、本ページに記載の利用規約およびプライバシーポリシーに同意したものとみなされます。
             </div>
           </div>
         </div>
@@ -148,4 +202,3 @@ export default function ConsentPage() {
     </div>
   )
 }
-

@@ -37,7 +37,7 @@ export default function PostLogin() {
           .select('is_concent')
           .eq('id', userId)
           .single()
-        if (!consentRow || consentRow.is_concent === null) {
+        if (!consentRow || consentRow.is_concent !== true) {
           router.replace('/auth/consent')
           return
         }

@@ -45,8 +45,8 @@ export default function Signup() {
           }
         }
 
-        // Redirect to dashboard
-        router.push("/dashboard/overview");
+        // Use central router that applies consent/subscription gates
+        router.push("/post-login");
       }
     };
 

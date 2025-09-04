@@ -89,7 +89,7 @@ export default function AuthCallback() {
               .select('is_concent')
               .eq('id', session.user.id)
               .single()
-            if (!consentRow || consentRow.is_concent === null) {
+            if (!consentRow || consentRow.is_concent !== true) {
               router.push('/auth/consent')
               return
             }
