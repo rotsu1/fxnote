@@ -40,6 +40,8 @@ export async function POST(req: NextRequest): Promise<NextResponse<ImportResult 
 
     // Read file text. Try as UTF-8 first; fallback is omitted for brevity
     let text = await file.text()
+    // Sanitize file-level anomalies (BOM, null bytes)
+    text = text.replace(/^\uFEFF/, '').replace(/\x00/g, '')
 
     // Robust header detection with fallback
     const findHeader = (t: string) => {
@@ -139,6 +141,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<ImportResult 
       exit_time: m.exit_time,
       profit_loss: m.profit_loss,
       pips: m.pips,
+      // Sanitize free-text memo (formula injection, control chars, and cap length)
       trade_memo: sanitizeCell(m.trade_memo),
       hold_time: m.hold_time,
       created_at: new Date().toISOString(),

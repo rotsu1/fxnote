@@ -20,12 +20,18 @@ export type MappedTrade = {
   hold_time: number // seconds
 }
 
-// Sanitize to prevent CSV formula injection
+// Sanitize to prevent CSV formula injection and strip control chars
 export function sanitizeCell(value: string | null | undefined): string {
-  const v = String(value ?? '').trim()
+  let v = String(value ?? '')
+  // Remove BOM and null bytes/control chars except CR/LF/TAB
+  v = v.replace(/^\uFEFF/, '')
+       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '')
+  v = v.trim()
   if (!v) return ''
   const dangerous = ['=', '+', '-', '@']
-  if (dangerous.includes(v[0])) return "'" + v
+  if (dangerous.includes(v[0])) v = "'" + v
+  // Hard cap to avoid oversized text payloads
+  if (v.length > 2048) v = v.slice(0, 2048)
   return v
 }
 

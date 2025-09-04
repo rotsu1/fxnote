@@ -7,6 +7,16 @@ import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabaseClient";
 
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
+    // Lightweight text sanitizer for free-text fields heading to DB (CSV formula guard)
+    const sanitizeText = (value: string): string => {
+      let v = String(value ?? '')
+      v = v.replace(/^[\uFEFF]/, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '').trim()
+      if (!v) return ''
+      const danger = ['=', '+', '-', '@']
+      if (danger.includes(v[0])) v = "'" + v
+      if (v.length > 256) v = v.slice(0, 256)
+      return v
+    }
     const [isCustomBrokerOpen, setIsCustomBrokerOpen] = useState(false);
     const [customBrokerName, setCustomBrokerName] = useState("");
     const [customBrokerCSV, setCustomBrokerCSV] = useState<File | null>(null);
@@ -48,6 +58,21 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
           return;
         }
 
+        // Basic client-side validation
+        const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+        if (customBrokerCSV.size > MAX_BYTES) {
+          setSubmitError("ファイルサイズが大きすぎます（最大 5MB）。");
+          setIsSubmitting(false);
+          return;
+        }
+        const lower = customBrokerCSV.name.toLowerCase()
+        const mime = (customBrokerCSV.type || '').toLowerCase()
+        if (!lower.endsWith('.csv') && !mime.includes('csv') && mime !== 'application/vnd.ms-excel') {
+          setSubmitError("CSVファイル（.csv）をアップロードしてください。");
+          setIsSubmitting(false);
+          return;
+        }
+
         // Upload CSV to user-uploads bucket under users/<uid>/csv-uploads/<uuid>.csv
         const objectPath = `users/${uid}/csv-uploads/${(globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}.csv`;
         const { error: upErr } = await supabase
@@ -63,9 +88,9 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
 
         // Create parser request via RPC (RLS-safe, checks path ownership)
         const { error: rpcErr } = await supabase.rpc('request_csv_parser', {
-          p_broker: customBrokerName.trim(),
+          p_broker: sanitizeText(customBrokerName.trim()),
           p_storage_path: objectPath,
-          p_original_filename: customBrokerCSV.name,
+          p_original_filename: sanitizeText(customBrokerCSV.name),
         });
         if (rpcErr) {
           console.error('[custom-broker] rpc error', rpcErr);
