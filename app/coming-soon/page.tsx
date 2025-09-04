@@ -264,10 +264,10 @@ export default function Component() {
           &copy; {new Date().getFullYear()} FXNote. 全ての権利を保有します。
         </p>
         <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="#" className="text-xs hover:underline underline-offset-4">
+          <Link href="/terms" className="text-xs hover:underline underline-offset-4">
             利用規約
           </Link>
-          <Link href="#" className="text-xs hover:underline underline-offset-4">
+          <Link href="/privacy" className="text-xs hover:underline underline-offset-4">
             プライバシーポリシー
           </Link>
         </nav>
