@@ -9,9 +9,10 @@ import { supabase } from "@/lib/supabaseClient";
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
     const [isCustomBrokerOpen, setIsCustomBrokerOpen] = useState(false);
     const [customBrokerName, setCustomBrokerName] = useState("");
-    const [customBrokerEmail, setCustomBrokerEmail] = useState("");
     const [customBrokerCSV, setCustomBrokerCSV] = useState<File | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string>("");
+    const [submitSuccess, setSubmitSuccess] = useState<string>("");
     const [selectedBroker, setSelectedBroker] = useState<string>("");
     const [csvFile, setCsvFile] = useState<File | null>(null);
     const [isImporting, setIsImporting] = useState(false);
@@ -31,27 +32,58 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
     }, [isOpen]);
   
     const handleCustomBrokerSubmit = async () => {
-      if (!customBrokerName.trim() || !customBrokerEmail.trim() || !customBrokerCSV) {
+      setSubmitError("");
+      setSubmitSuccess("");
+      if (!customBrokerName.trim() || !customBrokerCSV) {
+        setSubmitError("ブローカー名とCSVファイルを入力してください。");
         return;
       }
-  
       setIsSubmitting(true);
-      
       try {
-        // Here you would typically send this data to your backend
-        // For now, we'll just simulate a submission
-        
-        // Reset form
-        setCustomBrokerName("");
-        setCustomBrokerEmail("");
-        setCustomBrokerCSV(null);
-        setIsCustomBrokerOpen(false);
-        
-        // Show success message (you can implement a toast notification here)
-        alert("リクエストが送信されました。開発チームが確認次第、対応いたします。");
+        const { data: s } = await supabase.auth.getSession();
+        const uid = s.session?.user.id;
+        if (!uid) {
+          setSubmitError("認証が必要です。ログインし直してください。");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Upload CSV to user-uploads bucket under users/<uid>/csv-uploads/<uuid>.csv
+        const objectPath = `users/${uid}/csv-uploads/${(globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2))}.csv`;
+        const { error: upErr } = await supabase
+          .storage
+          .from('user-uploads')
+          .upload(objectPath, customBrokerCSV, { contentType: customBrokerCSV.type || 'text/csv' });
+        if (upErr) {
+          console.error('[custom-broker] upload error', upErr);
+          setSubmitError("CSVのアップロードに失敗しました。");
+          setIsSubmitting(false);
+          return;
+        }
+
+        // Create parser request via RPC (RLS-safe, checks path ownership)
+        const { error: rpcErr } = await supabase.rpc('request_csv_parser', {
+          p_broker: customBrokerName.trim(),
+          p_storage_path: objectPath,
+          p_original_filename: customBrokerCSV.name,
+        });
+        if (rpcErr) {
+          console.error('[custom-broker] rpc error', rpcErr);
+          setSubmitError("リクエスト作成に失敗しました。");
+          setIsSubmitting(false);
+          return;
+        }
+
+        setSubmitSuccess("リクエストを送信しました。対応までお待ちください。");
+        // Reset form after brief delay
+        setTimeout(() => {
+          setCustomBrokerName("");
+          setCustomBrokerCSV(null);
+          setIsCustomBrokerOpen(false);
+        }, 1200);
       } catch (error) {
         console.error("Error submitting custom broker request:", error);
-        alert("エラーが発生しました。もう一度お試しください。");
+        setSubmitError("エラーが発生しました。もう一度お試しください。");
       } finally {
         setIsSubmitting(false);
       }
@@ -59,7 +91,7 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
   
     const handleCSVFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
-      if (file && file.type === "text/csv") {
+      if (file && (file.type === "text/csv" || file.name.toLowerCase().endsWith('.csv'))) {
         setCustomBrokerCSV(file);
       }
     };
@@ -233,25 +265,23 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
                 <Label htmlFor="brokerName">ブローカー名 *</Label>
                 <Input
                   id="brokerName"
-                  placeholder="例: FXCM, IG, Saxo Bank"
+                  placeholder="例: DMM, GMO, 楽天証券"
                   value={customBrokerName}
                   onChange={(e) => setCustomBrokerName(e.target.value)}
                 />
               </div>
-  
-              <div>
-                <Label htmlFor="email">メールアドレス *</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="your.email@example.com"
-                  value={customBrokerEmail}
-                  onChange={(e) => setCustomBrokerEmail(e.target.value)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  対応完了時に通知をお送りします
-                </p>
-              </div>
+
+              {submitError && (
+                <div className="bg-red-50 p-3 rounded-md">
+                  <p className="text-sm text-red-800">{submitError}</p>
+                </div>
+              )}
+
+              {submitSuccess && (
+                <div className="bg-green-50 p-3 rounded-md">
+                  <p className="text-sm text-green-800">{submitSuccess}</p>
+                </div>
+              )}
   
               <div>
                 <Label htmlFor="csvSample">CSVファイルサンプル *</Label>
@@ -284,7 +314,7 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
               </Button>
               <Button 
                 onClick={handleCustomBrokerSubmit}
-                disabled={!customBrokerName.trim() || !customBrokerEmail.trim() || !customBrokerCSV || isSubmitting}
+                disabled={!customBrokerName.trim() || !customBrokerCSV || isSubmitting}
               >
                 {isSubmitting ? "送信中..." : "リクエスト送信"}
               </Button>
