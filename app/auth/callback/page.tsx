@@ -82,6 +82,19 @@ export default function AuthCallback() {
             }
           }
 
+          // If consent not given, route to consent page first (login/signup gate)
+          try {
+            const { data: consentRow } = await supabase
+              .from('profiles')
+              .select('is_concent')
+              .eq('id', session.user.id)
+              .single()
+            if (!consentRow || consentRow.is_concent === null) {
+              router.push('/auth/consent')
+              return
+            }
+          } catch {}
+
           // Decide where to send the user based on subscription status
           try {
             const token = session.access_token

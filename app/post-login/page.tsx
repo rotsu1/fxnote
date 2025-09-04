@@ -25,6 +25,23 @@ export default function PostLogin() {
         router.replace('/auth/login')
         return
       }
+      // Consent gate: if not given, go to consent page first
+      try {
+        const userId = sessionRes.session?.user.id
+        if (!userId) {
+          router.replace('/auth/login')
+          return
+        }
+        const { data: consentRow } = await supabase
+          .from('profiles')
+          .select('is_concent')
+          .eq('id', userId)
+          .single()
+        if (!consentRow || consentRow.is_concent === null) {
+          router.replace('/auth/consent')
+          return
+        }
+      } catch {}
       try {
         const res = await fetch('/api/me/subscription-status', {
           headers: { Authorization: `Bearer ${token}` },
@@ -48,4 +65,3 @@ export default function PostLogin() {
     </div>
   )
 }
-
