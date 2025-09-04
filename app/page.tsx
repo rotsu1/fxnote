@@ -301,10 +301,10 @@ export default function Component() {
                 <h3 className="text-2xl font-bold text-gray-800 dark:text-white">お問い合わせ先</h3>
                 <p className="text-muted-foreground">ご連絡は以下のメールアドレスまでお願いします。</p>
                 <a
-                  href="mailto:support@fxnote.app"
+                  href="mailto:fxnote.help@gmail.com"
                   className="inline-block text-lg font-semibold text-purple-700 dark:text-purple-300 underline underline-offset-4 hover:text-purple-800 dark:hover:text-purple-200"
                 >
-                  support@fxnote.app
+                  fxnote.help@gmail.com
                 </a>
               </div>
             </div>

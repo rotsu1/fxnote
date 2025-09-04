@@ -187,7 +187,6 @@ export default function ConsentPage() {
             )}
 
             <div className="flex items-center justify-end gap-3">
-              <Link href="/" className="text-sm underline underline-offset-4">後で確認する</Link>
               <Button onClick={handleSubmit} disabled={!canSubmit}>
                 {saving ? "保存中..." : "同意して進む"}
               </Button>
