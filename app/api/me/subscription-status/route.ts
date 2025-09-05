@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 
 type Access = 'none' | 'limited' | 'full'
 type Route = '/subscription' | '/dashboard/overview'
-type Reason = 'no_history' | 'inactive' | 'active'
+type Reason = 'no_history' | 'inactive' | 'active' | 'staff'
 
 export type SubscriptionStatusResponse = {
   route: Route
@@ -35,6 +35,28 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const userId = userRes.user.id
+
+    // Staff bypass: staff has full access regardless of subscription
+    try {
+      const { data: profile, error: profileErr } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle()
+      if (!profileErr && profile?.role === 'staff') {
+        const res: SubscriptionStatusResponse = {
+          route: '/dashboard/overview',
+          access: 'full',
+          isActive: true,
+          hasHistory: true,
+          status: 'staff',
+          reason: 'staff',
+          cancel_at: null,
+          canceled_at: null,
+        }
+        return NextResponse.json(res)
+      }
+    } catch {}
 
     const { data: subs, error: subErr } = await supabaseAdmin
       .from('subscriptions')

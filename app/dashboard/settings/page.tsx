@@ -18,7 +18,7 @@ export default function Settings() {
   const router = useRouter();
   const [sub, setSub] = useState<{
     access: 'none' | 'limited' | 'full'
-    reason: 'no_history' | 'inactive' | 'active'
+    reason: 'no_history' | 'inactive' | 'active' | 'staff'
     status: string | null
   } | null>(null)
   const [loading, setLoading] = useState(false)

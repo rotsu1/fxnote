@@ -10,7 +10,7 @@ type Status = {
   isActive: boolean
   hasHistory: boolean
   status: string | null
-  reason: 'no_history' | 'inactive' | 'active'
+  reason: 'no_history' | 'inactive' | 'active' | 'staff'
 }
 
 export default function PostLogin() {

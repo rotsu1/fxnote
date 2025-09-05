@@ -8,7 +8,7 @@ import { supabase } from "@/lib/supabaseClient";
 type SubStatus = {
   route: '/subscription' | '/dashboard/overview'
   access: 'none' | 'limited' | 'full'
-  reason: 'no_history' | 'inactive' | 'active'
+  reason: 'no_history' | 'inactive' | 'active' | 'staff'
 }
 
 export default function AuthGuard({ children }: { children: ReactNode }) {
