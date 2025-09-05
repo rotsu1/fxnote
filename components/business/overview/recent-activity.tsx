@@ -17,10 +17,13 @@ export function RecentActivity() {
       setLoading(true);
       setError("");
       
-      // Fetch recent trades
+      // Fetch recent trades with symbol name from symbols table
       supabase
         .from("trades")
-        .select("*")
+        .select(`
+          id, entry_date, entry_time, profit_loss,
+          symbols(symbol)
+        `)
         .eq("user_id", user.id)
         .order("entry_date", { ascending: false })
         .order("entry_time", { ascending: false })
@@ -168,7 +171,7 @@ export function RecentActivity() {
                     recentTrades.map((trade, index) => (
                       <TableRow key={trade.id || index}>
                         <TableCell className="text-sm">{formatDate(trade.entry_date)}</TableCell>
-                        <TableCell className="font-medium">{trade.currency_pair}</TableCell>
+                        <TableCell className="font-medium">{trade.symbols?.symbol || trade.symbol_name || ''}</TableCell>
                         <TableCell className={trade.profit_loss >= 0 ? "text-green-600" : "text-red-600"}>
                           {formatProfitLoss(trade.profit_loss)}
                         </TableCell>
