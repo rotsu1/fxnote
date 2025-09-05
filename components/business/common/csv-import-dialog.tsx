@@ -213,8 +213,6 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
                 </SelectTrigger>
                 <SelectContent>
                     <SelectItem value="hirose">ヒロセ通商</SelectItem>
-                  <SelectItem value="mt4">MetaTrader 4</SelectItem>
-                  <SelectItem value="mt5">MetaTrader 5</SelectItem>
                 </SelectContent>
               </Select>
                 <Button 
