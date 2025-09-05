@@ -105,6 +105,9 @@ export default function Component() {
           <span className="ml-2 font-bold text-lg">FXNote</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
+          <Link href="/blog" className="text-sm font-medium hover:underline underline-offset-4">
+            ブログ
+          </Link>
           <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4">
             ログイン / 新規登録
           </Link>
