@@ -139,7 +139,7 @@ export default function ConsentPage() {
                 <h3 className="text-base font-semibold">11. 準拠法および管轄</h3>
                 <p>日本法に準拠。当社所在地を管轄する裁判所を第一審の専属的合意管轄とします。</p>
                 <h3 className="text-base font-semibold">12. お問い合わせ</h3>
-                <p>support@fxnote.app までご連絡ください。</p>
+                <p>fxnote.help@gmail.com までご連絡ください。</p>
               </div>
             </section>
 
@@ -174,11 +174,11 @@ export default function ConsentPage() {
                 <h3 className="text-base font-semibold">7. クッキー等</h3>
                 <p>ログイン維持やセキュリティのため最小限のクッキー・ローカルストレージ等を使用。広告目的のトラッキングは行いません。</p>
                 <h3 className="text-base font-semibold">8. ユーザーの権利</h3>
-                <p>データの閲覧・修正・削除が可能です。連絡先：support@fxnote.app</p>
+                <p>データの閲覧・修正・削除が可能です。連絡先：fxnote.help@gmail.com</p>
                 <h3 className="text-base font-semibold">9. 改定</h3>
                 <p>法令やサービス内容の変更に応じて改定される場合があります。重要な変更はアプリ内で通知します。</p>
                 <h3 className="text-base font-semibold">10. お問い合わせ</h3>
-                <p>support@fxnote.app までご連絡ください。</p>
+                <p>fxnote.help@gmail.com までご連絡ください。</p>
               </div>
             </section>
 

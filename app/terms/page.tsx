@@ -111,7 +111,7 @@ export default function TermsPage() {
               <section>
                 <h2 className="text-xl font-semibold mb-2">12. お問い合わせ</h2>
                 <p>
-                  本規約および本サービスに関するお問い合わせは、<a className="underline" href="mailto:support@fxnote.app">support@fxnote.app</a> までご連絡ください。
+                  本規約および本サービスに関するお問い合わせは、<a className="underline" href="mailto:fxnote.help@gmail.com">fxnote.help@gmail.com</a> までご連絡ください。
                 </p>
               </section>
             </div>
