@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { BarChart3, Calendar, Table, TrendingUp, FileText } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { supabase } from "@/lib/supabaseClient"
+import Footer from "@/components/ui/Footer"
 
 export default function Component() {
   const router = useRouter()
@@ -105,12 +104,6 @@ export default function Component() {
           <span className="ml-2 font-bold text-lg tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent group-hover:from-emerald-500 group-hover:to-cyan-500 transition-colors">FXNote</span>
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
-          <Link href="/blog" className="text-sm font-medium hover:underline underline-offset-4">
-            ブログ
-          </Link>
-          <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4">
-            ログイン / 新規登録
-          </Link>
           <button 
             onClick={() => scrollToSection('features')}
             className="text-sm font-medium hover:underline underline-offset-4"
@@ -129,6 +122,12 @@ export default function Component() {
           >
             お問い合わせ
           </button>
+          <Link href="/blog" className="text-sm font-medium hover:underline underline-offset-4">
+            ブログ
+          </Link>
+          <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4">
+            ログイン / 新規登録
+          </Link>
         </nav>
       </header>
 
@@ -316,19 +315,7 @@ export default function Component() {
       </main>
 
       {/* Footer */}
-      <footer className="flex flex-col gap-2 sm:flex-row py-6 w-full shrink-0 items-center px-4 md:px-6 border-t">
-        <p className="text-xs text-muted-foreground">
-          &copy; {new Date().getFullYear()} FXNote. 全ての権利を保有します。
-        </p>
-        <nav className="sm:ml-auto flex gap-4 sm:gap-6">
-          <Link href="/terms" className="text-xs hover:underline underline-offset-4">
-            利用規約
-          </Link>
-          <Link href="/privacy" className="text-xs hover:underline underline-offset-4">
-            プライバシーポリシー
-          </Link>
-        </nav>
-      </footer>
+      <Footer />
     </div>
   )
 }

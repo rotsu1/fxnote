@@ -8,6 +8,14 @@ export default function Header() {
             <Image src="/logo.svg?height=30&width=30" width="30" height="30" alt="FXNote Logo" />
             <span className="ml-2 font-bold text-lg tracking-tight bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent group-hover:from-emerald-500 group-hover:to-cyan-500 transition-colors">FXNote</span>
             </Link>
+            <nav className="ml-auto flex gap-4 sm:gap-6">
+                <Link href="/" className="text-sm font-medium hover:underline underline-offset-4">
+                    ホーム
+                </Link>
+                <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4">
+                    ログイン / 新規登録
+                </Link>
+            </nav>
         </header>
     )
 };

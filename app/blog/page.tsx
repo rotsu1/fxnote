@@ -2,8 +2,8 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { allPosts } from "@/.contentlayer/generated"
 import { compareDescByDate } from "@/lib/date"
-
 import { absoluteUrl } from "@/lib/seo"
+import Footer from "@/components/ui/Footer"
 
 export const metadata: Metadata = {
   title: "Blog",
@@ -37,7 +37,7 @@ export default function BlogIndex({ searchParams }: PageProps) {
     <div className="relative">
       {/* Subtle finance-themed top gradient + divider */}
       <Header />
-      <div className="container max-w-6xl mx-auto px-4 py-6">
+      <div className="container max-w-6xl mx-auto px-4 py-6 mb-10">
         <NavBar />
         <div className="mb-8 flex items-end justify-between gap-4">
           <div>
@@ -57,6 +57,7 @@ export default function BlogIndex({ searchParams }: PageProps) {
 
         <Pagination page={page} totalPages={totalPages} />
       </div>
+      <Footer />
     </div>
   )
 }
