@@ -11,8 +11,6 @@ import Header from "../_components/Header"
 import NavBar from "../_components/NavBar"
 import Footer from "@/components/ui/Footer"
 
-type PageProps = { params: { slug: string } }
-
 export function generateStaticParams() {
   const prod = process.env.NODE_ENV === "production"
   return allPosts
@@ -20,8 +18,9 @@ export function generateStaticParams() {
     .map((p) => ({ slug: p.slug }))
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const post = allPosts.find((p) => p.slug === params.slug)
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params
+  const post = allPosts.find((p) => p.slug === slug)
   if (!post) return {}
   const url = absoluteUrl(post.url)
   const images = post.cover ? [{ url: post.cover }] : undefined
@@ -45,9 +44,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 }
 
-export default function BlogPostPage({ params }: PageProps) {
+export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const prod = process.env.NODE_ENV === "production"
-  const post = allPosts.find((p) => p.slug === params.slug)
+  const { slug } = await params
+  const post = allPosts.find((p) => p.slug === slug)
   if (!post || (prod && post.draft)) notFound()
 
   return (

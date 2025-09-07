@@ -20,14 +20,11 @@ function getNonDraftPosts() {
     .sort((a, b) => compareDescByDate(a.date, b.date))
 }
 
-type PageProps = {
-  searchParams?: Record<string, string | string[] | undefined>
-}
-
-export default function BlogIndex({ searchParams }: PageProps) {
-  const pageParam = Number((searchParams?.page as string) || 1)
+export default async function BlogIndex({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = (await searchParams) || {}
+  const pageParam = Number((sp.page as string) || 1)
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
-  const tag = (searchParams?.tag as string) || ""
+  const tag = (sp.tag as string) || ""
   let posts = getNonDraftPosts()
   if (tag) {
     const t = tag.toLowerCase()
