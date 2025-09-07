@@ -4,6 +4,7 @@ import { useMDXComponent } from "next-contentlayer/hooks"
 import { Callout } from "./Callout"
 import { Badge } from "./Badge"
 import CopyCodeButton from "./CopyCodeButton"
+import MdxImage from "./MdxImage"
 import { ComponentType } from "react"
 import Image from "next/image"
 
@@ -14,7 +15,7 @@ type Props = {
 const components = {
   Callout,
   Badge,
-  Image,
+  Image: MdxImage,
 }
 
 export default function PostBody({ code }: Props) {

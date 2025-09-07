@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const post = allPosts.find((p) => p.slug === slug)
   if (!post) return {}
   const url = absoluteUrl(post.url)
-  const images = post.cover ? [{ url: post.cover }] : undefined
+  const images = post.cover ? [{ url: resolveCover(post.cover) }] : undefined
   return {
     title: post.title,
     description: post.description,
@@ -62,7 +62,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
           {post.cover ? (
             <div className="relative aspect-[16/9] w-full overflow-hidden rounded-lg border my-6">
-              <Image src={post.cover} alt="" fill className="object-cover" sizes="100vw" priority={false} />
+              <Image src={resolveCover(post.cover)} alt="" fill className="object-cover" sizes="100vw" priority={false} />
             </div>
           ) : null}
 
@@ -88,4 +88,11 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       <Footer />
     </div>
   )
+}
+
+function resolveCover(src: string) {
+  const base = (process.env.NEXT_PUBLIC_SUPABASE_BLOG_BASE || "").replace(/\/$/, "")
+  if (!src) return src
+  if (src.startsWith("http") || src.startsWith("/")) return src
+  return base ? `${base}/${src}` : src
 }
