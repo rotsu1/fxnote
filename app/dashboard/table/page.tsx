@@ -171,64 +171,67 @@ function TableContent() {
       savingCells: new Set(prev.savingCells).add(cellKey)
     }));
     
-    const result = await saveCellValue({
-      id,
-      field,
-      value,
-      originalValue,
-      user: user!
-    });
-    
-    if (result.success) {
-      if (result.displayValue !== undefined) {
-        // Update local state with the display value
-        setTrades(prevTrades => 
-          prevTrades.map(trade => 
-            trade.id === id ? { ...trade, [field]: result.displayValue } : trade
-          )
-        );
-      }
+    try {
+      const result = await saveCellValue({
+        id,
+        field,
+        value,
+        originalValue,
+        user: user!
+      });
       
-      // Clear editing state
-      setCellEditingState(prev => ({
-        ...prev,
-        editingCell: null,
-        editingValues: {
-          ...prev.editingValues,
-          [cellKey]: undefined
-        },
-        originalValues: {
-          ...prev.originalValues,
-          [cellKey]: undefined
+      if (result.success) {
+        if (result.displayValue !== undefined) {
+          // Update local state with the display value
+          setTrades(prevTrades => 
+            prevTrades.map(trade => 
+              trade.id === id ? { ...trade, [field]: result.displayValue } : trade
+            )
+          );
         }
-      }));
-    } else {
-      // Set error state but clear editing state to prevent infinite loops
-      setCellEditingState(prev => ({
-        ...prev,
-        editingCell: null,
-        editingValues: {
-          ...prev.editingValues,
-          [cellKey]: undefined
-        },
-        originalValues: {
-          ...prev.originalValues,
-          [cellKey]: undefined
-        },
-        cellErrors: {
-          ...prev.cellErrors,
-          [cellKey]: result.error || '更新に失敗しました'
-        }
-      }));
+        
+        // Clear editing state
+        setCellEditingState(prev => ({
+          ...prev,
+          editingCell: null,
+          editingValues: {
+            ...prev.editingValues,
+            [cellKey]: undefined
+          },
+          originalValues: {
+            ...prev.originalValues,
+            [cellKey]: undefined
+          }
+        }));
+      } else {
+        // Set error state but clear editing state to prevent infinite loops
+        setCellEditingState(prev => ({
+          ...prev,
+          editingCell: null,
+          editingValues: {
+            ...prev.editingValues,
+            [cellKey]: undefined
+          },
+          originalValues: {
+            ...prev.originalValues,
+            [cellKey]: undefined
+          },
+          cellErrors: {
+            ...prev.cellErrors,
+            [cellKey]: result.error || '更新に失敗しました'
+          }
+        }));
+      }
+    } finally {
+      // Clear saving state and spinner
+      setCellEditingState(prev => {
+        const newSet = new Set(prev.savingCells);
+        newSet.delete(cellKey);
+        return { ...prev, savingCells: newSet };
+      });
+      setStatus(prev => ({ ...prev, isSaving: false }));
     }
-    
-    // Clear saving state
-    setCellEditingState(prev => {
-      const newSet = new Set(prev.savingCells);
-      newSet.delete(cellKey);
-      return { ...prev, savingCells: newSet };
-    });
-  }, [cellEditingState.editingValues, cellEditingState.originalValues, user]);
+  }, [cellEditingState.editingValues, cellEditingState.originalValues, user, setTrades, setStatus]);
 
   const handleCellBlur = useCallback(() => {
     const result = handleCellBlurLogic(cellEditingState, status.isSaving);
