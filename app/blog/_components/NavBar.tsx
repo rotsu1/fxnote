@@ -1,27 +1,14 @@
 import Link from "next/link"
 
+const tags = ["ツール", "テクニカル分析", "ファンダメンタルズ分析", "FX業者"]
+
 const navItems = [
-    {
-      title: "ツール",
-      href: "#",
-    },
-    {
-      title: "テクニカル分析",
-      href: "#",
-    },
-    {
-      title: "ファンダメンタルズ分析",
-      href: "#",
-    },
-    {
-      title: "FX業者",
-      href: "#",
-    },
-    {
-      title: "新着記事",
-      href: "#",
-    },
-  ];
+  ...tags.map((tag) => ({
+    title: tag,
+    href: `/blog?tag=${encodeURIComponent(tag)}`,
+  })),
+  { title: "記事一覧", href: "/blog" },
+]
 
 export default function NavBar() {
     return (

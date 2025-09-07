@@ -9,7 +9,7 @@ export function SearchInput() {
     <input
       id="blog-search"
       type="search"
-      placeholder="Search posts…"
+      placeholder="記事を検索…"
       className="h-9 w-56 rounded-md border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-400"
       aria-label="Search posts"
     />
@@ -38,7 +38,7 @@ export function ClientFilteredList({ initialPosts }: { initialPosts: Post[] }) {
   }, [query, initialPosts])
 
   if (!filtered.length) {
-    return <p className="text-sm text-muted-foreground">No posts found.</p>
+    return <p className="text-sm text-muted-foreground">該当する記事が見つかりませんでした。</p>
   }
 
   return (
@@ -63,4 +63,3 @@ export default {
   SearchInput,
   ClientFilteredList,
 }
-

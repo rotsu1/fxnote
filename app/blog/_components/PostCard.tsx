@@ -22,9 +22,9 @@ export default function PostCard({ href, title, description, date, readingTime, 
       ) : null}
       <div className="p-4 sm:p-6">
         <div className="flex gap-2 text-xs text-muted-foreground">
-          <time dateTime={date}>{formatDateLong(date)}</time>
+          <time dateTime={date}>{formatDateLong(date, "ja-JP")}</time>
           <span aria-hidden>•</span>
-          <span>{readingTime} min read</span>
+          <span>読了目安：{readingTime}分</span>
         </div>
         <h3 className="mt-2 text-lg font-semibold">
           <Link href={href} className="hover:underline">
@@ -45,4 +45,3 @@ export default function PostCard({ href, title, description, date, readingTime, 
     </article>
   )
 }
-

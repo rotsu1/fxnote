@@ -27,7 +27,12 @@ type PageProps = {
 export default function BlogIndex({ searchParams }: PageProps) {
   const pageParam = Number((searchParams?.page as string) || 1)
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1
-  const posts = getNonDraftPosts()
+  const tag = (searchParams?.tag as string) || ""
+  let posts = getNonDraftPosts()
+  if (tag) {
+    const t = tag.toLowerCase()
+    posts = posts.filter((p) => (p.tags || []).some((x) => x.toLowerCase() === t))
+  }
   const totalPages = Math.max(1, Math.ceil(posts.length / PER_PAGE))
   const start = (page - 1) * PER_PAGE
   const end = start + PER_PAGE
@@ -78,15 +83,15 @@ function Pagination({ page, totalPages }: { page: number; totalPages: number }) 
         className="px-3 py-1 rounded-md border text-sm disabled:opacity-50 bg-background hover:bg-gradient-to-r hover:from-emerald-500/10 hover:to-cyan-500/10 transition-colors"
         href={prev ? mkHref(prev) : "#"}
       >
-        <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">Previous</span>
+        <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">前へ</span>
       </Link>
-      <span className="text-sm text-muted-foreground">Page {page} of {totalPages}</span>
+      <span className="text-sm text-muted-foreground">ページ {page} / {totalPages}</span>
       <Link
         aria-disabled={!next}
         className="px-3 py-1 rounded-md border text-sm disabled:opacity-50 bg-background hover:bg-gradient-to-r hover:from-emerald-500/10 hover:to-cyan-500/10 transition-colors"
         href={next ? mkHref(next) : "#"}
       >
-        <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">Next</span>
+        <span className="bg-gradient-to-r from-emerald-600 to-cyan-600 bg-clip-text text-transparent">次へ</span>
       </Link>
     </nav>
   )

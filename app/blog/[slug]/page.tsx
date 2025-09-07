@@ -69,9 +69,9 @@ export default function BlogPostPage({ params }: PageProps) {
           <div className="mb-6">
             <h1 className="text-3xl font-bold tracking-tight">{post.title}</h1>
             <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-              <time dateTime={formatDateISO(post.date)}>{formatDateLong(post.date)}</time>
+              <time dateTime={formatDateISO(post.date)}>{formatDateLong(post.date, "ja-JP")}</time>
               {post.updated ? (
-                <span>(更新日: {formatDateLong(post.updated)})</span>
+                <span>(更新日: {formatDateLong(post.updated, "ja-JP")})</span>
               ) : null}
               <span aria-hidden>•</span>
               <span>読み時間：約{post.readingTime} 分</span>
