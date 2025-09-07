@@ -1,6 +1,6 @@
 import { defineDocumentType, makeSource } from "contentlayer/source-files"
 import rehypeSlug from "rehype-slug"
-import rehypeAutolinkHeadings from "rehype-autolink-headings"
+// import rehypeAutolinkHeadings from "rehype-autolink-headings"
 // Types of some rehype plugins can mismatch depending on unified versions in the tree.
 // Cast to any to keep config TS-safe while runtime works as expected.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -52,7 +52,7 @@ export default makeSource({
     remarkPlugins: [],
     rehypePlugins: [
       rehypeSlug as any,
-      [rehypeAutolinkHeadings as any, { behavior: "wrap" }] as any,
+      // [rehypeAutolinkHeadings as any, { behavior: "wrap" }] as any,
       [rehypePrettyCode as any, { theme: "github-dark-default", keepBackground: false }] as any,
     ] as any,
   },

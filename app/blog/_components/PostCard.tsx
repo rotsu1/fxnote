@@ -1,6 +1,6 @@
-import Image from "next/image"
 import Link from "next/link"
 import { formatDateLong } from "@/lib/date"
+import MdxImage from "./MdxImage"
 
 type Props = {
   href: string
@@ -17,7 +17,7 @@ export default function PostCard({ href, title, description, date, readingTime, 
     <article className="flex flex-col overflow-hidden rounded-lg border bg-background">
       {cover ? (
         <Link href={href} className="block aspect-[16/9] relative">
-          <Image src={cover} alt="" fill className="object-cover" sizes="(min-width: 1024px) 33vw, 100vw" priority={false} />
+          <MdxImage src={cover} alt="" fill className="object-cover" sizes="(min-width: 1024px) 33vw, 100vw" priority={false} />
         </Link>
       ) : null}
       <div className="p-4 sm:p-6">

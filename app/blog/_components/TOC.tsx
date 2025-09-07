@@ -56,7 +56,7 @@ export default function TOC({ containerSelector = "#post-content" }: { container
           <li key={n.id} className="">
             <a
               href={`#${n.id}`}
-              className="inline-flex gap-2 text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-400 rounded"
+              className="inline-flex gap-2 text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-zinc-400 rounded relative before:absolute before:bottom-0 before:left-1/2 before:w-0 before:h-0.5 before:bg-zinc-600 dark:before:bg-zinc-300 before:transition-all before:duration-300 before:ease-out hover:before:w-full hover:before:left-0"
             >
               <span className="shrink-0 tabular-nums text-zinc-500">{label}.</span>
               <span>{n.text}</span>

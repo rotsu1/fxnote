@@ -1,6 +1,6 @@
 import Link from "next/link"
 
-const tags = ["ツール", "テクニカル分析", "ファンダメンタルズ分析", "FX業者"]
+const tags = ["テクニカル分析", "ファンダメンタルズ分析", "FX業者"]
 
 const navItems = [
   ...tags.map((tag) => ({
