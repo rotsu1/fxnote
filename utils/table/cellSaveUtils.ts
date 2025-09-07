@@ -275,7 +275,7 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
         // 3) Link tag to trade
         const { error: linkError } = await supabase
           .from('trade_tag_links')
-          .insert([{ trade_id: id, tag_id: tagId }])
+          .insert([{ trade_id: id, tag_id: tagId, user_id: user.id, created_at: new Date().toISOString() }])
 
         if (linkError) {
           console.error('Error creating tag link:', linkError)
@@ -331,7 +331,7 @@ const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: a
         // Create link
         const { error: linkError } = await supabase
           .from('trade_emotion_links')
-          .insert([{ trade_id: id, emotion_id: emotionId }])
+          .insert([{ trade_id: id, emotion_id: emotionId, user_id: user.id, created_at: new Date().toISOString() }])
 
         if (linkError) {
           console.error('Error creating emotion link:', linkError)

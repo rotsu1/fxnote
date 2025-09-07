@@ -212,6 +212,7 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade |
               .insert([{
                 trade_id: tradeId,
                 tag_id: tagId,
+                user_id: user.id,
                 created_at: new Date().toISOString()
               }]);
             
@@ -267,6 +268,7 @@ export const saveTrade = async (tradeData: Partial<Trade>, editingTrade: Trade |
               .insert([{
                 trade_id: tradeId,
                 emotion_id: emotionId,
+                user_id: user.id,
                 created_at: new Date().toISOString()
               }]);
             
