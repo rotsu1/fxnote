@@ -4,7 +4,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { allPosts } from "@/.contentlayer/generated"
 import PostBody from "../_components/PostBody"
-import TOC from "../_components/TOC"
+import TOCInContent from "../_components/TOCInContent"
 import { absoluteUrl } from "@/lib/seo"
 import { formatDateISO, formatDateLong } from "@/lib/date"
 import Header from "../_components/Header"
@@ -79,10 +79,9 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
           </div>
 
           <div className="mt-8">
-            <div className="w-2/3 mx-auto">
-              <TOC />
-            </div>
             <PostBody code={post.body.code} />
+            {/* Inject TOC before the first h2 inside the post content */}
+            <TOCInContent />
           </div>
         </div>
       </div>

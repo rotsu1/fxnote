@@ -79,7 +79,7 @@ export function RecentActivity() {
           <Card>
             <CardHeader>
               <CardTitle>最近の取引履歴</CardTitle>
-              <CardDescription>最新5件の取引</CardDescription>
+              <CardDescription>最新{recentTrades.length}件の取引</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
@@ -97,7 +97,7 @@ export function RecentActivity() {
           <Card>
             <CardHeader>
               <CardTitle>最近のメモ</CardTitle>
-              <CardDescription>最新3件のメモ</CardDescription>
+              <CardDescription>最新{recentNotes.length}件のメモ</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -148,7 +148,7 @@ export function RecentActivity() {
         <Card>
           <CardHeader>
             <CardTitle>最近の取引履歴</CardTitle>
-            <CardDescription>最新5件の取引</CardDescription>
+            <CardDescription>最新{recentTrades.length}件の取引</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -187,7 +187,7 @@ export function RecentActivity() {
         <Card>
           <CardHeader>
             <CardTitle>最近のメモ</CardTitle>
-            <CardDescription>最新3件のメモ</CardDescription>
+            <CardDescription>最新{recentNotes.length}件のメモ</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">

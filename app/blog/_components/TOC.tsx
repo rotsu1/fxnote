@@ -73,8 +73,8 @@ export default function TOC({ containerSelector = "#post-content" }: { container
   )
 
   return (
-    <nav aria-label="Table of contents" className="not-prose rounded-md border p-4 text-sm mb-6">
-      <strong className="block mb-2">On this page</strong>
+    <nav aria-label="Table of contents" className="not-prose rounded-md border p-4 text-sm mb-6 my-10 bg-blue-200">
+      <strong className="block mb-2">目次</strong>
       {renderList(tree)}
     </nav>
   )

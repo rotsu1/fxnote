@@ -47,6 +47,9 @@ body {
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Sticky header height for anchor offset (Header uses h-14) */
+    --header-height: 56px;
   }
   .dark {
     --background: 0 0% 3.9%;
@@ -91,6 +94,15 @@ body {
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Ensure anchored headings are not hidden behind the sticky header */
+#post-content h2,
+#post-content h3,
+#post-content h4,
+#post-content h5,
+#post-content h6 {
+  scroll-margin-top: calc(var(--header-height) + 16px); /* +16px breathing room */
 }
 
 /* Hide number input spinners for profit field */
