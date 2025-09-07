@@ -227,107 +227,115 @@ export const saveCellValue = async (options: CellSaveOptions): Promise<CellSaveR
  * Handles special field updates for tags and emotions
  */
 const handleSpecialFieldUpdate = async (id: number, field: keyof Trade, value: any, user: any) => {
-  
   if (field === 'tags') {
-    // Delete existing tags
-    await supabase
-      .from("trade_tag_links")
+    // Delete existing tag links (fail loudly if policy blocks it)
+    const { error: deleteError } = await supabase
+      .from('trade_tag_links')
       .delete()
-      .eq("trade_id", id)
-    
-    // Add new tags
+      .eq('trade_id', id)
+
+    if (deleteError) {
+      console.error('Error deleting existing tag links:', deleteError)
+      throw deleteError
+    }
+
+    // Add new tags (existing only; create if missing)
     if (Array.isArray(value) && value.length > 0) {
       for (const tagName of value) {
-        // Get or create tag
-        let { data: tagData, error: tagError } = await supabase
-          .from("trade_tags")
-          .select("id")
-          .eq("tag_name", tagName)
-          .eq("user_id", user.id)
-          .single()
-        
-        let tagId = null
-        if (tagError && tagError.code === 'PGRST116') {
-          // Tag doesn't exist, create it
-          const { data: newTag, error: createTagError } = await supabase
-            .from("trade_tags")
-            .insert([{ tag_name: tagName, user_id: user.id }])
-            .select()
-            .single()
-          
-          if (createTagError) {
-            console.error("Error creating tag:", createTagError)
-            continue
-          }
-          tagId = newTag.id
-        } else if (tagError) {
-          console.error("Error finding tag:", tagError)
-          continue
-        } else if (tagData) {
-          tagId = tagData.id
+        // 1) Find tag for this user (use maybeSingle pattern to avoid .single() pitfalls)
+        const { data: foundTags, error: findError } = await supabase
+          .from('trade_tags')
+          .select('id')
+          .eq('tag_name', tagName)
+          .eq('user_id', user.id)
+          .limit(1)
+
+        if (findError) {
+          console.error('Error finding tag:', findError)
+          throw findError
         }
-        
-        // Create link
-        await supabase
-          .from("trade_tag_links")
+
+        let tagId: number | null = (foundTags && foundTags[0]?.id) || null
+
+        // 2) Create if not exists
+        if (!tagId) {
+          const { data: created, error: createError } = await supabase
+            .from('trade_tags')
+            .insert([{ tag_name: tagName, user_id: user.id }])
+            .select('id')
+            .single()
+
+          if (createError || !created) {
+            console.error('Error creating tag:', createError)
+            throw createError || new Error('Failed to create tag')
+          }
+          tagId = created.id
+        }
+
+        // 3) Link tag to trade
+        const { error: linkError } = await supabase
+          .from('trade_tag_links')
           .insert([{ trade_id: id, tag_id: tagId }])
+
+        if (linkError) {
+          console.error('Error creating tag link:', linkError)
+          throw linkError
+        }
       }
     }
   } else if (field === 'emotion') {
-    // Delete existing emotions
+    // Delete existing emotion links first
     const { error: deleteError } = await supabase
-      .from("trade_emotion_links")
+      .from('trade_emotion_links')
       .delete()
-      .eq("trade_id", id)
-    
+      .eq('trade_id', id)
+
     if (deleteError) {
       console.error('Error deleting existing emotions:', deleteError)
       throw deleteError
     }
-    
+
     // Add new emotions
     if (Array.isArray(value) && value.length > 0) {
       for (const emotionName of value) {
-        
-        // Get or create emotion
-        let { data: emotionData, error: emotionError } = await supabase
-          .from("emotions")
-          .select("id")
-          .eq("emotion", emotionName)
-          .eq("user_id", user.id)
-          .single()
-        
-        let emotionId = null
-        if (emotionError && emotionError.code === 'PGRST116') {
-          // Emotion doesn't exist, create it
-          const { data: newEmotion, error: createEmotionError } = await supabase
-            .from("emotions")
-            .insert([{ emotion: emotionName, user_id: user.id }])
-            .select()
-            .single()
-          
-          if (createEmotionError) {
-            console.error("Error creating emotion:", createEmotionError)
-            continue
-          }
-          emotionId = newEmotion.id
-        } else if (emotionError) {
-          console.error("Error finding emotion:", emotionError)
-          continue
-        } else if (emotionData) {
-          emotionId = emotionData.id
+        // Try to find existing emotion
+        const { data: foundEmotions, error: findError } = await supabase
+          .from('emotions')
+          .select('id')
+          .eq('emotion', emotionName)
+          .eq('user_id', user.id)
+          .limit(1)
+
+        if (findError) {
+          console.error('Error finding emotion:', findError)
+          throw findError
         }
-        
-        if (emotionId) {
-          // Create link
-          const { error: linkError } = await supabase
-            .from("trade_emotion_links")
-            .insert([{ trade_id: id, emotion_id: emotionId }])
-          
-          if (linkError) {
-            console.error('Error creating emotion link:', linkError)
-            throw linkError
+
+        let emotionId: number | null = (foundEmotions && foundEmotions[0]?.id) || null
+
+        // Create if not exists
+        if (!emotionId) {
+          const { data: created, error: createError } = await supabase
+            .from('emotions')
+            .insert([{ emotion: emotionName, user_id: user.id }])
+            .select('id')
+            .single()
+
+          if (createError || !created) {
+            console.error('Error creating emotion:', createError)
+            throw createError || new Error('Failed to create emotion')
           }
+          emotionId = created.id
+        }
+
+        // Create link
+        const { error: linkError } = await supabase
+          .from('trade_emotion_links')
+          .insert([{ trade_id: id, emotion_id: emotionId }])
+
+        if (linkError) {
+          console.error('Error creating emotion link:', linkError)
+          throw linkError
         }
       }
     }
