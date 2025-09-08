@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "lucide-react";
 import { formatHoldTime } from "@/utils/ui/timeUtils";
 
-export function MonthlyBreakdown() {
+export function MonthlyBreakdown({ filterTags = [], filterEmotions = [] }: { filterTags?: string[]; filterEmotions?: string[] }) {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [monthlyData, setMonthlyData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -26,11 +26,11 @@ export function MonthlyBreakdown() {
       const y = selectedYear;
       supabase
         .from("trades")
-        .select("profit_loss,pips,hold_time,entry_date,entry_time")
+        .select("id,profit_loss,pips,hold_time,entry_date,entry_time")
         .eq("user_id", user.id)
         .gte("entry_date", `${y}-01-01`)
         .lte("entry_date", `${y}-12-31`)
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           if (error) {
             setError(error.message);
             setMonthlyData([]);
@@ -40,9 +40,44 @@ export function MonthlyBreakdown() {
               "7月", "8月", "9月", "10月", "11月", "12月"
             ];
   
+            // Apply tag/emotion filters on the whole year's data first
+            let filteredYearData = data || [];
+            if ((filterTags && filterTags.length > 0) || (filterEmotions && filterEmotions.length > 0)) {
+              const ids = filteredYearData.map((t: any) => t.id);
+              if (ids.length > 0) {
+                const [tagLinksRes, emoLinksRes] = await Promise.all([
+                  supabase
+                    .from('trade_tag_links')
+                    .select('trade_id, trade_tags!inner(tag_name)')
+                    .in('trade_id', ids),
+                  supabase
+                    .from('trade_emotion_links')
+                    .select('trade_id, emotions!inner(emotion)')
+                    .in('trade_id', ids)
+                ]);
+                const tagsByTrade: Record<number, Set<string>> = {};
+                const emosByTrade: Record<number, Set<string>> = {};
+                (tagLinksRes.data || []).forEach((row: any) => {
+                  tagsByTrade[row.trade_id] = tagsByTrade[row.trade_id] || new Set();
+                  if (row.trade_tags?.tag_name) tagsByTrade[row.trade_id].add(row.trade_tags.tag_name);
+                });
+                (emoLinksRes.data || []).forEach((row: any) => {
+                  emosByTrade[row.trade_id] = emosByTrade[row.trade_id] || new Set();
+                  if (row.emotions?.emotion) emosByTrade[row.trade_id].add(row.emotions.emotion);
+                });
+                filteredYearData = filteredYearData.filter((t: any) => {
+                  const tagOk = !filterTags || filterTags.length === 0 || (tagsByTrade[t.id] && filterTags.some(tag => tagsByTrade[t.id].has(tag)));
+                  const emoOk = !filterEmotions || filterEmotions.length === 0 || (emosByTrade[t.id] && filterEmotions.some(em => emosByTrade[t.id].has(em)));
+                  return tagOk && emoOk;
+                });
+              } else {
+                filteredYearData = [];
+              }
+            }
+
             const monthlyStats = months.map((month, index) => {
               const m = index + 1;
-              const monthTrades = (data || []).filter((t: any) => {
+              const monthTrades = (filteredYearData || []).filter((t: any) => {
                 if (!t.entry_date) return false;
                 const dt = new Date(`${t.entry_date}T${(t.entry_time || '00:00:00')}Z`);
                 if (isNaN(dt.getTime())) return false;
@@ -114,7 +149,7 @@ export function MonthlyBreakdown() {
           }
           setLoading(false);
         });
-    }, [user, selectedYear]);
+    }, [user, selectedYear, filterTags, filterEmotions]);
   
     const processMonthlyData = (performanceData: any[]) => {
       const months = [

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
@@ -8,11 +8,32 @@ import { SidebarInset, SidebarProvider, SidebarTrigger, AppSidebar } from "@/com
 import { KeyStatsGrid } from "@/components/business/analysis/key-stats-grid";
 import { TimeAnalysis } from "@/components/business/analysis/time-analysis";
 import { MonthlyBreakdown } from "@/components/business/analysis/monthly-breakdown";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
+import { loadTags, loadEmotions } from "@/utils/data/dataLoadingUtils";
+import { useAuth } from "@/hooks/useAuth";
 
 export default function Analysis() {
+  const user = useAuth();
   const [selectedYear, setSelectedYear] = useState<number | "指定しない">(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<number | "指定しない">(new Date().getMonth() + 1);
   const [selectedDay, setSelectedDay] = useState<number | "指定しない">(new Date().getDate());
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+  const [filterEmotions, setFilterEmotions] = useState<string[]>([]);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!user) return;
+      const [tagsRes, emoRes] = await Promise.all([loadTags(user.id), loadEmotions(user.id)]);
+      if (!tagsRes.error) setAvailableTags(tagsRes.data.map(t => t.tag_name));
+      if (!emoRes.error) setAvailableEmotions(emoRes.data);
+    };
+    load();
+  }, [user]);
 
   // Generate year options (current year and 5 years back)
   const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
@@ -94,6 +115,7 @@ export default function Analysis() {
                     ))}
                   </SelectContent>
                 </Select>
+                <Button variant="outline" onClick={() => setIsFilterOpen(true)}>フィルター</Button>
               </div>
             </div>
             <div className="space-y-4">
@@ -101,6 +123,8 @@ export default function Analysis() {
                 selectedYear={selectedYear}
                 selectedMonth={selectedMonth}
                 selectedDay={selectedDay}
+                filterTags={filterTags}
+                filterEmotions={filterEmotions}
               />
             </div>
           </section>
@@ -114,14 +138,81 @@ export default function Analysis() {
               </TabsList>
 
               <TabsContent value="time" className="mt-6">
-                <TimeAnalysis />
+                <TimeAnalysis filterTags={filterTags} filterEmotions={filterEmotions} />
               </TabsContent>
 
               <TabsContent value="trend" className="mt-6">
-              <MonthlyBreakdown />
+              <MonthlyBreakdown filterTags={filterTags} filterEmotions={filterEmotions} />
               </TabsContent>
             </Tabs>
           </section>
+
+          {/* Filter Dialog */}
+          <Dialog open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle>フィルター</DialogTitle>
+                <DialogDescription>タグと感情で取引を絞り込みます（任意）。</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div>
+                  <div className="text-sm font-medium mb-2">タグ</div>
+                  <div className="flex flex-wrap gap-2 border rounded p-2 min-h-[44px]">
+                    {availableTags.length === 0 && (
+                      <span className="text-xs text-muted-foreground">タグがありません</span>
+                    )}
+                    {availableTags.map((tag) => {
+                      const selected = filterTags.includes(tag);
+                      return (
+                        <Badge
+                          key={tag}
+                          variant={selected ? "default" : "outline"}
+                          className="cursor-pointer text-xs"
+                          onClick={() => {
+                            setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+                          }}
+                        >
+                          {tag}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <div className="text-sm font-medium mb-2">感情</div>
+                  <div className="flex flex-wrap gap-2 border rounded p-2 min-h-[44px]">
+                    {availableEmotions.length === 0 && (
+                      <span className="text-xs text-muted-foreground">感情がありません</span>
+                    )}
+                    {availableEmotions.map((emo) => {
+                      const selected = filterEmotions.includes(emo);
+                      return (
+                        <Badge
+                          key={emo}
+                          variant={selected ? "default" : "outline"}
+                          className="cursor-pointer text-xs"
+                          onClick={() => {
+                            setFilterEmotions(prev => prev.includes(emo) ? prev.filter(e => e !== emo) : [...prev, emo]);
+                          }}
+                        >
+                          {emo}
+                        </Badge>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => {
+                    setFilterTags([]);
+                    setFilterEmotions([]);
+                  }}>クリア</Button>
+                  <Button onClick={() => setIsFilterOpen(false)}>適用</Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
 
         </main>
       </SidebarInset>

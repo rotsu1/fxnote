@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Clock } from "lucide-react";
 import { formatHoldTime } from "@/utils/ui/timeUtils";
 
-export function TimeAnalysis() {
+export function TimeAnalysis({ filterTags = [], filterEmotions = [] }: { filterTags?: string[]; filterEmotions?: string[] }) {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
     const [timeData, setTimeData] = useState<any[]>([]);
@@ -58,11 +58,11 @@ export function TimeAnalysis() {
       // Fetch trades around the selected month using entry_date
       supabase
         .from("trades")
-        .select("*")
+        .select("id, user_id, profit_loss, pips, hold_time, entry_date, entry_time")
         .eq("user_id", user.id)
         .gte("entry_date", startFetchYmd)
         .lte("entry_date", endFetchYmd)
-        .then(({ data, error }) => {
+        .then(async ({ data, error }) => {
           
           if (error) {
             console.error('TimeAnalysis: Error fetching trades:', error);
@@ -72,12 +72,48 @@ export function TimeAnalysis() {
             return;
           }
   
-          const dataInMonth = (data || []).filter((trade: any) => {
+          let dataInMonth = (data || []).filter((trade: any) => {
             if (!trade.entry_date) return false;
             const dt = new Date(`${trade.entry_date}T${(trade.entry_time || '00:00:00')}Z`);
             if (isNaN(dt.getTime())) return false;
             return dt.getFullYear() === selectedYear && (dt.getMonth() + 1) === selectedMonth;
           });
+
+          // Apply tag/emotion filters if provided
+          if ((filterTags && filterTags.length > 0) || (filterEmotions && filterEmotions.length > 0)) {
+            const ids = dataInMonth.map((t: any) => t.id);
+            if (ids.length > 0) {
+              const [tagLinksRes, emoLinksRes] = await Promise.all([
+                supabase
+                  .from('trade_tag_links')
+                  .select('trade_id, trade_tags!inner(tag_name)')
+                  .in('trade_id', ids),
+                supabase
+                  .from('trade_emotion_links')
+                  .select('trade_id, emotions!inner(emotion)')
+                  .in('trade_id', ids)
+              ]);
+
+              const tagsByTrade: Record<number, Set<string>> = {};
+              const emosByTrade: Record<number, Set<string>> = {};
+              (tagLinksRes.data || []).forEach((row: any) => {
+                tagsByTrade[row.trade_id] = tagsByTrade[row.trade_id] || new Set();
+                if (row.trade_tags?.tag_name) tagsByTrade[row.trade_id].add(row.trade_tags.tag_name);
+              });
+              (emoLinksRes.data || []).forEach((row: any) => {
+                emosByTrade[row.trade_id] = emosByTrade[row.trade_id] || new Set();
+                if (row.emotions?.emotion) emosByTrade[row.trade_id].add(row.emotions.emotion);
+              });
+
+              dataInMonth = dataInMonth.filter((t: any) => {
+                const tagOk = !filterTags || filterTags.length === 0 || (tagsByTrade[t.id] && filterTags.some(tag => tagsByTrade[t.id].has(tag)));
+                const emoOk = !filterEmotions || filterEmotions.length === 0 || (emosByTrade[t.id] && filterEmotions.some(em => emosByTrade[t.id].has(em)));
+                return tagOk && emoOk;
+              });
+            } else {
+              dataInMonth = [];
+            }
+          }
   
           // Define time slots (1-hour intervals)
           const timeSlots = [
@@ -206,7 +242,7 @@ export function TimeAnalysis() {
           setTimeData(processedData);
           setLoading(false);
         });
-    }, [user, selectedYear, selectedMonth]);
+    }, [user, selectedYear, selectedMonth, filterTags, filterEmotions]);
   
     if (loading) {
       return (

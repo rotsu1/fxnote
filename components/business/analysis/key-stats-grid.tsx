@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeyStatsGridProps) {
+export function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay, filterTags = [], filterEmotions = [] }: KeyStatsGridProps & { filterTags?: string[]; filterEmotions?: string[] }) {
     const user = useAuth();
     const [keyStats, setKeyStats] = useState<any>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -19,7 +19,7 @@ export function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeySt
       // Build optional year range to reduce result size
       let query = supabase
         .from("trades")
-        .select("profit_loss,pips,hold_time,entry_date,entry_time")
+        .select("id,profit_loss,pips,hold_time,entry_date,entry_time")
         .eq("user_id", user.id);
   
       // Fetch a broad range by year if specified to include timezone edge cases
@@ -28,15 +28,15 @@ export function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeySt
         query = query.gte("entry_date", `${y}-01-01`).lte("entry_date", `${y}-12-31`);
       }
   
-      query.then(({ data, error }) => {
+      query.then(async ({ data, error }) => {
         if (error) {
           setError(error.message);
           setKeyStats(null);
           setLoading(false);
           return;
         }
-  
-        const trades = (data || []).filter((t: any) => {
+
+        let trades = (data || []).filter((t: any) => {
           if (!t.entry_date) return false;
           const dt = new Date(`${t.entry_date}T${(t.entry_time || '00:00:00')}Z`);
           if (isNaN(dt.getTime())) return false;
@@ -48,6 +48,42 @@ export function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeySt
           if (selectedDay !== "指定しない" && td !== selectedDay) return false;
           return true;
         });
+
+        // Apply tag/emotion filters if provided
+        if ((filterTags && filterTags.length > 0) || (filterEmotions && filterEmotions.length > 0)) {
+          const ids = trades.map((t: any) => t.id);
+          if (ids.length > 0) {
+            const [tagLinksRes, emoLinksRes] = await Promise.all([
+              supabase
+                .from('trade_tag_links')
+                .select('trade_id, trade_tags!inner(tag_name)')
+                .in('trade_id', ids),
+              supabase
+                .from('trade_emotion_links')
+                .select('trade_id, emotions!inner(emotion)')
+                .in('trade_id', ids)
+            ]);
+
+            const tagsByTrade: Record<number, Set<string>> = {};
+            const emosByTrade: Record<number, Set<string>> = {};
+            (tagLinksRes.data || []).forEach((row: any) => {
+              tagsByTrade[row.trade_id] = tagsByTrade[row.trade_id] || new Set();
+              if (row.trade_tags?.tag_name) tagsByTrade[row.trade_id].add(row.trade_tags.tag_name);
+            });
+            (emoLinksRes.data || []).forEach((row: any) => {
+              emosByTrade[row.trade_id] = emosByTrade[row.trade_id] || new Set();
+              if (row.emotions?.emotion) emosByTrade[row.trade_id].add(row.emotions.emotion);
+            });
+
+            trades = trades.filter((t: any) => {
+              const tagOk = !filterTags || filterTags.length === 0 || (tagsByTrade[t.id] && filterTags.some(tag => tagsByTrade[t.id].has(tag)));
+              const emoOk = !filterEmotions || filterEmotions.length === 0 || (emosByTrade[t.id] && filterEmotions.some(em => emosByTrade[t.id].has(em)));
+              return tagOk && emoOk;
+            });
+          } else {
+            trades = [];
+          }
+        }
   
         const wins = trades.filter((t: any) => (t.profit_loss || 0) > 0);
         const losses = trades.filter((t: any) => (t.profit_loss || 0) < 0);
@@ -90,7 +126,7 @@ export function KeyStatsGrid({ selectedYear, selectedMonth, selectedDay }: KeySt
         });
         setLoading(false);
       });
-    }, [user, selectedYear, selectedMonth, selectedDay]);
+    }, [user, selectedYear, selectedMonth, selectedDay, filterTags, filterEmotions]);
   
     const aggregateMetrics = (data: any[]) => {
       const total = data.reduce((acc, row) => {
