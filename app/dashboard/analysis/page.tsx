@@ -24,6 +24,8 @@ export default function Analysis() {
   const [availableEmotions, setAvailableEmotions] = useState<string[]>([]);
   const [filterTags, setFilterTags] = useState<string[]>([]);
   const [filterEmotions, setFilterEmotions] = useState<string[]>([]);
+  const [pendingFilterTags, setPendingFilterTags] = useState<string[]>([]);
+  const [pendingFilterEmotions, setPendingFilterEmotions] = useState<string[]>([]);
 
   useEffect(() => {
     const load = async () => {
@@ -34,6 +36,14 @@ export default function Analysis() {
     };
     load();
   }, [user]);
+
+  // Initialize pending filters when dialog opens
+  useEffect(() => {
+    if (isFilterOpen) {
+      setPendingFilterTags(filterTags);
+      setPendingFilterEmotions(filterEmotions);
+    }
+  }, [isFilterOpen]);
 
   // Generate year options (current year and 5 years back)
   const yearOptions = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
@@ -162,14 +172,14 @@ export default function Analysis() {
                       <span className="text-xs text-muted-foreground">タグがありません</span>
                     )}
                     {availableTags.map((tag) => {
-                      const selected = filterTags.includes(tag);
+                      const selected = pendingFilterTags.includes(tag);
                       return (
                         <Badge
                           key={tag}
                           variant={selected ? "default" : "outline"}
                           className="cursor-pointer text-xs"
                           onClick={() => {
-                            setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
+                            setPendingFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]);
                           }}
                         >
                           {tag}
@@ -186,14 +196,14 @@ export default function Analysis() {
                       <span className="text-xs text-muted-foreground">感情がありません</span>
                     )}
                     {availableEmotions.map((emo) => {
-                      const selected = filterEmotions.includes(emo);
+                      const selected = pendingFilterEmotions.includes(emo);
                       return (
                         <Badge
                           key={emo}
                           variant={selected ? "default" : "outline"}
                           className="cursor-pointer text-xs"
                           onClick={() => {
-                            setFilterEmotions(prev => prev.includes(emo) ? prev.filter(e => e !== emo) : [...prev, emo]);
+                            setPendingFilterEmotions(prev => prev.includes(emo) ? prev.filter(e => e !== emo) : [...prev, emo]);
                           }}
                         >
                           {emo}
@@ -205,10 +215,14 @@ export default function Analysis() {
 
                 <div className="flex justify-end gap-2">
                   <Button variant="outline" onClick={() => {
-                    setFilterTags([]);
-                    setFilterEmotions([]);
+                    setPendingFilterTags([]);
+                    setPendingFilterEmotions([]);
                   }}>クリア</Button>
-                  <Button onClick={() => setIsFilterOpen(false)}>適用</Button>
+                  <Button onClick={() => {
+                    setFilterTags(pendingFilterTags);
+                    setFilterEmotions(pendingFilterEmotions);
+                    setIsFilterOpen(false);
+                  }}>適用</Button>
                 </div>
               </div>
             </DialogContent>
