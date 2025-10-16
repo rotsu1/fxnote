@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabaseClient'
 
 type Status = {
-  route: '/subscription' | '/dashboard'
+  route: '/subscription' | '/dashboard' | '/dashboard/overview'
   access: 'none' | 'limited' | 'full'
   isActive: boolean
   hasHistory: boolean

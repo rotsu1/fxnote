@@ -73,8 +73,8 @@ export async function GET(req: NextRequest) {
     const row = subs?.[0]
     if (!row) {
       const res: SubscriptionStatusResponse = {
-        route: '/subscription',
-        access: 'none',
+        route: '/dashboard/overview',
+        access: 'limited',
         isActive: false,
         hasHistory: false,
         status: null,
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
         cancel_at: null,
         canceled_at: null,
       }
-      console.log('[me/subscription-status] no history ->', res)
+      console.log('[me/subscription-status] no history (freemium) ->', res)
       return NextResponse.json(res)
     }
 

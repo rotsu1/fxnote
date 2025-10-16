@@ -66,12 +66,7 @@ export default function AuthGuard({ children }: { children: ReactNode }) {
           sessionStorage.setItem('fxnote.access', json.access)
           sessionStorage.setItem('fxnote.subReason', json.reason)
 
-          // If user has no subscription history and is trying to access dashboard, send to subscription page
-          if (json.reason === 'no_history' && pathname?.startsWith('/dashboard')) {
-            router.replace('/subscription')
-            setIsLoading(false)
-            return
-          }
+          // Freemium: do not block dashboard for users without subscription history
         }
       } catch (e) {
         // Non-fatal, proceed with limited UI; login is already confirmed
