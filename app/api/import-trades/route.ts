@@ -25,6 +25,41 @@ export async function POST(req: NextRequest): Promise<NextResponse<ImportResult 
     if (userErr || !userRes?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const userId = userRes.user.id
 
+    // Freemium gating: allow only active subscribers (or staff)
+    try {
+      // Staff bypass
+      const { data: profile } = await supabaseAdmin
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .maybeSingle()
+      if (profile?.role !== 'staff') {
+        const { data: subs } = await supabaseAdmin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false })
+          .limit(1)
+        const row = subs?.[0]
+        const now = new Date()
+        const parse = (s?: string | null) => (s ? new Date(s) : null)
+        const currentEnd = parse(row?.current_period_end)
+        const trialEnd = parse(row?.trial_end)
+        const endedAt = parse(row?.ended_at)
+        const status = String(row?.status || '')
+        const withinCurrent = currentEnd ? currentEnd > now : false
+        const withinTrial = trialEnd ? trialEnd > now : false
+        const notEnded = !endedAt
+        const isActive = (
+          ((status === 'active' || status === 'trialing') && (withinCurrent || withinTrial) && notEnded) ||
+          (status === 'canceled' && withinCurrent)
+        )
+        if (!isActive) {
+          return NextResponse.json({ error: 'CSVインポートは有料プラン限定機能です。プランにご加入ください。' }, { status: 403 })
+        }
+      }
+    } catch {}
+
     // Parse multipart/form-data
     const form = await req.formData()
     const file = form.get('file') as File | null
