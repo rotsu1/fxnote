@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { loadTags, loadEmotions } from "@/utils/data/dataLoadingUtils";
 import { useAuth } from "@/hooks/useAuth";
+import { FreemiumCard } from "@/components/business/common/freemium-dialog";
+import { supabase } from "@/lib/supabaseClient";
 
 export default function Analysis() {
   const user = useAuth();
@@ -26,6 +28,29 @@ export default function Analysis() {
   const [filterEmotions, setFilterEmotions] = useState<string[]>([]);
   const [pendingFilterTags, setPendingFilterTags] = useState<string[]>([]);
   const [pendingFilterEmotions, setPendingFilterEmotions] = useState<string[]>([]);
+  const [access, setAccess] = useState<'none' | 'limited' | 'full' | null>(null);
+
+  // Determine access level for freemium gating below key stats
+  useEffect(() => {
+    try {
+      const a = sessionStorage.getItem('fxnote.access') as 'none' | 'limited' | 'full' | null
+      if (a) setAccess(a)
+    } catch {}
+    ;(async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession()
+        const token = s.session?.access_token
+        if (!token) return
+        const res = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const json = await res.json() as { access: 'none' | 'limited' | 'full'; reason: string }
+        try {
+          sessionStorage.setItem('fxnote.access', json.access)
+          sessionStorage.setItem('fxnote.subReason', json.reason)
+        } catch {}
+        setAccess(json.access)
+      } catch {}
+    })()
+  }, [])
 
   useEffect(() => {
     const load = async () => {
@@ -140,7 +165,7 @@ export default function Analysis() {
           </section>
 
           {/* Analysis Tabs */}
-          <section>
+          <section className="relative">
             <Tabs defaultValue="time" className="w-full">
               <TabsList className="grid w-full grid-cols-2 lg:grid-cols-2">
                 <TabsTrigger value="time">時間帯分析</TabsTrigger>
@@ -148,13 +173,18 @@ export default function Analysis() {
               </TabsList>
 
               <TabsContent value="time" className="mt-6">
-                <TimeAnalysis filterTags={filterTags} filterEmotions={filterEmotions} />
+                <TimeAnalysis filterTags={filterTags} filterEmotions={filterEmotions} locked={access !== 'full'} />
               </TabsContent>
 
               <TabsContent value="trend" className="mt-6">
-              <MonthlyBreakdown filterTags={filterTags} filterEmotions={filterEmotions} />
+              <MonthlyBreakdown filterTags={filterTags} filterEmotions={filterEmotions} locked={access !== 'full'} />
               </TabsContent>
             </Tabs>
+            {access !== 'full' && (
+              <div className="pointer-events-auto absolute inset-0 bg-black/50 z-20 flex items-center justify-center">
+                <FreemiumCard onClose={() => { /* remain on page */ }} featureLabel="詳細分析" />
+              </div>
+            )}
           </section>
 
           {/* Filter Dialog */}

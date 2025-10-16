@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Clock } from "lucide-react";
 import { formatHoldTime } from "@/utils/ui/timeUtils";
 
-export function TimeAnalysis({ filterTags = [], filterEmotions = [] }: { filterTags?: string[]; filterEmotions?: string[] }) {
+export function TimeAnalysis({ filterTags = [], filterEmotions = [], locked = false }: { filterTags?: string[]; filterEmotions?: string[]; locked?: boolean }) {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
     const [timeData, setTimeData] = useState<any[]>([]);
@@ -36,6 +36,27 @@ export function TimeAnalysis({ filterTags = [], filterEmotions = [] }: { filterT
     useEffect(() => {
       if (!user) {
         return;
+      }
+      // If locked (freemium), show default zeros and skip fetching
+      if (locked) {
+        const timeSlots = Array.from({ length: 24 }, (_, h) => ({
+          time: `${String(h).padStart(2, '0')}:00-${String((h + 1) % 24).padStart(2, '0')}:00`,
+          wins: 0,
+          losses: 0,
+          avgPips: 0,
+          performance: 'neutral',
+          totalProfit: 0,
+          avgWinProfit: 0,
+          avgLossLoss: 0,
+          avgWinPips: 0,
+          avgLossPips: 0,
+          avgWinHoldingTime: 0,
+          avgLossHoldingTime: 0,
+        }))
+        setTimeData(timeSlots)
+        setLoading(false)
+        setError("")
+        return
       }
       
       setLoading(true);
@@ -242,7 +263,7 @@ export function TimeAnalysis({ filterTags = [], filterEmotions = [] }: { filterT
           setTimeData(processedData);
           setLoading(false);
         });
-    }, [user, selectedYear, selectedMonth, filterTags, filterEmotions]);
+    }, [user, selectedYear, selectedMonth, filterTags, filterEmotions, locked]);
   
     if (loading) {
       return (

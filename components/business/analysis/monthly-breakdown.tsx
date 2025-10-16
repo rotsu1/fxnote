@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Calendar } from "lucide-react";
 import { formatHoldTime } from "@/utils/ui/timeUtils";
 
-export function MonthlyBreakdown({ filterTags = [], filterEmotions = [] }: { filterTags?: string[]; filterEmotions?: string[] }) {
+export function MonthlyBreakdown({ filterTags = [], filterEmotions = [], locked = false }: { filterTags?: string[]; filterEmotions?: string[]; locked?: boolean }) {
     const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
     const [monthlyData, setMonthlyData] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
@@ -18,6 +18,28 @@ export function MonthlyBreakdown({ filterTags = [], filterEmotions = [] }: { fil
   
     useEffect(() => {
       if (!user) return;
+      // If locked (freemium), set default zeros and skip fetching
+      if (locked) {
+        const months = [
+          "1月", "2月", "3月", "4月", "5月", "6月",
+          "7月", "8月", "9月", "10月", "11月", "12月"
+        ];
+        setMonthlyData(months.map((month) => ({
+          month,
+          trades: 0,
+          winRate: 0,
+          profit: 0,
+          avgWinProfit: 0,
+          avgLossLoss: 0,
+          avgWinPips: 0,
+          avgLossPips: 0,
+          avgWinHoldingTime: 0,
+          avgLossHoldingTime: 0,
+        })))
+        setLoading(false)
+        setError("")
+        return
+      }
       
       setLoading(true);
       setError("");
@@ -149,7 +171,7 @@ export function MonthlyBreakdown({ filterTags = [], filterEmotions = [] }: { fil
           }
           setLoading(false);
         });
-    }, [user, selectedYear, filterTags, filterEmotions]);
+    }, [user, selectedYear, filterTags, filterEmotions, locked]);
   
     const processMonthlyData = (performanceData: any[]) => {
       const months = [
