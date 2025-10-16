@@ -181,8 +181,10 @@ export default function Analysis() {
               </TabsContent>
             </Tabs>
             {access !== 'full' && (
-              <div className="pointer-events-auto absolute inset-0 bg-black/50 z-20 flex items-center justify-center">
-                <FreemiumCard onClose={() => { /* remain on page */ }} featureLabel="詳細分析" />
+              <div className="pointer-events-auto absolute inset-0 bg-black/50 z-20 flex items-start justify-center">
+                <div className="w-full flex justify-center pt-6 md:pt-10">
+                  <FreemiumCard onClose={() => { /* remain on page */ }} featureLabel="詳細分析" />
+                </div>
               </div>
             )}
           </section>
