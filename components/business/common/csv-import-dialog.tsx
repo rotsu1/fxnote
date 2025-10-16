@@ -5,50 +5,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabaseClient";
+import { FreemiumDialog } from "@/components/business/common/freemium-dialog"
 
 export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; onClose: () => void; user: any }) {
-    const [access, setAccess] = useState<'none' | 'limited' | 'full' | null>(null)
-    const [checkoutLoading, setCheckoutLoading] = useState(false)
-    useEffect(() => {
-      if (!isOpen) return
-      // Try sessionStorage first for snappy UX
-      try {
-        const a = sessionStorage.getItem('fxnote.access') as 'none' | 'limited' | 'full' | null
-        if (a) setAccess(a)
-      } catch {}
-      // Also refresh from server in the background
-      ;(async () => {
-        try {
-          const { data: s } = await supabase.auth.getSession()
-          const token = s.session?.access_token
-          if (!token) return
-          const res = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
-          const json = await res.json() as { access: 'none' | 'limited' | 'full'; reason: string }
-          try {
-            sessionStorage.setItem('fxnote.access', json.access)
-            sessionStorage.setItem('fxnote.subReason', json.reason)
-          } catch {}
-          setAccess(json.access)
-        } catch {}
-      })()
-    }, [isOpen])
-
-    const goCheckout = async () => {
-      setCheckoutLoading(true)
+  const [access, setAccess] = useState<'none' | 'limited' | 'full' | null>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    // Try sessionStorage first for snappy UX
+    try {
+      const a = sessionStorage.getItem('fxnote.access') as 'none' | 'limited' | 'full' | null
+      if (a) setAccess(a)
+    } catch {}
+    // Also refresh from server in the background
+    ;(async () => {
       try {
         const { data: s } = await supabase.auth.getSession()
         const token = s.session?.access_token
         if (!token) return
-        const res = await fetch('/api/stripe/checkout', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-        const json = await res.json()
-        if (json.url) {
-          window.location.href = json.url
-        }
+        const res = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const json = await res.json() as { access: 'none' | 'limited' | 'full'; reason: string }
+        try {
+          sessionStorage.setItem('fxnote.access', json.access)
+          sessionStorage.setItem('fxnote.subReason', json.reason)
+        } catch {}
+        setAccess(json.access)
       } catch {}
-      finally {
-        setCheckoutLoading(false)
-      }
-    }
+    })()
+  }, [isOpen])
     // Lightweight text sanitizer for free-text fields heading to DB (CSV formula guard)
     const sanitizeText = (value: string): string => {
       let v = String(value ?? '')
@@ -236,32 +219,16 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
         setImportError("このブローカーのインポート機能はまだ実装されていません。");
       }
     };
-  
+
+    // Freemium: show upgrade dialog for non-subscribers
+    if (access !== 'full') {
+      return <FreemiumDialog open={isOpen} onClose={onClose} featureLabel="CSVインポート" />
+    }
+
     return (
       <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent>
-          {access !== 'full' ? (
-            <>
-              <DialogHeader>
-                <DialogTitle>CSVインポートは有料機能です</DialogTitle>
-                <DialogDescription>
-                  この機能はご購読者さま限定です。ご利用にはプランのご購読が必要です。
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  サブスクに加入すると、CSVからの一括インポートがご利用いただけます。
-                </p>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={onClose}>あとで</Button>
-                  <Button onClick={goCheckout} disabled={checkoutLoading}>
-                    {checkoutLoading ? 'リダイレクト中...' : 'プランに加入する'}
-                  </Button>
-                </div>
-              </div>
-            </>
-          ) : (
             <>
               <DialogHeader>
                 <DialogTitle>CSV インポート</DialogTitle>
@@ -335,7 +302,6 @@ export function CSVImportDialog({ isOpen, onClose, user }: { isOpen: boolean; on
               </Button>
           </div>
             </>
-          )}
         </DialogContent>
       </Dialog>
   

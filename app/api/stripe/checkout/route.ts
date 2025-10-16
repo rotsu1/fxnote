@@ -97,7 +97,7 @@ export async function POST(req: NextRequest): Promise<NextResponse<CheckoutRespo
       },
       allow_promotion_codes: false,
       success_url: `${origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/subscription`,
+      cancel_url: `${origin}/dashboard/settings`,
     })
 
     console.log('[checkout] Created session', session.id)

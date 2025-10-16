@@ -19,9 +19,12 @@ import { supabase } from "@/lib/supabaseClient";
 import { useAuth } from "@/hooks/useAuth";
 import { MemoCard } from "@/components/business/memo/memo-card";
 import { MemoEditDialog } from "@/components/business/memo/memo-edit-dialog";
+import { FreemiumCard } from "@/components/business/common/freemium-dialog";
+import { useRouter } from "next/navigation";
 
 export default function Memo() {
   const user = useAuth();
+  const router = useRouter();
   const [memos, setMemos] = useState<any[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState<string>("updated_at_desc");
@@ -30,6 +33,29 @@ export default function Memo() {
   const [originalFormData, setOriginalFormData] = useState<any>(null);
   const [showExitWarning, setShowExitWarning] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+  const [access, setAccess] = useState<'none' | 'limited' | 'full' | null>(null);
+
+  useEffect(() => {
+    // Read cached access and refresh in background
+    try {
+      const a = sessionStorage.getItem('fxnote.access') as 'none' | 'limited' | 'full' | null
+      if (a) setAccess(a)
+    } catch {}
+    ;(async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession()
+        const token = s.session?.access_token
+        if (!token) return
+        const res = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+        const json = await res.json() as { access: 'none' | 'limited' | 'full'; reason: string }
+        try {
+          sessionStorage.setItem('fxnote.access', json.access)
+          sessionStorage.setItem('fxnote.subReason', json.reason)
+        } catch {}
+        setAccess(json.access)
+      } catch {}
+    })()
+  }, [])
 
   useEffect(() => {
     if (!user) return;
@@ -327,5 +353,10 @@ export default function Memo() {
         />
       </SidebarInset>
     </SidebarProvider>
+    {access !== 'full' && (
+      <div className="pointer-events-auto fixed inset-0 md:left-[16rem] bg-black/50 z-50 flex items-center justify-center">
+        <FreemiumCard onClose={() => router.replace('/dashboard/overview')} featureLabel="メモ" />
+      </div>
+    )}
   );
 }
