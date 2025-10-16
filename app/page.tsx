@@ -122,9 +122,6 @@ export default function Component() {
           >
             お問い合わせ
           </button>
-          <Link href="/blog" className="text-sm font-medium hover:underline underline-offset-4">
-            ブログ
-          </Link>
           <Link href="/auth/login" className="text-sm font-medium hover:underline underline-offset-4">
             ログイン / 新規登録
           </Link>
