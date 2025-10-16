@@ -251,6 +251,7 @@ export default function Memo() {
   };
 
   return (
+    <>
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
@@ -358,5 +359,6 @@ export default function Memo() {
         <FreemiumCard onClose={() => router.replace('/dashboard/overview')} featureLabel="メモ" />
       </div>
     )}
+    </>
   );
 }
