@@ -3,20 +3,44 @@ import { supabase } from "@/lib/supabaseClient";
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { FreemiumCard } from "@/components/business/common/freemium-dialog";
 
 export function RecentActivity() {
     const [recentTrades, setRecentTrades] = useState<any[]>([]);
     const [recentNotes, setRecentNotes] = useState<any[]>([]);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>("");
+    const [access, setAccess] = useState<'none' | 'limited' | 'full' | null>(null);
     const user = useAuth();
   
+    // Determine access level to gate recent memos
+    useEffect(() => {
+      try {
+        const a = sessionStorage.getItem('fxnote.access') as 'none' | 'limited' | 'full' | null
+        if (a) setAccess(a)
+      } catch {}
+      ;(async () => {
+        try {
+          const { data: s } = await supabase.auth.getSession()
+          const token = s.session?.access_token
+          if (!token) return
+          const res = await fetch('/api/me/subscription-status', { headers: { Authorization: `Bearer ${token}` }, cache: 'no-store' })
+          const json = await res.json() as { access: 'none' | 'limited' | 'full'; reason: string }
+          try {
+            sessionStorage.setItem('fxnote.access', json.access)
+            sessionStorage.setItem('fxnote.subReason', json.reason)
+          } catch {}
+          setAccess(json.access)
+        } catch {}
+      })()
+    }, [])
+
+    // Load recent trades (always) and recent notes (only for subscribed)
     useEffect(() => {
       if (!user) return;
-      
       setLoading(true);
       setError("");
-      
+
       // Fetch recent trades with symbol name from symbols table
       supabase
         .from("trades")
@@ -35,25 +59,33 @@ export function RecentActivity() {
           } else {
             setRecentTrades(tradesData || []);
           }
+        }).then(() => {
+          // If memos are gated (not fetched), end loading after trades finish
+          if (access !== 'full') setLoading(false)
         });
-  
-      // Fetch recent notes
-      supabase
-        .from("notes")
-        .select("*")
-        .eq("user_id", user.id)
-        .order("note_date", { ascending: false })
-        .limit(3)
-        .then(({ data: notesData, error: notesError }) => {
-          if (notesError) {
-            setError(notesError.message);
-            setRecentNotes([]);
-          } else {
-            setRecentNotes(notesData || []);
-          }
-          setLoading(false);
-        });
-    }, [user]);
+
+      // Conditionally fetch recent notes based on access
+      if (access === 'full') {
+        supabase
+          .from("notes")
+          .select("*")
+          .eq("user_id", user.id)
+          .order("note_date", { ascending: false })
+          .limit(3)
+          .then(({ data: notesData, error: notesError }) => {
+            if (notesError) {
+              setError(notesError.message);
+              setRecentNotes([]);
+            } else {
+              setRecentNotes(notesData || []);
+            }
+            setLoading(false);
+          });
+      } else {
+        // Not subscribed: do not load memos
+        setRecentNotes([]);
+      }
+    }, [user, access]);
   
     const formatDate = (dateString: string) => {
       return new Date(dateString).toLocaleDateString('ja-JP', {
@@ -184,29 +216,36 @@ export function RecentActivity() {
           </CardContent>
         </Card>
   
-        <Card>
-          <CardHeader>
-            <CardTitle>最近のメモ</CardTitle>
-            <CardDescription>最新{recentNotes.length}件のメモ</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {recentNotes.length === 0 ? (
-                <div className="text-center text-muted-foreground py-8">
-                  メモデータがありません
-                </div>
-              ) : (
-                recentNotes.map((note, index) => (
-                  <div key={note.id || index} className="border-b pb-3 last:border-b-0">
-                    <div className="font-medium text-sm">{note.title}</div>
-                    <div className="text-xs text-muted-foreground mt-1">{formatDate(note.note_date)}</div>
-                    <div className="text-sm text-muted-foreground mt-1">{truncateContent(note.content)}</div>
+        <div className="relative">
+          <Card>
+            <CardHeader>
+              <CardTitle>最近のメモ</CardTitle>
+              <CardDescription>最新{recentNotes.length}件のメモ</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {recentNotes.length === 0 ? (
+                  <div className="text-center text-muted-foreground py-8">
+                    メモデータがありません
                   </div>
-                ))
-              )}
+                ) : (
+                  recentNotes.map((note, index) => (
+                    <div key={note.id || index} className="border-b pb-3 last:border-b-0">
+                      <div className="font-medium text-sm">{note.title}</div>
+                      <div className="text-xs text-muted-foreground mt-1">{formatDate(note.note_date)}</div>
+                      <div className="text-sm text-muted-foreground mt-1">{truncateContent(note.content)}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+          {access !== 'full' && (
+            <div className="pointer-events-auto absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
+              <FreemiumCard onClose={() => { /* remain on overview */ }} featureLabel="メモ" />
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
     )
   }
